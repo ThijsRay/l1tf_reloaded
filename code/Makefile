@@ -1,10 +1,24 @@
-CFLAGS += -Wall -Wextra -Iinclude
+INC_DIR = include
+SRC_DIR = src
+OBJ_DIR = obj
+BIN_DIR = bin
 
-MDS_SOURCES = src/flush_and_reload.c src/mds.c
+CFLAGS += -Wall -Wextra -I$(INC_DIR)
 
-mds: $(MDS_SOURCES)
-	$(CC) $(MDS_SOURCES) -o $@
+SRC_FILES = $(wildcard src/*.c)
+OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
+
+$(BIN_DIR)/mds: $(OBJ_FILES)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) $^ -o $@
 
 .PHONY: clean
 clean:
-	rm -rf mds
+	rm -rf obj bin
+	rm -f mds
+
+print-%: ; @echo $*=$($*)
