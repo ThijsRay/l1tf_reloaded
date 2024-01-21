@@ -3,18 +3,20 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 
-CFLAGS += -Wall -Wextra -I$(INC_DIR)
+CFLAGS += -Wall -Wextra -I$(INC_DIR) -ftrapv
+LDFLAGS += -lm
 
 SRC_FILES = $(wildcard src/*.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
+INC_FILES = $(wildcard include/*.h)
 
-$(BIN_DIR)/mds: $(OBJ_FILES)
+$(BIN_DIR)/mds: $(OBJ_FILES) $(INC_FILES)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(filter %.o,$^) -o $@ $(LDFLAGS)
 
-$(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES)
 	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) $^ -o $@
+	$(CC) -c $(CFLAGS) $(filter %.c,$^) -o $@
 
 .PHONY: clean
 clean:

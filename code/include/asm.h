@@ -17,3 +17,7 @@ static inline __attribute__((always_inline)) void lfence() {
 static inline __attribute__((always_inline)) void mfence() {
 	asm volatile ("mfence\n");
 }
+
+static inline __attribute__((always_inline)) void maccess(void *ptr) {
+    asm volatile("movq (%0), %%rax\n" : : "r"(ptr) : "rax");
+}
