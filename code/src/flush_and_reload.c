@@ -1,34 +1,35 @@
 #include <stdint.h>
+#include <sched.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "asm.h"
 #include "flush_and_reload.h"
 #include "statistics.h"
 
 size_t measure_in_cache_threshold_time(void *ptr) {
-  size_t nr_of_measurements = 1000000;
+  size_t n = 100000;
 
-  size_t* in_cache_times = malloc(sizeof(size_t) * nr_of_measurements);
-  size_t* not_in_cache_times = malloc(sizeof(size_t) * nr_of_measurements);
-
+  size_t* in_cache_times = malloc(sizeof(size_t) * n);
   assert(in_cache_times);
-  assert(not_in_cache_times);
 
-  for (size_t i = 0; i < nr_of_measurements; ++i) {
-    // Not in cache
-    clflush(ptr);
-    not_in_cache_times[i] = access_time(ptr);
+  size_t in_cache_variance = 0;
+  do {
+    flush(n, sizeof(size_t), (uint8_t*)in_cache_times);
+    for (size_t i = 0; i < n; ++i) {
+      // In cache
+      maccess(ptr);
+      in_cache_times[i] = access_time(ptr);
+    }
+   
+    in_cache_variance = variance(n, in_cache_times);
+    printf("Variance: %ld\n", in_cache_variance);
+    sched_yield();
+  } while (in_cache_variance > 200);
 
-    // In cache
-    maccess(ptr);
-    in_cache_times[i] = access_time(ptr);
-  }
-
-  const size_t threshold = threshold_deviate_from_median(nr_of_measurements, in_cache_times, 0.05);
-
+  const size_t threshold = mean(n, in_cache_times);
   free(in_cache_times);
-  free(not_in_cache_times);
 
   return threshold;
 }

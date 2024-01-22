@@ -4,17 +4,17 @@ OBJ_DIR = obj
 BIN_DIR = bin
 
 CFLAGS += -Wall -Wextra -I$(INC_DIR) -ftrapv
-LDFLAGS += -lm
+LDFLAGS += -lm -no-pie
 
 SRC_FILES = $(wildcard src/*.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
 INC_FILES = $(wildcard include/*.h)
 
-$(BIN_DIR)/mds: $(OBJ_FILES) $(INC_FILES)
+$(BIN_DIR)/mds: $(OBJ_DIR)/find_threshold.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/mds.o
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(filter %.o,$^) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES)
+$(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) $(filter %.c,$^) -o $@
 

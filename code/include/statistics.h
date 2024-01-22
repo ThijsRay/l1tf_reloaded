@@ -47,6 +47,19 @@ int compares_size_ts(const void *a, const void *b) {
   return (*sa > *sb) - (*sa < *sb);
 }
 
+size_t median(const size_t n, size_t samples[n]) {
+  assert(samples != NULL);
+  assert(n > 0);
+  qsort((void*)samples, n, sizeof(size_t), compares_size_ts);
+  return samples[n/2];
+}
+
+void sort(const size_t n, size_t samples[n]) {
+  assert(samples != NULL);
+  assert(n > 0);
+  qsort((void*)samples, n, sizeof(size_t), compares_size_ts);
+}
+
 // Given two equally sized lists of numbers containing
 // numbers of an unknown distribution, e.g.
 // A = [2,3,5,6,7,7,10,13,17] and
@@ -66,7 +79,10 @@ size_t threshold_with_least_error(const size_t n, const size_t low[n], const siz
   qsort((void*)low, n, sizeof(size_t), compares_size_ts);
   qsort((void*)high, n, sizeof(size_t), compares_size_ts);
 
-  for (size_t i = 0; i < n; ++i) {
+  // Ignore the 35% that is closest
+  size_t start = (n / 100) * 35;
+
+  for (size_t i = start; i < n; ++i) {
     const size_t l = low[n-1-i];
     const size_t h = high[i];
 
