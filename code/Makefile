@@ -10,6 +10,10 @@ SRC_FILES = $(wildcard src/*.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
 INC_FILES = $(wildcard include/*.h)
 
+$(BIN_DIR)/rsb: $(OBJ_DIR)/find_threshold.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/rsb.o $(SRC_DIR)/ret2spec.S
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 $(BIN_DIR)/mds: $(OBJ_DIR)/find_threshold.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/mds.o
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)

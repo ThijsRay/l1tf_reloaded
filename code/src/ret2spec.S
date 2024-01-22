@@ -53,9 +53,8 @@ ret2spec:
   // are never executed (except speculatively)
   call recursive_mispredict
 
-  // The instruction that causes a segmentation fault. It should
-  // never actually execute this, because the call to recursive_mispredict
-  // will modify it's return pointer to ret2spec_end
+  // It should never actually execute this, because the call to
+  // recursive_mispredict will modify it's return pointer to ret2spec_end
   movb (%rdi), %al
 
   // These two instructions are never actually executed, but are speculatively
