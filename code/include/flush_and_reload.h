@@ -41,7 +41,9 @@ static inline __attribute__((always_inline)) void reload(const size_t nr_values,
             size_t results[nr_values],
             const size_t threshold) {
   for (size_t i = 0; i < nr_values; i++) {
-    size_t time = access_time((void*)&buffer[i * stride]); 
+    size_t k = ((i * 167) + 13) & 0xff;
+    // TODO: randomize pattern
+    size_t time = access_time((void*)&buffer[k * stride]); 
     if (time < threshold) {
       results[i] += 1;
     }

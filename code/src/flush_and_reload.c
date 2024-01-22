@@ -7,7 +7,7 @@
 #include "statistics.h"
 
 size_t measure_in_cache_threshold_time(void *ptr) {
-  size_t nr_of_measurements = 100000;
+  size_t nr_of_measurements = 1000000;
 
   size_t* in_cache_times = malloc(sizeof(size_t) * nr_of_measurements);
   size_t* not_in_cache_times = malloc(sizeof(size_t) * nr_of_measurements);
@@ -25,7 +25,7 @@ size_t measure_in_cache_threshold_time(void *ptr) {
     in_cache_times[i] = access_time(ptr);
   }
 
-  const size_t threshold = threshold_with_least_error(nr_of_measurements, in_cache_times, not_in_cache_times);
+  const size_t threshold = threshold_deviate_from_median(nr_of_measurements, in_cache_times, 0.05);
 
   free(in_cache_times);
   free(not_in_cache_times);

