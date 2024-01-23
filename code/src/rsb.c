@@ -17,7 +17,7 @@
 // This can then be measured using FLASH+RELOAD.
 int main() {
   // const int threshold = find_in_cache_threshold();
-  const int threshold = 200;
+  const int threshold = 150;
   assert(threshold > 0);
 
   const size_t secret = 0xe9;
@@ -31,7 +31,7 @@ int main() {
 
   for (int i = 0; i < 1000; ++i) {
     flush(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer);
-    uint64_t x = ret2spec((void*)&secret, reload_buffer, RSB_ENTRIES);
+    uint64_t x = ret2spec((void*)&secret, reload_buffer); 
     reload(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer, results, threshold);
 
     assert(x == 0);

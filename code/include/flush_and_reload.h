@@ -46,7 +46,7 @@ static inline __attribute__((always_inline)) void reload(const size_t nr_values,
             const uint8_t buffer[nr_values * stride],
             size_t results[nr_values],
             const size_t threshold) {
-  for (size_t i = 0; i < nr_values; i++) {
+  for (size_t i = 0; i < nr_values; ++i) {
     size_t time = access_time((void*)&buffer[i * stride]); 
     if (time < threshold) {
       results[i] += 1;
