@@ -1,7 +1,10 @@
+#define _GNU_SOURCE
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <sched.h>
+#include <unistd.h>
 
 #include "find_threshold.h"
 #include "flush_and_reload.h"
