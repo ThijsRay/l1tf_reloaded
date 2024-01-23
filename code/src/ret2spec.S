@@ -34,6 +34,7 @@ ret2spec:
   // executed. They have a side effect on the cache
   shl $0xc, %eax
   prefetcht0 (%rsi, %rax)
+  mfence
 
 loop:
   pause
