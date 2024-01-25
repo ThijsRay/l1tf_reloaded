@@ -3,7 +3,7 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 
-CFLAGS += -Wall -Wextra -I$(INC_DIR) -ftrapv
+CFLAGS += -Wall -Wextra -I$(INC_DIR) -ftrapv -z noexecstack
 LDFLAGS += -lm -no-pie
 
 SRC_FILES = $(wildcard src/*.c)
