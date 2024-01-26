@@ -81,7 +81,7 @@ int main() {
   // printf("buffers.leak is at %p\n", buffers.leak);
   // printf("sudo ./pagemap %d %p %p\n", getpid(), (char*)buffers.leak - 1*PAGE_SIZE, (char*)buffers.leak + 1*PAGE_SIZE);
 
-  for (int i = 0; i < 10000; ++i) {
+  for (int i = 0; i < 100000; ++i) {
     flush(VALUES_IN_BYTE, PAGE_SIZE, buffers.reload);
     ret2spec(buffers.microarch_page, buffers.reload);
     reload(VALUES_IN_BYTE, PAGE_SIZE, buffers.reload, results, threshold);
