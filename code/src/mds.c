@@ -1,3 +1,4 @@
+#include "asm.h"
 #define _GNU_SOURCE
 #include <assert.h>
 #include <stdbool.h>
@@ -29,26 +30,26 @@ struct buffers {
 struct buffers create_buffers() {
   struct buffers buffers = {0};
 
-  const int memfd = memfd_create("shared page", 0);
-  assert(memfd != -1);
-  ftruncate(memfd, PAGE_SIZE);
+ // const int memfd = memfd_create("shared page", 0);
+ // assert(memfd != -1);
+ // ftruncate(memfd, PAGE_SIZE);
+	//
+ // void** const same_page_buffers[2] = {&buffers.arch_page, &buffers.microarch_page};
+ // for (int i = 0; i < 2; ++i) {
+ //   *same_page_buffers[i] = mmap(NULL,
+ //                                PAGE_SIZE,
+ //                                PROT_READ | PROT_WRITE,
+ //                                MAP_SHARED | MAP_POPULATE,
+ //                                memfd,
+ //                                0);
+ //   assert(*same_page_buffers[i] != MAP_FAILED);
+ // }
 
-  void** const same_page_buffers[2] = {&buffers.arch_page, &buffers.microarch_page};
-  for (int i = 0; i < 2; ++i) {
-    *same_page_buffers[i] = mmap(NULL,
-                                 PAGE_SIZE,
-                                 PROT_READ | PROT_WRITE,
-                                 MAP_SHARED | MAP_POPULATE,
-                                 memfd,
-                                 0);
-    assert(*same_page_buffers[i] != MAP_FAILED);
-  }
-
-  // Test if they are mapped to the same page
-  assert(*(char*)buffers.microarch_page == (char)0);
-  *(char*)buffers.arch_page = 0xAA;
-  assert(*(char*)buffers.microarch_page == (char)0xAA);
-  *(char*)buffers.arch_page = 0;
+ // // Test if they are mapped to the same page
+ // assert(*(char*)buffers.microarch_page == (char)0);
+ // *(char*)buffers.arch_page = 0xAA;
+ // assert(*(char*)buffers.microarch_page == (char)0xAA);
+ // *(char*)buffers.arch_page = 0;
 
   // The reload buffer that will be used for FLUSH+RELOAD
   buffers.reload = mmap(NULL,
@@ -73,24 +74,32 @@ int main() {
   assert(threshold > 0);
 
   // Modifies the access bit of the two pages
-  assert(!ptedit_init());
-  ptedit_pte_set_bit(buffers.arch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
-  ptedit_pte_clear_bit(buffers.microarch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
+  // assert(!ptedit_init());
+
+  // printf("PFNs of the two pages: %lx and %lx\n",
+  //   ptedit_pte_get_pfn(buffers.arch_page, 0),
+  //   ptedit_pte_get_pfn(buffers.microarch_page, 0));
+
+  // ptedit_pte_set_bit(buffers.arch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
+  // ptedit_pte_clear_bit(buffers.microarch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
+  // ptedit_invalidate_tlb(buffers.arch_page);
+  // ptedit_invalidate_tlb(buffers.microarch_page);
 
   // *(char*)buffers.leak = 0xAA;
   // printf("buffers.leak is at %p\n", buffers.leak);
   // printf("sudo ./pagemap %d %p %p\n", getpid(), (char*)buffers.leak - 1*PAGE_SIZE, (char*)buffers.leak + 1*PAGE_SIZE);
 
-  for (int i = 0; i < 100000; ++i) {
+  // clflush(buffers.arch_page);
+  for (int i = 0; i < 10000; ++i) {
     flush(VALUES_IN_BYTE, PAGE_SIZE, buffers.reload);
-    ret2spec(buffers.microarch_page, buffers.reload);
+    ret2spec(NULL, buffers.reload);
     reload(VALUES_IN_BYTE, PAGE_SIZE, buffers.reload, results, threshold);
   }
 
-  bool arch_access = ptedit_pte_get_bit(buffers.arch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
-  bool microarch_access = ptedit_pte_get_bit(buffers.microarch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
-  printf("Arch access: %d\tMicroarch access: %d\n", arch_access, microarch_access);
-  ptedit_cleanup();
+  // bool arch_access = ptedit_pte_get_bit(buffers.arch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
+  // bool microarch_access = ptedit_pte_get_bit(buffers.microarch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
+  // printf("Arch access: %d\tMicroarch access: %d\n", arch_access, microarch_access);
+  // ptedit_cleanup();
 
   printf("Results:\n");
   for (size_t i = 0; i < VALUES_IN_BYTE; ++i) {
