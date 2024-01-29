@@ -3,12 +3,16 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 
-CFLAGS += -Wall -Wextra -I$(INC_DIR) -ftrapv -z noexecstack
+CFLAGS += -Wall -Wextra -I$(INC_DIR) -g -ftrapv -z noexecstack
 LDFLAGS += -lm -no-pie
 
 SRC_FILES = $(wildcard src/*.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
 INC_FILES = $(wildcard include/*.h)
+
+$(BIN_DIR)/l1tf: $(OBJ_DIR)/l1tf.o $(OBJ_DIR)/flush_and_reload.o $(SRC_DIR)/ret2spec.S
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(BIN_DIR)/ridl: $(OBJ_DIR)/ridl.o
 	@mkdir -p $(BIN_DIR)

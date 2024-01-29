@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
 #include <assert.h>
 #include <sched.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,9 +14,9 @@ void move_to_cpu(int cpu) {
   assert(!affinity);
 }
 
-void usage(char* program_name) {
-    fprintf(stderr, "Usage: %s [cpu] [secret in hex, max 64 bits]\n", program_name);
-    exit(1);
+void usage(char *program_name) {
+  fprintf(stderr, "Usage: %s [cpu] [secret character in hex]\n", program_name);
+  exit(1);
 }
 
 int main(int argc, char *argv[argc]) {
@@ -26,7 +26,7 @@ int main(int argc, char *argv[argc]) {
   }
 
   // Parsing CPU id
-  char* tailptr = NULL;
+  char *tailptr = NULL;
   int cpu = strtoul(argv[1], &tailptr, 10);
   if (tailptr == argv[1]) {
     usage(argv[0]);
@@ -35,7 +35,7 @@ int main(int argc, char *argv[argc]) {
 
   // Parsing secret
   tailptr = NULL;
-  uint64_t secret = strtoull(argv[2], &tailptr, 16);
+  uint8_t secret = strtoul(argv[2], &tailptr, 16) & 0xff;
   if (tailptr == argv[2]) {
     usage(argv[0]);
   }
@@ -44,11 +44,11 @@ int main(int argc, char *argv[argc]) {
   printf("Setting affinity to be scheduled to CPU core %d\n", cpu);
   move_to_cpu(cpu);
 
-  printf("Writing the secret 0x%lx to RSP\n", secret);
+  char buffer[4096] = {0};
+  char secret_str[8] = "SECRET0\0";
+  secret_str[6] = cpu + 1;
+  printf("Writing the secret 0x%lx to buffer\n", *(uint64_t *)secret_str);
   while (1) {
-			asm volatile(
-				"movq %0, (%%rsp)\n"
-				"mfence\n"
-				::"r"(secret));
-	}
+    memcpy(buffer, secret_str, 8);
+  }
 }
