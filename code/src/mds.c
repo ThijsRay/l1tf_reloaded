@@ -30,34 +30,31 @@ struct buffers {
 struct buffers create_buffers() {
   struct buffers buffers = {0};
 
- // const int memfd = memfd_create("shared page", 0);
- // assert(memfd != -1);
- // ftruncate(memfd, PAGE_SIZE);
-	//
- // void** const same_page_buffers[2] = {&buffers.arch_page, &buffers.microarch_page};
- // for (int i = 0; i < 2; ++i) {
- //   *same_page_buffers[i] = mmap(NULL,
- //                                PAGE_SIZE,
- //                                PROT_READ | PROT_WRITE,
- //                                MAP_SHARED | MAP_POPULATE,
- //                                memfd,
- //                                0);
- //   assert(*same_page_buffers[i] != MAP_FAILED);
- // }
+  // const int memfd = memfd_create("shared page", 0);
+  // assert(memfd != -1);
+  // ftruncate(memfd, PAGE_SIZE);
+  //
+  // void** const same_page_buffers[2] = {&buffers.arch_page,
+  // &buffers.microarch_page}; for (int i = 0; i < 2; ++i) {
+  //   *same_page_buffers[i] = mmap(NULL,
+  //                                PAGE_SIZE,
+  //                                PROT_READ | PROT_WRITE,
+  //                                MAP_SHARED | MAP_POPULATE,
+  //                                memfd,
+  //                                0);
+  //   assert(*same_page_buffers[i] != MAP_FAILED);
+  // }
 
- // // Test if they are mapped to the same page
- // assert(*(char*)buffers.microarch_page == (char)0);
- // *(char*)buffers.arch_page = 0xAA;
- // assert(*(char*)buffers.microarch_page == (char)0xAA);
- // *(char*)buffers.arch_page = 0;
+  // // Test if they are mapped to the same page
+  // assert(*(char*)buffers.microarch_page == (char)0);
+  // *(char*)buffers.arch_page = 0xAA;
+  // assert(*(char*)buffers.microarch_page == (char)0xAA);
+  // *(char*)buffers.arch_page = 0;
 
   // The reload buffer that will be used for FLUSH+RELOAD
-  buffers.reload = mmap(NULL,
-                        PAGE_SIZE * VALUES_IN_BYTE,
-                        PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE,
-                        -1,
-                        0);
+  buffers.reload =
+      mmap(NULL, PAGE_SIZE * VALUES_IN_BYTE, PROT_READ | PROT_WRITE,
+           MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(buffers.reload != MAP_FAILED);
 
   return buffers;
@@ -87,7 +84,8 @@ int main() {
 
   // *(char*)buffers.leak = 0xAA;
   // printf("buffers.leak is at %p\n", buffers.leak);
-  // printf("sudo ./pagemap %d %p %p\n", getpid(), (char*)buffers.leak - 1*PAGE_SIZE, (char*)buffers.leak + 1*PAGE_SIZE);
+  // printf("sudo ./pagemap %d %p %p\n", getpid(), (char*)buffers.leak -
+  // 1*PAGE_SIZE, (char*)buffers.leak + 1*PAGE_SIZE);
 
   // clflush(buffers.arch_page);
   for (int i = 0; i < 10000; ++i) {
@@ -96,10 +94,11 @@ int main() {
     reload(VALUES_IN_BYTE, PAGE_SIZE, buffers.reload, results, threshold);
   }
 
-  // bool arch_access = ptedit_pte_get_bit(buffers.arch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
-  // bool microarch_access = ptedit_pte_get_bit(buffers.microarch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
-  // printf("Arch access: %d\tMicroarch access: %d\n", arch_access, microarch_access);
-  // ptedit_cleanup();
+  // bool arch_access = ptedit_pte_get_bit(buffers.arch_page, 0,
+  // PTEDIT_PAGE_BIT_ACCESSED); bool microarch_access =
+  // ptedit_pte_get_bit(buffers.microarch_page, 0, PTEDIT_PAGE_BIT_ACCESSED);
+  // printf("Arch access: %d\tMicroarch access: %d\n", arch_access,
+  // microarch_access); ptedit_cleanup();
 
   printf("Results:\n");
   for (size_t i = 0; i < VALUES_IN_BYTE; ++i) {

