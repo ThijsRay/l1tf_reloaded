@@ -35,7 +35,7 @@ int main(int argc, char *argv[argc]) {
 
   // Parsing secret
   tailptr = NULL;
-  uint8_t secret = strtoul(argv[2], &tailptr, 16) & 0xff;
+  // uint8_t secret = strtoul(argv[2], &tailptr, 16) & 0xff;
   if (tailptr == argv[2]) {
     usage(argv[0]);
   }
@@ -44,11 +44,11 @@ int main(int argc, char *argv[argc]) {
   printf("Setting affinity to be scheduled to CPU core %d\n", cpu);
   move_to_cpu(cpu);
 
-  char buffer[4096] = {0};
+  volatile char buffer[4096] = {0};
   char secret_str[8] = "SECRET0\0";
-  secret_str[6] = cpu + 1;
+  secret_str[6] = (cpu + 1) * 0x11;
   printf("Writing the secret 0x%lx to buffer\n", *(uint64_t *)secret_str);
   while (1) {
-    memcpy(buffer, secret_str, 8);
+    memcpy((void *)buffer, secret_str, 8);
   }
 }

@@ -30,7 +30,7 @@ int main() {
 
   size_t threshold = 150;
 
-  for (int pfn = 0; pfn < 100000; ++pfn) {
+  for (int pfn = 0; pfn < 0x10000; ++pfn) {
     size_t results[VALUES_IN_BYTE] = {0};
     ptedit_pte_set_pfn(secret, 0, pfn);
 
@@ -41,12 +41,12 @@ int main() {
     }
 
     for (size_t i = 0; i < VALUES_IN_BYTE; ++i) {
-      if (i == 0x1 || i == 0x2 || i == 0x3 || i == 0x4) {
-        if (results[i] > 0) {
-          printf("Results PFN %x:\t", pfn);
-          printf("0x%lx\t%ld\n", i, results[i]);
-        }
+      // if (i == 0x1 || i == 0x2 || i == 0x3 || i == 0x4) {
+      if (results[i] > 0) {
+        printf("Results PFN %x:\t", pfn);
+        printf("0x%lx\t%ld\n", i, results[i]);
       }
+      // }
     }
   }
 
