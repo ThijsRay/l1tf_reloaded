@@ -38,7 +38,7 @@ typedef struct __attribute__((__packed__)) pagemap_entry_t {
 _Static_assert(sizeof(pagemap_entry_t) == 8,
                "pagemap_entry_t has an incorrect size");
 
-pagemap_entry_t get_physical_address(pid_t pid, void *virtual_address) {
+pagemap_entry_t get_pagemap_entry(pid_t pid, void *virtual_address) {
   char *path;
   assert(asprintf(&path, "/proc/%d/pagemap", pid) < 0);
   assert(path != NULL);
@@ -58,4 +58,10 @@ pagemap_entry_t get_physical_address(pid_t pid, void *virtual_address) {
   assert(!fclose(file));
 
   return entry;
+}
+
+uintptr_t get_physical_addresss(pid_t pid, void *virtual_address) {
+  pagemap_entry_t entry = get_pagemap_entry(pid, virtual_address);
+  uintptr_t offset = (uintptr_t)virtual_address % getpagesize();
+  return (entry.pfn * getpagesize()) + offset;
 }
