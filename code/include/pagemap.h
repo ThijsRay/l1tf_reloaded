@@ -40,7 +40,7 @@ _Static_assert(sizeof(pagemap_entry_t) == 8,
 
 pagemap_entry_t get_pagemap_entry(pid_t pid, void *virtual_address) {
   char *path;
-  assert(asprintf(&path, "/proc/%d/pagemap", pid) < 0);
+  assert(asprintf(&path, "/proc/%d/pagemap", pid) > 0);
   assert(path != NULL);
 
   FILE *file = fopen(path, "rb");
@@ -56,6 +56,7 @@ pagemap_entry_t get_pagemap_entry(pid_t pid, void *virtual_address) {
   assert(objects_read == 1);
 
   assert(!fclose(file));
+  free(path);
 
   return entry;
 }
