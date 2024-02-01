@@ -1,4 +1,5 @@
 .global ret2spec
+.global ret2spec_end
 
 .text
 
@@ -26,7 +27,7 @@ ret2spec:
   // This call actually modifies its return pointer to be at
   // ret2spec_end, so the instructions between the call and
   // the ret2spec_end label are never executed (except speculatively)
-  call rsb_mispredict
+  //call rsb_mispredict
   
   // Leak the value at (%rdi)
   movb (%rdi), %al
