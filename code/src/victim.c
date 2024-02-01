@@ -47,16 +47,16 @@ int main(int argc, char *argv[argc]) {
   printf("Setting affinity to be scheduled to CPU core %d\n", cpu);
   move_to_cpu(cpu);
 
-  char *buffer = malloc(getpagesize());
+  char *buffer = aligned_alloc(getpagesize(), getpagesize());
   memset(buffer, 0, getpagesize());
 
   char secret_str[8] = "SECRET0\0";
   secret_str[6] = (cpu + 1) * 0x11;
 
-  uint64_t dst_pfn = get_pagemap_entry(getpid(), buffer).pfn;
-  printf("dest buffer pfn:\t%lx\n", dst_pfn);
-  uint64_t src_pfn = get_pagemap_entry(getpid(), secret_str).pfn;
-  printf("src buffer pfn:\t%lx\n", src_pfn);
+  uintptr_t dst_addr = get_pagemap_entry(getpid(), buffer).pfn;
+  printf("dest buffer pfn:\t0x%lx\n", dst_addr);
+  uintptr_t src_addr = get_pagemap_entry(getpid(), secret_str).pfn;
+  printf("src buffer pfn:\t0x%lx\n", src_addr);
 
   printf("Writing the secret 0x%lx to buffer\n", *(uint64_t *)secret_str);
   while (1) {

