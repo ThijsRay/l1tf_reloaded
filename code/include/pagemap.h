@@ -1,3 +1,5 @@
+#pragma once
+
 #include <assert.h>
 #include <sched.h>
 #include <stdbool.h>
