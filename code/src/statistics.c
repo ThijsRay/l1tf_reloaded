@@ -8,10 +8,10 @@
 size_t maximum(const size_t n, const size_t x[n]) {
   size_t max = 0;
   size_t max_idx = 0;
-  for (size_t i = 0; i < n; ++i) {
-    if (x[i] > max) {
-      max = x[i];
-      max_idx = i;
+  for (size_t i = n; i > 0; --i) {
+    if (x[i - 1] > max) {
+      max = x[i - 1];
+      max_idx = i - 1;
     }
   }
   return max_idx;
