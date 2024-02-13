@@ -43,7 +43,7 @@ int main(int argc, char *argv[argc]) {
   memset(buffer, 0, getpagesize());
 
   char secret_str[64] =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJK\0";
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\0";
 
   uintptr_t dst_addr = get_pagemap_entry(getpid(), buffer).pfn;
   printf("dest buffer pfn:\t0x%lx\n", dst_addr);
@@ -53,5 +53,6 @@ int main(int argc, char *argv[argc]) {
   printf("Accessing the secret at %p (pfn: 0x%lx)\n", buffer, dst_addr);
   while (true) {
     memcpy(buffer, secret_str, 64);
+    asm volatile("verw");
   }
 }
