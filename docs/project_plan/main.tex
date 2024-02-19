@@ -1,6 +1,9 @@
 \documentclass[draft, a4paper, 11pt]{article}
 \usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
 
+\usepackage{biblatex}
+\addbibresource{../zotero.bib}
+
 \usepackage{enumitem,amssymb}
 \newlist{todolist}{itemize}{1}
 \setlist[todolist]{label=$\square$}
@@ -18,15 +21,16 @@
 \section{Goal of the project}
 The goal of the project is to study the feasibility of transient execution attacks in public cloud computing environments.
 To what extent can known hardware vulnerabilities be used by a malicious VM to leak secret data from its hypervisor, or from other VMs running on the same hardware?
-The intent is to keep realistic obstacles in mind, such as currently deployed mitigations, noise, and core co-location.
+The intent is to keep realistic obstacles in mind, such as currently deployed mitigations, difficulty of core co-location, and background noise.
 
 \section{Relevancy}
 While hardware vulnerabilities such as MDS and L1tf have been mitigated in recently released Intel CPUs, it is infeasible for cloud providers to update the hardware of their entire infrastructure whenever a new CPU is released.
 As a consequence, cloud providers still use older CPUs with known vulnerabilities.
 They rely on software mitigations to protect their diverse fleet of servers.
-
-Besides that, public cloud computing environments allow anyone to run their own code while sharing resources with other customers.
-Therefore, it is still relevant to study the feasibility of known vulnerabilities in this context.
+However, mitigations such as disabling SMT can come with a significant performance penalty which makes it expensive to deploy, especially at the scale of a large cloud provider.
+Instead, Google Cloud and Microsoft's Hyper-V add constraints to the scheduler to prevent simultaneous sharing of the same physical core by different VMs~\cite{cooleyHyperVHyperClearMitigation2023, turnerProtectingNewL1TF2018}, keeping SMT enabled.
+It is unclear to what extent it is still feasible to use transient execution attacks to leak sensitive data with these types of mitigations in place.
+Therefore, it is still relevant to study TEAs in this context.
 
 \section{Steps to reach the goal}
 
@@ -42,5 +46,8 @@ Therefore, it is still relevant to study the feasibility of known vulnerabilitie
   \item Investigate commonly deployed mitigations against guest-to-host and guest-to-guest attack scenarios (like Core Scheduling?)
   \item Look at the feasibility of overcoming those mitigations
 \end{todolist}
+
+\printbibliography
+
 
 \end{document}
