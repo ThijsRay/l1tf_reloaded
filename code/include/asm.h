@@ -1,7 +1,6 @@
 #pragma once
 
-#include <inttypes.h>
-
+#include <stdint.h>
 static inline __attribute__((always_inline)) void clflush(void *p) {
   asm volatile("clflush (%0)\n" ::"r"(p));
 }
@@ -22,6 +21,10 @@ static inline __attribute__((always_inline)) void mfence() {
 
 static inline __attribute__((always_inline)) void maccess(void *ptr) {
   asm volatile("movq (%0), %%rax\n" : : "r"(ptr) : "rax");
+}
+
+static inline void cpuid(int code, uint32_t *a, uint32_t *d) {
+  asm volatile("cpuid" : "=a"(*a), "=d"(*d) : "0"(code) : "ebx", "ecx");
 }
 
 static inline __attribute__((always_inline)) void

