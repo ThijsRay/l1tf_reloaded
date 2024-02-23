@@ -1,58 +1,91 @@
-#define _GNU_SOURCE
-#include <assert.h>
-#include <sched.h>
+// Adopted from https://github.com/gregvish/l1tf-poc
+//
+// MIT License
+//
+// Copyright (c) 2018 gregvish
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "pagemap.h"
+#define PAGE_SIZE (0x1000)
 
-void move_to_cpu(int cpu) {
-  cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set);
-  CPU_SET(cpu, &cpu_set);
-  int affinity = sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set);
-  assert(!affinity);
+uint64_t virt_to_phys(volatile void *virtual_address) {
+  int pagemap = 0;
+  uint64_t value = 0;
+  uint64_t page_frame_number = 0;
+
+  pagemap = open("/proc/self/pagemap", O_RDONLY);
+  if (pagemap < 0) {
+    return 0;
+  }
+
+  if (sizeof(uint64_t) !=
+      pread(pagemap, &value, sizeof(uint64_t),
+            (((uint64_t)virtual_address) / PAGE_SIZE) * sizeof(uint64_t))) {
+    return 0;
+  }
+
+  page_frame_number = value & ((1ULL << 54) - 1);
+  if (page_frame_number == 0) {
+    return 0;
+  }
+
+  return page_frame_number * PAGE_SIZE + (uint64_t)virtual_address % PAGE_SIZE;
 }
 
-void usage(char *program_name) {
-  fprintf(stderr, "Usage: %s [cpu]\n", program_name);
-  exit(1);
+volatile uint8_t test[] = {
+    0xde, 0xad, 0xbe, 0xef, 0x67, 0x04, 0x3e, 0x1c, 0x2a, 0x2e, 0x4e,
+    0x86, 0x3d, 0x99, 0x3f, 0xac, 0x1b, 0x8b, 0xce, 0xb6, 0x84, 0xf8,
+    0x2f, 0xf9, 0x95, 0x97, 0x08, 0x63, 0xc1, 0x1d, 0xf3, 0xee, 0xab,
+    0xd7, 0xb3, 0x31, 0x20, 0x36, 0xa6, 0x38, 0xa2, 0x14, 0xb3, 0x2f,
+    0x8b, 0x0f, 0xc7, 0xfe, 0x5c, 0xf8, 0x67, 0xb2, 0x74, 0x69, 0xb1,
+    0x4c, 0x33, 0xae, 0xe8, 0x4d, 0xba, 0xbe, 0xca, 0xfe};
+
+void dump_memory(volatile uint8_t *ptr, uint32_t size) {
+  uint64_t i = 0;
+
+  for (i = 0; i < size; i += 1) {
+    if (i % 0x10 == 0 && i != 0) {
+      printf("\n");
+    }
+    printf("%02x ", ptr[i]);
+  }
+
+  printf("\n");
 }
 
-int main(int argc, char *argv[argc]) {
-  assert(argc > 0);
-  if (argc != 2) {
-    usage(argv[0]);
+int main(void) {
+  char *buffer = aligned_alloc(PAGE_SIZE, sizeof(test));
+  memcpy(buffer, (void *)test, sizeof(test));
+
+  printf("Virt %p, Phys: 0x%lx\nData:\n", buffer, virt_to_phys(buffer));
+  dump_memory((void *)buffer, sizeof(test));
+
+  // Access a byte in test. This will cache 64 bytes (a whole cache line)
+  while (buffer[0]) {
   }
 
-  // Parsing CPU id
-  char *tailptr = NULL;
-  int cpu = strtoul(argv[1], &tailptr, 10);
-  if (tailptr == argv[1]) {
-    usage(argv[0]);
-  }
-  assert(tailptr != argv[1]);
-
-  printf("Setting affinity to be scheduled to CPU core %d\n", cpu);
-  move_to_cpu(cpu);
-
-  char *buffer = aligned_alloc(getpagesize(), getpagesize());
-  memset(buffer, 0, getpagesize());
-
-  char secret_str[64] =
-      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\0";
-
-  uintptr_t dst_addr = get_pagemap_entry(getpid(), buffer).pfn;
-  printf("dest buffer pfn:\t0x%lx\n", dst_addr);
-  uintptr_t src_addr = get_pagemap_entry(getpid(), secret_str).pfn;
-  printf("src buffer pfn:\t0x%lx\n", src_addr);
-
-  printf("Accessing the secret at %p (pfn: 0x%lx)\n", buffer, dst_addr);
-  while (true) {
-    memcpy(buffer, secret_str, 64);
-    asm volatile("verw");
-  }
+  return 0;
 }
