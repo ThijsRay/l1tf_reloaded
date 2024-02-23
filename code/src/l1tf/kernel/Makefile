@@ -1,4 +1,4 @@
-obj-m += kernel_l1tf.o
+obj-m += l1tf.o
 
 PWD := $(CURDIR)
 
