@@ -235,17 +235,14 @@ int main_leak(const int argc, char *argv[argc]) {
 int main_scan(const int argc, char *argv[argc]) {
   uintptr_t start_addr = -1;
   size_t length = -1;
-  char *needle = NULL;
-  size_t needle_size = 0;
 
   static struct option options[] = {
       {"start", required_argument, 0, 's'},
       {"length", required_argument, 0, 'l'},
-      {"needle", required_argument, 0, 'n'},
   };
   while (true) {
     int option_idx = 0;
-    int choice = getopt_long(argc, argv, "s:l:n:", options, &option_idx);
+    int choice = getopt_long(argc, argv, "s:l:", options, &option_idx);
     if (choice == -1) {
       break;
     }
@@ -271,30 +268,22 @@ int main_scan(const int argc, char *argv[argc]) {
         exit(1);
       }
       break;
-    case 'n':
-      // TODO, read needle from stdin
-      needle_size = strnlen(optarg, 255);
-      if (needle_size == 0) {
-        fprintf(stderr, "Needle cannot be empty\n");
-        exit(1);
-      }
-      needle = malloc(needle_size);
-      strncpy(needle, optarg, needle_size);
-      break;
     }
   }
 
+  char needle[128];
+  ssize_t needle_size = read(STDIN_FILENO, needle, 128);
+
   if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 ||
-      needle == NULL) {
-    fprintf(
-        stderr,
-        "Required arguments of scan subcommand\n"
-        "\t-%c, --%s\thexadecimal physcial address where you "
-        "want to start scanning from\n"
-        "\t-%c, --%s\tthe length of the range that you want to scan in bytes\n"
-        "\t-%c, --%s\tthe substring that you are looking for\n",
-        options[0].val, options[0].name, options[1].val, options[1].name,
-        options[2].val, options[2].name);
+      needle_size <= 0) {
+    fprintf(stderr,
+            "Required arguments of scan subcommand\n"
+            "\t-%c, --%s\thexadecimal physcial address where you "
+            "want to start scanning from\n"
+            "\t-%c, --%s\tthe length of the range that you want to scan in "
+            "bytes\n"
+            "Make sure to pass the needle in via stdin\n",
+            options[0].val, options[0].name, options[1].val, options[1].name);
     exit(1);
   }
 
@@ -306,7 +295,6 @@ int main_scan(const int argc, char *argv[argc]) {
           "string\n\t\"%s\"\n",
           start_addr, end_addr, needle);
   do_scan(start_addr, end_addr, needle_size, needle);
-  free(needle);
   exit(0);
 }
 
