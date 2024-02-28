@@ -3,4 +3,4 @@
 	url = https://github.com/misc0110/PTEditor.git
 [submodule "code/deps/PTEditor"]
 	path = code/deps/PTEditor
-	url = https://github.com/misc0110/PTEditor.git
+	url = https://github.com/ThijsRay/PTEditor.git
