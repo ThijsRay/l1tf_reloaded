@@ -174,6 +174,11 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   ptedit_cleanup();
 }
 
+void *do_scan(uintptr_t start, uintptr_t end, size_t needle_size,
+              char needle[needle_size]) {
+  return NULL;
+}
+
 // If you already know a physical address that you want to leak
 int main_leak(const int argc, char *argv[argc]) {
   // Parse the physcial address and the length from the
@@ -181,12 +186,12 @@ int main_leak(const int argc, char *argv[argc]) {
   uintptr_t phys_addr = -1;
   size_t length = -1;
 
-  while (true) {
-    static struct option options[] = {
-        {"address", required_argument, 0, 'a'},
-        {"length", required_argument, 0, 'l'},
-    };
+  static struct option options[] = {
+      {"address", required_argument, 0, 'a'},
+      {"length", required_argument, 0, 'l'},
+  };
 
+  while (true) {
     int option_idx = 0;
     int choice = getopt_long(argc, argv, "a:l:", options, &option_idx);
     if (choice == -1) {
@@ -214,9 +219,12 @@ int main_leak(const int argc, char *argv[argc]) {
 
   // Make sure that both the phys_addr and length are set
   if (phys_addr == (uintptr_t)-1 || length == (size_t)-1) {
-    fprintf(stderr, "Required arguments of leak subcommand\n"
-                    "\t--address [hexadecimal address]\n"
-                    "\t--length [length]\n");
+    fprintf(stderr,
+            "Required arguments of leak subcommand\n"
+            "\t-%c, --%s\thexadecimal physical address where you "
+            "want to leak from\n"
+            "\t-%c, --%s\tamount of bytes you want to leak\n",
+            options[0].val, options[0].name, options[1].val, options[1].name);
     exit(1);
   }
 
@@ -224,7 +232,83 @@ int main_leak(const int argc, char *argv[argc]) {
   exit(0);
 }
 
-int main_scan(const int argc, char *argv[argc]) { return 0; }
+int main_scan(const int argc, char *argv[argc]) {
+  uintptr_t start_addr = -1;
+  size_t length = -1;
+  char *needle = NULL;
+  size_t needle_size = 0;
+
+  static struct option options[] = {
+      {"start", required_argument, 0, 's'},
+      {"length", required_argument, 0, 'l'},
+      {"needle", required_argument, 0, 'n'},
+  };
+  while (true) {
+    int option_idx = 0;
+    int choice = getopt_long(argc, argv, "s:l:n:", options, &option_idx);
+    if (choice == -1) {
+      break;
+    }
+
+    char *tail = NULL;
+    switch (choice) {
+    case 's':
+      start_addr = strtoull(optarg, &tail, 16);
+      if (tail == optarg) {
+        fprintf(stderr,
+                "Failed to parse physical start address as hexadecimal\n");
+        exit(1);
+      }
+      break;
+    case 'l':
+      length = strtoull(optarg, &tail, 10);
+      if (tail == optarg) {
+        fprintf(stderr, "Failed to parse scanning range length\n");
+        exit(1);
+      }
+      if (length == 0) {
+        fprintf(stderr, "Length cannot be 0\n");
+        exit(1);
+      }
+      break;
+    case 'n':
+      // TODO, read needle from stdin
+      needle_size = strnlen(optarg, 255);
+      if (needle_size == 0) {
+        fprintf(stderr, "Needle cannot be empty\n");
+        exit(1);
+      }
+      needle = malloc(needle_size);
+      strncpy(needle, optarg, needle_size);
+      break;
+    }
+  }
+
+  if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 ||
+      needle == NULL) {
+    fprintf(
+        stderr,
+        "Required arguments of scan subcommand\n"
+        "\t-%c, --%s\thexadecimal physcial address where you "
+        "want to start scanning from\n"
+        "\t-%c, --%s\tthe length of the range that you want to scan in bytes\n"
+        "\t-%c, --%s\tthe substring that you are looking for\n",
+        options[0].val, options[0].name, options[1].val, options[1].name,
+        options[2].val, options[2].name);
+    exit(1);
+  }
+
+  uintptr_t end_addr = start_addr + length;
+  assert(end_addr > start_addr);
+
+  fprintf(stderr,
+          "Starting to scan for matches in the range 0x%lx-0x%lx for the "
+          "string\n\t\"%s\"\n",
+          start_addr, end_addr, needle);
+  do_scan(start_addr, end_addr, needle_size, needle);
+  free(needle);
+  exit(0);
+}
 
 int main(int argc, char *argv[argc]) {
   assert(argc > 0);
