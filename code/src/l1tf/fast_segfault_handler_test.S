@@ -1,10 +1,10 @@
-.global main
+.global _start
 
 .text
 
-main:
-  movq $10000000, %r11
-  movq $0, %rcx
+_start:
+  movq $100000000, %r11
+  movq $0x0, %rcx
 
 loop:
   movl $0xB1ABE849, %r12d
@@ -14,32 +14,22 @@ loop:
   test %r11, %r11
   jz success
 
-  lfence
-  rdtsc
-  lfence
-
-  mov %rax, %r10
-
   // Do the segfault!
   movq (0x4732987432), %rax
 
   // Should not go here, give an error code
-  movq $1, %rax
+  movq $0x1, %rax
   ret
   
 
 handler:
-  lfence
-  rdtsc
-  lfence
-
-  sub %r10, %rax
-  add %rax, %rcx
-
-  dec %r11
+  decq %r11
   jmp loop
 
 success:
-  // TODO print the value
-  movq $69, %rax
-  ret
+  movq $0, %rax
+
+_exit:
+  movq %rax, %rdi
+  movq $60, %rax
+  syscall
