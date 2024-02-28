@@ -4,6 +4,7 @@
 #include "flush_and_reload.h"
 #include "statistics.h"
 #include <bits/types/siginfo_t.h>
+#include <getopt.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -122,16 +123,8 @@ void initialize_pteditor_lib() {
   ptedit_use_implementation(PTEDIT_IMPL_USER);
 }
 
-int main_leak(int argc, char *argv[argc]) {
+void do_leak(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
-
-  char *tail = NULL;
-  uintptr_t phys_addr = strtoull(argv[1], &tail, 16);
-  assert(tail != argv[1]);
-
-  tail = NULL;
-  size_t length = strtoull(argv[2], &tail, 10);
-  assert(tail != argv[2]);
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length,
           (void *)phys_addr);
@@ -181,7 +174,57 @@ int main_leak(int argc, char *argv[argc]) {
   ptedit_cleanup();
 }
 
-int main_scan(int argc, char *argv[argc]) {}
+// If you already know a physical address that you want to leak
+int main_leak(const int argc, char *argv[argc]) {
+  // Parse the physcial address and the length from the
+  // command line arguments
+  uintptr_t phys_addr = -1;
+  size_t length = -1;
+
+  while (true) {
+    static struct option options[] = {
+        {"address", required_argument, 0, 'a'},
+        {"length", required_argument, 0, 'l'},
+    };
+
+    int option_idx = 0;
+    int choice = getopt_long(argc, argv, "a:l:", options, &option_idx);
+    if (choice == -1) {
+      break;
+    }
+
+    char *tail = NULL;
+    switch (choice) {
+    case 'a':
+      phys_addr = strtoull(optarg, &tail, 16);
+      if (tail == optarg) {
+        fprintf(stderr, "Failed to parse physical address as hexadecimal\n");
+        exit(1);
+      }
+      break;
+    case 'l':
+      length = strtoull(optarg, &tail, 10);
+      if (tail == optarg) {
+        fprintf(stderr, "Failed to parse length\n");
+        exit(1);
+      }
+      break;
+    }
+  }
+
+  // Make sure that both the phys_addr and length are set
+  if (phys_addr == (uintptr_t)-1 || length == (size_t)-1) {
+    fprintf(stderr, "Required arguments of leak subcommand\n"
+                    "\t--address [hexadecimal address]\n"
+                    "\t--length [length]\n");
+    exit(1);
+  }
+
+  do_leak(phys_addr, length);
+  exit(0);
+}
+
+int main_scan(const int argc, char *argv[argc]) { return 0; }
 
 int main(int argc, char *argv[argc]) {
   assert(argc > 0);
@@ -193,6 +236,7 @@ int main(int argc, char *argv[argc]) {
       return main_scan(argc, argv);
     }
   }
+
   fprintf(stderr,
           "Usage\n"
           "\t%s leak\n"
