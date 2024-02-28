@@ -82,12 +82,15 @@ typedef struct {
   size_t *pte_ptr;
 } leak_addr_t;
 
+typedef struct {
+  uintptr_t start;
+  uintptr_t end;
+  size_t stride;
+} scan_opts_t;
+
 leak_addr_t l1tf_leak_buffer_create();
 void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr);
 void l1tf_leak_buffer_free(leak_addr_t *leak);
 
 reload_buffer_t *l1tf_reload_buffer_create();
 void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer);
-
-void *l1tf_scan_physical_memory(uintptr_t start, uintptr_t end, size_t stride,
-                                size_t needle_size, char needle[needle_size]);

