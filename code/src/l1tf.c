@@ -122,21 +122,8 @@ void initialize_pteditor_lib() {
   ptedit_use_implementation(PTEDIT_IMPL_USER);
 }
 
-int main(int argc, char *argv[argc]) {
+int main_leak(int argc, char *argv[argc]) {
   initialize_pteditor_lib();
-
-  // Step 1: Create a variable
-  // Step 2: modify PTE to change make page containing that variable non-present
-  //         and modify the PFN
-  // Step 3: FLUSH reload buffer
-  // Step 4: Speculatively access variable
-  // Step 5: RELOAD reload buffer
-  assert(argc > 0);
-  if (argc != 3) {
-    fprintf(stderr, "Usage: %s [physical address to leak in hex] [length]\n",
-            argv[0]);
-    exit(1);
-  }
 
   char *tail = NULL;
   uintptr_t phys_addr = strtoull(argv[1], &tail, 16);
@@ -192,4 +179,24 @@ int main(int argc, char *argv[argc]) {
 
   assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
   ptedit_cleanup();
+}
+
+int main_scan(int argc, char *argv[argc]) {}
+
+int main(int argc, char *argv[argc]) {
+  assert(argc > 0);
+
+  if (argc >= 2) {
+    if (!strncmp("leak", argv[1], 5)) {
+      return main_leak(argc, argv);
+    } else if (!strncmp("scan", argv[1], 5)) {
+      return main_scan(argc, argv);
+    }
+  }
+  fprintf(stderr,
+          "Usage\n"
+          "\t%s leak\n"
+          "\t%s scan\n",
+          argv[0], argv[0]);
+  exit(1);
 }
