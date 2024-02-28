@@ -6,11 +6,11 @@ main:
   movq $10000000, %r11
   movq $0, %rcx
 
-  movq $0xC7DB70C9B1ABE849, %r12
-  movq $0x47DF1DF4CD7E16F1, %r13
+loop:
+  movl $0xB1ABE849, %r12d
+  movl $0xCD7E16F1, %r13d
   leaq handler(%rip), %r14
 
-loop:
   test %r11, %r11
   jz success
 
