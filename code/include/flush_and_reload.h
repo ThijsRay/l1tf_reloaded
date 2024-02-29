@@ -42,7 +42,13 @@ static inline __attribute__((always_inline)) size_t access_time(void *ptr) {
 }
 
 size_t measure_in_cache_threshold_time(void *ptr);
-void flush(size_t nr_values, size_t stride, uint8_t buffer[nr_values * stride]);
+static inline __attribute__((always_inline)) void
+flush(const size_t nr_values, const size_t stride,
+      uint8_t buffer[nr_values * stride]) {
+  for (size_t n = 0; n < nr_values; ++n) {
+    clflush(&buffer[n * stride]);
+  }
+}
 
 static inline __attribute__((always_inline)) size_t
 reload(const size_t nr_values, const size_t stride,

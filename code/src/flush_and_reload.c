@@ -34,10 +34,3 @@ size_t measure_in_cache_threshold_time(void *ptr) {
 
   return threshold;
 }
-
-void flush(const size_t nr_values, const size_t stride,
-           uint8_t buffer[nr_values * stride]) {
-  for (size_t n = 0; n < nr_values; ++n) {
-    clflush(&buffer[n * stride]);
-  }
-}

