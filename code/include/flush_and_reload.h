@@ -44,14 +44,14 @@ static inline __attribute__((always_inline)) size_t access_time(void *ptr) {
 size_t measure_in_cache_threshold_time(void *ptr);
 void flush(size_t nr_values, size_t stride, uint8_t buffer[nr_values * stride]);
 
-static inline __attribute__((always_inline)) void
+static inline __attribute__((always_inline)) size_t
 reload(const size_t nr_values, const size_t stride,
-       const uint8_t buffer[nr_values * stride], size_t results[nr_values],
-       const size_t threshold) {
+       const uint8_t buffer[nr_values * stride], const size_t threshold) {
   for (size_t i = 0; i < nr_values; ++i) {
     size_t time = access_time((void *)&buffer[i * stride]);
     if (time < threshold) {
-      results[i] += 1;
+      return i;
     }
   }
+  return 0;
 }
