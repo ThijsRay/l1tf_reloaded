@@ -30,6 +30,9 @@ $(BIN_DIR)/mds: $(OBJ_DIR)/find_threshold.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+$(BIN_DIR)/fast_segfault_handler_test: $(SRC_DIR)/fast_segfault_handler_test.S
+	$(CC) -static -z noexecstack -nostdlib $^ -o $@
+
 $(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) $(filter %.c,$^) -o $@
