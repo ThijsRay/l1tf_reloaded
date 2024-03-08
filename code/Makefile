@@ -10,6 +10,8 @@ SRC_FILES = $(wildcard src/*.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
 INC_FILES = $(wildcard include/*.h)
 
+.PHONY: l1tf
+l1tf: $(BIN_DIR)/l1tf
 $(BIN_DIR)/l1tf: $(OBJ_DIR)/l1tf.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/statistics.o $(SRC_DIR)/ret2spec.S
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
@@ -19,6 +21,12 @@ $(BIN_DIR)/ridl: $(OBJ_DIR)/ridl.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(BIN_DIR)/victim: $(OBJ_DIR)/victim.o
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+.PHONY: quick_ssh
+quick_ssh: $(BIN_DIR)/quick_ssh
+$(BIN_DIR)/quick_ssh: $(OBJ_DIR)/quick_ssh.o
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -40,6 +48,5 @@ $(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 .PHONY: clean
 clean:
 	rm -rf obj bin
-	rm -f mds
 
 print-%: ; @echo $*=$($*)
