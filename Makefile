@@ -16,6 +16,12 @@ $(BIN_DIR)/l1tf: $(OBJ_DIR)/l1tf.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/stat
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+.PHONY: hypercall
+hypercall: $(BIN_DIR)/hypercall
+$(BIN_DIR)/hypercall: $(OBJ_DIR)/hypercall.o
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 $(BIN_DIR)/ridl: $(OBJ_DIR)/ridl.o
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
