@@ -17,10 +17,8 @@ $(BIN_DIR)/l1tf: $(OBJ_DIR)/l1tf.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/stat
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 .PHONY: hypercall
-hypercall: $(BIN_DIR)/hypercall
-$(BIN_DIR)/hypercall: $(OBJ_DIR)/hypercall.o
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+hypercall:
+	$(MAKE) -C $(SRC_DIR)/hypercall
 
 $(BIN_DIR)/ridl: $(OBJ_DIR)/ridl.o
 	@mkdir -p $(BIN_DIR)
@@ -54,5 +52,6 @@ $(OBJ_FILES): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 .PHONY: clean
 clean:
 	rm -rf obj bin
+	$(MAKE) -C $(SRC_DIR)/hypercall clean
 
 print-%: ; @echo $*=$($*)
