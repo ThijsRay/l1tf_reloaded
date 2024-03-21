@@ -20,6 +20,10 @@ $(BIN_DIR)/l1tf: $(OBJ_DIR)/l1tf.o $(OBJ_DIR)/flush_and_reload.o $(OBJ_DIR)/stat
 hypercall:
 	$(MAKE) -C $(SRC_DIR)/hypercall
 
+.PHONY: spectre_tester
+spectre_tester:
+	$(MAKE) -C $(SRC_DIR)/spectre_tester
+
 $(BIN_DIR)/ridl: $(OBJ_DIR)/ridl.o
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)

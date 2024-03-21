@@ -1,0 +1,10 @@
+*.cmd
+*.o
+*.symvers
+*.order
+*.mod
+*.mod.c
+*.ko
+.cache
+compile_commands.json
+spectre_tester_guest
