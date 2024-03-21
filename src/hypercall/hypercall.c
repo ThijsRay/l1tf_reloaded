@@ -3,6 +3,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/printk.h>
+#include <linux/types.h>
 
 #include <linux/kvm_para.h>
 
@@ -10,9 +11,17 @@
 // The hypercall number should be placed in rax and the return value will be
 // placed in rax. No other registers will be clobbered unless explicitly
 // stated by the particular hypercall.
-uint64_t hypercall(int type, uint64_t a0, uint64_t a1, uint64_t a2,
-                   uint64_t a3) {
+uint64_t inline hypercall(int type, uint64_t a0, uint64_t a1, uint64_t a2,
+                          uint64_t a3) {
   uint64_t rax = type;
+  asm volatile("movq $0, %%rcx\n"
+               "cmpq %%rcx, 0\n"
+               ".rept 300\n" // TODO: optimize this, maybe 300 is to much?
+               "je 1f\n"
+               "1:\n"
+               ".endr\n" ::
+                   : "rcx");
+
   asm volatile("vmcall" : "+a"(rax), "+b"(a0), "+c"(a1), "+d"(a2), "+S"(a3));
   return rax;
 }
