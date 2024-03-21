@@ -66,7 +66,7 @@ static const struct proc_ops proc_file_fops = {
 };
 
 static int __init hypercall_main(void) {
-  proc_entry = proc_create(procfs_name, 0644, NULL, &proc_file_fops);
+  proc_entry = proc_create(procfs_name, 0666, NULL, &proc_file_fops);
   if (NULL == proc_entry) {
     proc_remove(proc_entry);
     pr_alert("Error:Could not initialize /proc/%s\n", procfs_name);
