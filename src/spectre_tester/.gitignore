@@ -8,3 +8,4 @@
 .cache
 compile_commands.json
 spectre_tester_guest
+spectre_scanner_host
