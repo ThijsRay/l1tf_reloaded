@@ -21,7 +21,7 @@ uint64_t inline hypercall(int type, uint64_t a0, uint64_t a1, uint64_t a2,
                           uint64_t a3) {
   uint64_t rax = type;
   asm volatile("movq $0, %%rcx\n"
-               "cmpq %%rcx, $0\n"
+               "cmpq $0, %%rcx\n"
                ".rept 300\n" // TODO: optimize this, maybe 300 is to much?
                "je 1f\n"
                "1:\n"
