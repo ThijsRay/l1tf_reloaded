@@ -14,13 +14,12 @@
 int write_to_ipi_proc(struct hypercall_opts opts) {
   int fd = open("/proc/ipi_hypercall", O_WRONLY);
   if (fd < 0) {
-    err(fd, "Failed to open /proc/ipi_hypercall");
+    err(errno, "Failed to open /proc/ipi_hypercall");
   }
 
   int b = write(fd, &opts, sizeof(opts));
   if (b < 0) {
-    errno = b;
-    err(b, "Failed to write to /proc/ipi_hypercall");
+    err(errno, "Failed to write to /proc/ipi_hypercall");
   }
   printf("Send IPI to %d CPUs\n", b);
   return b;

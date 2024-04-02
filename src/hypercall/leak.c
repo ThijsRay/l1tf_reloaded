@@ -2,7 +2,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 
 #include "hypercall.h"
@@ -13,18 +12,21 @@ void hypercall(struct hypercall_opts *opts) {
     err(fd, "Failed to open /proc/ipi_hypercall");
   }
 
-  int b = write(fd, opts, sizeof(*opts));
+  // int b = write(fd, opts, sizeof(*opts));
+  int b = write(fd, opts, 1);
   close(fd);
   if (b < 0) {
     err(errno, "Failed to write to /proc/ipi_hypercall");
   } else {
-    printf("Succesfully wrote %d/%ld bytes\n", b, sizeof(*opts));
+    printf("Received back: %d\n", b);
   }
 }
 
 int main(int argc, char *argv[argc]) {
   struct hypercall_opts opts = {0};
-  memset(&opts, 0xff, sizeof(opts));
+  opts.mask_low = 0b1111;
+  opts.mask_high = 0;
+  opts.min = 0x0;
   hypercall(&opts);
 
   return 0;

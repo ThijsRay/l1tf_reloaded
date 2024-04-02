@@ -43,6 +43,8 @@ int send_ipi(unsigned long ipi_bitmap_low, unsigned long ipi_bitmap_high,
 
 static ssize_t procfile_write(struct file *file, const char __user *buff,
                               size_t len, loff_t *off) {
+  // kvm_sched_yield(len);
+  // return len;
   int count = 0;
   struct hypercall_opts opts = {0};
 
@@ -56,7 +58,7 @@ static ssize_t procfile_write(struct file *file, const char __user *buff,
     return -EFAULT;
   }
 
-  count = send_ipi(opts.mask_low, opts.mask_high, opts.min, opts.icr);
+  count = send_ipi(opts.mask_low, opts.mask_high, opts.min, opts.icr.raw_icr);
   return count;
 }
 
