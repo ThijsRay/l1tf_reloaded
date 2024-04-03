@@ -62,7 +62,9 @@ struct __attribute__((packed)) icr {
 _Static_assert(sizeof(struct icr) == sizeof(unsigned long),
                "struct icr should be 8 bytes");
 
-struct hypercall_opts {
+static const uint64_t page_value = 0x3b10a75503c510c3;
+
+struct send_ipi_hypercall_opts {
   unsigned long mask_low;
   unsigned long mask_high;
   union {
@@ -70,4 +72,8 @@ struct hypercall_opts {
     unsigned long raw_icr;
   } icr;
   uint32_t min;
+};
+
+struct sched_yield_opts {
+  unsigned long dest_id;
 };
