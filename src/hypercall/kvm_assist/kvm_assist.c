@@ -4,7 +4,7 @@
 #include <linux/types.h>
 #include <linux/uaccess.h>
 
-#include "../hypercall.h"
+#include "hypercall.h"
 
 #define MAX_PHYS_MEMORY (34359738368)
 

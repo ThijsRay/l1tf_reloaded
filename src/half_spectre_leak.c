@@ -7,8 +7,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "../../include/asm.h"
-#include "../../include/flush_and_reload.h"
+#include "asm.h"
+#include "flush_and_reload.h"
 #include "hypercall.h"
 
 #define LEAK_PAGE_SIZE (2097152) // 2MiB
