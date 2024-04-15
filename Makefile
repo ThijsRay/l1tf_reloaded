@@ -10,7 +10,7 @@ INC_DIR = include
 SRC_DIR = src
 OBJ_DIR = obj
 
-CFLAGS += -Wall -Wextra -I$(INC_DIR) -g -ftrapv -z noexecstack -O0
+CFLAGS += -Wall -Wextra -I$(INC_DIR) -g -O0
 LDFLAGS += -lm -no-pie
 
 SRC_FILES = $(wildcard src/*.c)
