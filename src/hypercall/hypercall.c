@@ -28,7 +28,7 @@ void inline hypercall(int type, struct hypercall_args real, struct hypercall_arg
   // Confuse the branch predictor
   asm volatile("movq $0, %%rcx\n"
                "cmpq $0, %%rcx\n"
-               ".rept 100\n" // TODO: optimize this, maybe 100 is too much/too little?
+               ".rept 300\n" // TODO: optimize this, maybe 300 is too much/too little?
                "je 1f\n"
                "1:\n"
                ".endr\n" ::

