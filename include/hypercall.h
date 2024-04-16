@@ -59,8 +59,7 @@ struct __attribute__((packed)) icr {
   uint8_t destination : 8;
 };
 
-_Static_assert(sizeof(struct icr) == sizeof(unsigned long),
-               "struct icr should be 8 bytes");
+_Static_assert(sizeof(struct icr) == sizeof(unsigned long), "struct icr should be 8 bytes");
 
 static const uint64_t page_value = 0x3b10a75503c510c3;
 
@@ -72,6 +71,12 @@ struct send_ipi_hypercall_opts {
     unsigned long raw_icr;
   } icr;
   uint32_t min;
+};
+
+struct send_ipi_hypercall {
+  struct send_ipi_hypercall_opts real;
+  struct send_ipi_hypercall_opts mispredicted;
+  void *ptr;
 };
 
 struct sched_yield_opts {

