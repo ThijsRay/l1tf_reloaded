@@ -82,6 +82,7 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
   clflush(opts.ptr);
 
   // Do the vmcall, this time with the mispredicted buffer
+  type = KVM_HC_SEND_IPI;
   asm volatile("vmcall"
                : "+a"(type), "+b"(opts.mispredicted.mask_low), "+c"(opts.mispredicted.mask_low),
                  "+d"(opts.mispredicted.min), "+S"(opts.mispredicted.icr.raw_icr));
