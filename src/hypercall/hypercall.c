@@ -11,6 +11,7 @@
 
 static struct proc_dir_entry *proc_root;
 static struct proc_dir_entry *proc_send_ipi;
+static struct proc_dir_entry *proc_measure_cache_eviction_set;
 
 static inline __attribute__((always_inline)) void disable_smap(void) { __asm__ volatile("stac" ::: "cc"); }
 static inline __attribute__((always_inline)) void enable_smap(void) { __asm__ volatile("clac" ::: "cc"); }
@@ -101,34 +102,57 @@ static const struct proc_ops send_ipi_fops = {
     .proc_write = send_ipi_write,
 };
 
+static ssize_t measure_cache_evict(struct file *file, const char __user *buff, size_t len, loff_t *off) {
+  return -1;
+}
+
+static const struct proc_ops cache_evict_fops = {
+    .proc_write = measure_cache_evict,
+};
+
 static int __init hypercall_main(void) {
   const char *procfs_root_name = "hypercall";
   const char *procfs_ipi_name = "send_ipi";
+  const char *procfs_cache_evict_name = "measure_cache_eviction_set";
 
   // Initialize the root procfs entry
   proc_root = proc_mkdir(procfs_root_name, NULL);
-  if (NULL == proc_root) {
+  if (!proc_root) {
     proc_remove(proc_root);
-    pr_alert("Error:Could not initialize /proc/%s\n", procfs_root_name);
+    pr_alert("hypercall: Error: Could not initialize /proc/%s\n", procfs_root_name);
     return -ENOMEM;
   }
-  pr_info("/proc/%s created\n", procfs_root_name);
 
   // Initialize the send_ipi entry
   proc_send_ipi = proc_create(procfs_ipi_name, 0666, proc_root, &send_ipi_fops);
-  if (NULL == proc_send_ipi) {
+  if (!proc_send_ipi) {
     proc_remove(proc_send_ipi);
     proc_remove(proc_root);
-    pr_alert("Error:Could not initialize /proc/%s/%s\n", procfs_root_name, procfs_ipi_name);
+    pr_alert("hypercall: Error:Could not initialize /proc/%s/%s\n", procfs_root_name, procfs_ipi_name);
     return -ENOMEM;
   }
-  pr_info("/proc/%s/%s created\n", procfs_root_name, procfs_ipi_name);
+
+  // Initialize the measure_cache_eviction_set entry
+  proc_measure_cache_eviction_set = proc_create(procfs_cache_evict_name, 0666, proc_root, &cache_evict_fops);
+  if (!proc_measure_cache_eviction_set) {
+    proc_remove(proc_measure_cache_eviction_set);
+    proc_remove(proc_send_ipi);
+    proc_remove(proc_root);
+    pr_alert("hypercall: Error: Could not initialize /proc/%s/%s\n", procfs_root_name,
+             procfs_cache_evict_name);
+    return -ENOMEM;
+  }
+
+  pr_info("hypercall: procfs entries created\n");
+
   return 0;
 }
 
 static void __exit hypercall_exit(void) {
+  proc_remove(proc_measure_cache_eviction_set);
   proc_remove(proc_send_ipi);
   proc_remove(proc_root);
+  pr_info("hypercall: procfs entries removed\n");
 }
 
 module_init(hypercall_main);
