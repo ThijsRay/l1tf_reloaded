@@ -2,7 +2,7 @@ PROGRAMS = l1tf half_spectre_leak
 
 l1tf_OBJS = l1tf.o flush_and_reload.o statistics.o
 
-half_spectre_leak_OBJS = half_spectre_leak.o
+half_spectre_leak_OBJS = half_spectre_leak.o time_deque.o
 
 ############
 
