@@ -9,6 +9,7 @@
 
 #include "cache_eviction.h"
 #include "hypercall.h"
+#include "timing.h"
 
 static struct proc_dir_entry *proc_root;
 static struct proc_dir_entry *proc_send_ipi;
@@ -16,39 +17,6 @@ static struct proc_dir_entry *proc_measure_cache_eviction_set;
 
 static inline __attribute__((always_inline)) void disable_smap(void) { __asm__ volatile("stac" ::: "cc"); }
 static inline __attribute__((always_inline)) void enable_smap(void) { __asm__ volatile("clac" ::: "cc"); }
-
-// From figure 4 of Yarom and Falkner, “FLUSH+RELOAD: A High Resolution, Low Noise,
-// L3 Cache Side-Channel Attack.”
-static inline __attribute__((always_inline)) size_t access_time(void __user *ptr) {
-  volatile unsigned long time;
-
-  asm volatile(
-      // From x86 docs
-      // If software requires RDTSC to be executed only after all previous
-      // instructions have executed and all previous loads and stores are
-      // globally visible, it can execute the sequence MFENCE;LFENCE
-      // immediately before RDTSC.
-      "mfence\n"
-      "lfence\n"
-      "rdtsc\n"
-
-      // From x86 docs
-      // If software requires RDTSC to be executed prior to execution of any
-      // subsequent instruction (including any memory accesses), it can execute
-      // the sequence LFENCE immediately after RDTSC.
-      "lfence\n"
-
-      "movl %%eax, %%esi\n"
-      "movl (%1), %%eax\n"
-
-      "lfence\n"
-      "rdtsc\n"
-      "subl %%esi, %%eax\n"
-      : "=a"(time)
-      : "c"(ptr)
-      : "%esi", "%edx");
-  return time;
-}
 
 static inline __attribute__((always_inline)) void confuse_branch_predictor(void) {
   // Confuse the branch predictor

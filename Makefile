@@ -1,8 +1,10 @@
-PROGRAMS = l1tf half_spectre_leak
+PROGRAMS = l1tf half_spectre_leak cache_eviction
 
 l1tf_OBJS = l1tf.o flush_and_reload.o statistics.o
 
 half_spectre_leak_OBJS = half_spectre_leak.o time_deque.o
+
+cache_eviction_OBJS = cache_eviction.o
 
 ############
 
