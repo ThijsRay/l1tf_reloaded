@@ -1,8 +1,6 @@
 #pragma once
 
 #if __has_include(<stdint.h>)
-#include "asm.h"
-#include "constants.h"
 #include <stdint.h>
 #include <stdio.h>
 #else
@@ -20,7 +18,7 @@ static inline __attribute__((always_inline)) void evict_l1d(const char *buf, con
     size_t idx = (way * stride) + (set_index * cache_line_size);
     deref_as_char_ptr(&buf[idx]);
   }
-  mfence();
+  asm volatile("mfence\n");
 }
 
 static inline __attribute__((always_inline)) void evict_l2(const char *buf, const size_t set_index) {
@@ -33,5 +31,5 @@ static inline __attribute__((always_inline)) void evict_l2(const char *buf, cons
     size_t idx = (way * stride) + (set_index * cache_line_size);
     deref_as_char_ptr(&buf[idx]);
   }
-  mfence();
+  asm volatile("mfence\n");
 }
