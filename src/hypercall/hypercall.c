@@ -9,7 +9,7 @@
 
 #include "cache_eviction.h"
 #include "hypercall.h"
-#include "timing.h"
+#include "linux/gfp_types.h"
 
 static struct proc_dir_entry *proc_root;
 static struct proc_dir_entry *proc_send_ipi;
@@ -97,21 +97,47 @@ static const struct proc_ops send_ipi_fops = {
     .proc_write = send_ipi_write,
 };
 
-static ssize_t measure_cache_evict(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
+#define L2_NR_OF_SETS (1024)
+struct hc_set_indices {
+  size_t size;
+  size_t buf[L2_NR_OF_SETS];
+};
 
-  const int iters = 1000;
+void push_set_index(struct hc_set_indices *x, size_t idx) {
+  BUG_ON(x->size > L2_NR_OF_SETS);
+  x->buf[x->size] = idx;
+  x->size++;
+}
 
-  for (int set_idx = 0; set_idx < 1024; ++set_idx) {
+static void prune_set_indices(const char __user *buf, struct hc_set_indices **x, const size_t iterations) {
+  struct hc_set_indices *new_set = kzalloc(sizeof(struct hc_set_indices), GFP_KERNEL);
+  BUG_ON(!new_set);
+
+  struct hc_set_indices *current_set = *x;
+
+  pr_info("hypercall: new pruning round with %ld candidates\n", current_set->size);
+
+  for (size_t set_idx = 0; set_idx < current_set->size; ++set_idx) {
     disable_smap();
 
     size_t before = -1;
     size_t after = -1;
 
-    for (size_t i = 0; i < iters; ++i) {
+    for (size_t i = 0; i < iterations; ++i) {
       confuse_branch_predictor();
 
       // First, capture the base line
-      size_t before_time = measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, -1, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
+      size_t before_time = measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
 
       // Then, evict and do it again
       evict_l2(buf, set_idx);
@@ -124,13 +150,33 @@ static ssize_t measure_cache_evict(struct file *file, const char __user *buf, si
     enable_smap();
 
     if (after > before) {
-      pr_info("hypercall: idx %.4d\tBefore: %ld\tAfter: %ld\n", set_idx, before, after);
+      push_set_index(new_set, set_idx);
+      pr_info("hypercall:\tidx %.4ld\tBefore: %ld\tAfter: %ld\n", set_idx, before, after);
     }
 
     cond_resched();
   }
 
+  *x = new_set;
+  kfree(current_set);
+}
+
+static ssize_t measure_cache_evict(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
+  struct hc_set_indices *set = kzalloc(sizeof(struct hc_set_indices), GFP_KERNEL);
+  for (size_t i = 0; i < L2_NR_OF_SETS; ++i) {
+    push_set_index(set, i);
+  }
+
+  for (size_t i = 1; i < 12; ++i) {
+    prune_set_indices(buf, &set, 100 * i);
+  }
+
+  for (size_t i = 0; i < set->size; ++i) {
+    pr_info("final: %ld\n", set->buf[i]);
+  }
+
   pr_info("hypercall: cache measurement done!\n");
+  kfree(set);
 
   // Check if it is a huge page address (doing a mask on the address)
   // Do the same vmcall twice and measure the timing of the latter to establish a base line
