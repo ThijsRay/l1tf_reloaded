@@ -1,29 +1,37 @@
 #pragma once
 
 #if __has_include(<stdint.h>)
+#include "asm.h"
+#include "constants.h"
 #include <stdint.h>
+#include <stdio.h>
 #else
 #include <linux/types.h>
 #endif
 
 #define deref_as_char_ptr(ptr) (*((volatile char *)(ptr)));
-static inline __attribute__((always_inline)) void evict_set_l1d(const char *buf, int set_index) {
-  uintptr_t addr = (uintptr_t)buf;
+static inline __attribute__((always_inline)) void evict_l1d(const char *buf, const size_t set_index) {
+  const size_t cache_line_size = 64;
+  const size_t sets = 64;
+  const size_t stride = cache_line_size * sets;
+  const size_t ways = 16;
 
-  // Change the set index bits in the address
-  set_index &= 0b111111;
-  uintptr_t set_mask = ~((0b111111) << 6);
-  addr = (addr & set_mask) | (set_index << 6);
+  for (size_t way = 0; way < ways; ++way) {
+    size_t idx = (way * stride) + (set_index * cache_line_size);
+    deref_as_char_ptr(&buf[idx]);
+  }
+  mfence();
+}
 
-  // Since there are 8 ways in L1d, we need access the same set with 8 different tags.
-  // This can be done by changing some bits of the tag, while skipping the 6 offset bits
-  // and the 6 set index bits.
-  deref_as_char_ptr(addr);
-  deref_as_char_ptr(addr ^ (1 << 12));
-  deref_as_char_ptr(addr ^ (2 << 12));
-  deref_as_char_ptr(addr ^ (3 << 12));
-  deref_as_char_ptr(addr ^ (4 << 12));
-  deref_as_char_ptr(addr ^ (5 << 12));
-  deref_as_char_ptr(addr ^ (6 << 12));
-  deref_as_char_ptr(addr ^ (7 << 12));
+static inline __attribute__((always_inline)) void evict_l2(const char *buf, const size_t set_index) {
+  const size_t cache_line_size = 64;
+  const size_t sets = 1024;
+  const size_t stride = cache_line_size * sets;
+  const size_t ways = 16;
+
+  for (size_t way = 0; way < ways; ++way) {
+    size_t idx = (way * stride) + (set_index * cache_line_size);
+    deref_as_char_ptr(&buf[idx]);
+  }
+  mfence();
 }

@@ -33,7 +33,6 @@ static inline __attribute__((always_inline)) size_t access_time(void *ptr) {
       "lfence\n"
       "rdtsc\n"
       "subl %%esi, %%eax\n"
-      "clflush 0(%1)\n"
       : "=a"(time)
       : "c"(ptr)
       : "%esi", "%edx");
