@@ -7,6 +7,7 @@
 
 #include <linux/kvm_para.h>
 
+#include "cache_eviction.h"
 #include "hypercall.h"
 
 static struct proc_dir_entry *proc_root;
@@ -58,28 +59,6 @@ static inline __attribute__((always_inline)) void confuse_branch_predictor(void)
                "1:\n"
                ".endr\n" ::
                    : "rcx", "cc");
-}
-
-#define deref_as_char_ptr(ptr) (*((volatile char *)(ptr)));
-static inline __attribute__((always_inline)) void evict_set_l1d(const char __user *buf, int set_index) {
-  uintptr_t addr = (uintptr_t)buf;
-
-  // Change the set index bits in the address
-  set_index &= 0b111111;
-  uintptr_t set_mask = ~((0b111111) << 6);
-  addr = (addr & set_mask) | (set_index << 6);
-
-  // Since there are 8 ways in L1d, we need access the same set with 8 different tags.
-  // This can be done by changing some bits of the tag, while skipping the 6 offset bits
-  // and the 6 set index bits.
-  deref_as_char_ptr(addr);
-  deref_as_char_ptr(addr ^ (1 << 12));
-  deref_as_char_ptr(addr ^ (2 << 12));
-  deref_as_char_ptr(addr ^ (3 << 12));
-  deref_as_char_ptr(addr ^ (4 << 12));
-  deref_as_char_ptr(addr ^ (5 << 12));
-  deref_as_char_ptr(addr ^ (6 << 12));
-  deref_as_char_ptr(addr ^ (7 << 12));
 }
 
 static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
