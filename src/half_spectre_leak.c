@@ -171,12 +171,13 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
     err(errno, "Could not parse min");
   }
 
-  // char needle[128];
-  // ssize_t needle_size = read(STDIN_FILENO, needle, 128);
-  // if (needle_size <= 0) {
-  //   err(errno, "No l1tf needle");
-  // }
-  // memcpy(leak_page, needle, needle_size);
+  char needle[128];
+  ssize_t needle_size = read(STDIN_FILENO, needle, 128);
+  if (needle_size <= 0) {
+    err(errno, "No l1tf needle");
+  }
+  memcpy(leak_page, needle, needle_size);
+  clflush(leak_page);
 
   const size_t iterations = 100000;
   printf("Doing %ld iterations\n", iterations);
@@ -188,7 +189,7 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
     printf("%d\tMiss: %ld\tHit: %ld\n", set_idx, miss, hit);
   }
 
-  // memset(leak_page, 0, needle_size);
+  memset(leak_page, 0, needle_size);
 }
 
 int main(int argc, char *argv[argc]) {

