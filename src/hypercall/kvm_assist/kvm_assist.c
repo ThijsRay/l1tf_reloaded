@@ -17,6 +17,18 @@ static struct kprobe kp = {
     .symbol_name = symbol,
 };
 
+static uintptr_t PAGE_ADDR = 0;
+static uintptr_t MAP_ADDR = 0;
+
+static size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_addr) {
+  // It is below the phys_map, and thus unreachable
+  if (phys_page_addr < phys_map_addr) {
+    return 0;
+  }
+
+  return (phys_page_addr - phys_map_addr) / 8;
+}
+
 static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs) {
   struct kvm_vcpu *vcpu;
   struct kvm *kvm;
@@ -40,7 +52,12 @@ static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs) {
     return 1;
   }
 
-  pr_info("map->phys_map[0] is at %px\n", &map->phys_map[0]);
+  MAP_ADDR = (uintptr_t)&map->phys_map[0];
+  pr_info("map->phys_map[0] is at %px\n", (void *)MAP_ADDR);
+
+  if (MAP_ADDR && PAGE_ADDR) {
+    pr_info("index into map->phys_map is 0x%lx\n", calculate_min(PAGE_ADDR, MAP_ADDR));
+  }
   return 0;
 }
 
@@ -65,7 +82,8 @@ static int __init kvm_assist_main(void) {
     }
 
     if (value == page_value) {
-      pr_info("kvm_assist: leak page is at %px\n", (char *)page);
+      PAGE_ADDR = page;
+      pr_info("kvm_assist: leak page is at %px\n", (void *)PAGE_ADDR);
       return 0;
     }
   }
