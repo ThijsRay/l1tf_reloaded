@@ -485,9 +485,8 @@ int main_scan(const int argc, char *argv[argc]) {
     }
   }
 
-  char needle[128];
+  char needle[128] = {0};
   ssize_t needle_size = read(STDIN_FILENO, needle, 128);
-  printf("Needle size: %d\n", needle_size);
 
   if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 || needle_size <= 0) {
     fprintf(stderr,
