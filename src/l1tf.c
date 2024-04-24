@@ -140,10 +140,10 @@ mds_offenders_t detect_mds_bytes_in_page(void) {
   mds_offenders_t offenders = {0};
   offenders.mmap_size = ((PAGE_SIZE + 1) * sizeof(bool));
 
-  offenders.fd = open("bin/.mds.cache", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  offenders.fd = open(".mds.cache", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (offenders.fd < 0) {
     fprintf(stderr,
-            "Failed to open the file bin/.mds.cache: %s. Continuing without the "
+            "Failed to open the file .mds.cache: %s. Continuing without the "
             "cache\n",
             strerror(errno));
     offenders.ptr =
