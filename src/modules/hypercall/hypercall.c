@@ -66,9 +66,9 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
   vmcall(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
 
   // Do the mispredicted vmcall!
-  disable_smap();
   vmcall(type, opts.mispredicted.mask_low, opts.mispredicted.mask_high, opts.mispredicted.min,
          opts.mispredicted.icr.raw_icr);
+  disable_smap();
   size_t time = access_time(opts.ptr);
   enable_smap();
 
