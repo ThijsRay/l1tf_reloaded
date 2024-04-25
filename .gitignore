@@ -15,3 +15,5 @@ Module.symvers
 modules.order
 
 compile_commands.json
+
+include/ptedit_header.h
