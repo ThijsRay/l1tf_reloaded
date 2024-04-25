@@ -49,7 +49,7 @@ $(ALL_OBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 clean:
 	$(RM) -r obj $(PROGRAMS) $(INC_DIR)/ptedit_header.h
 	$(MAKE) -C $(SRC_DIR)/modules clean
-	$(MAKE) -C $(PTEDIT_DIR)/clean
+	$(MAKE) -C $(PTEDIT_DIR) clean
 
 .PHONY: modules
 modules:
