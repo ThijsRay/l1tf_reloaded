@@ -41,13 +41,21 @@ $(ALL_OBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 clean:
 	$(RM) -r obj $(PROGRAMS)
 	$(MAKE) -C $(SRC_DIR)/modules clean
+	$(MAKE) -C deps/PTEditor clean
 
 .PHONY: modules
 modules:
 	$(MAKE) -C $(SRC_DIR)/modules
+	$(MAKE) -C deps/PTEditor
 
 .PHONY: insert_modules
-insert_modules:
-	$(MAKE) -C $(SRC_DIR)/modules insert
+insert_modules: modules
+	insmod $(SRC_DIR)/modules/hypercall/hypercall.ko
+	insmod deps/PTEditor/module/pteditor.ko
+
+.PHONY: remove_modules
+remove_modules:
+	rmmod hypercall
+	rmmod pteditor
 
 print-%: ; @echo $*=$($*)

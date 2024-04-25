@@ -22,18 +22,3 @@ $(foreach module,$(MODULES),$(eval $(call MODULE_clean,$(module))))
 
 .PHONY: clean
 clean: $(CLEAN_TARGETS)
-
-define MODULE_insert =
-.PHONY: $(1)_INSERT
-$(1)_INSERT: $(1)
-	insmod $(1)
-INSERT_TARGETS += $(1)_INSERT
-endef
-$(foreach target,$(MAKE_TARGETS),$(eval $(call MODULE_insert,$(target))))
-
-.PHONY: insert
-insert: $(INSERT_TARGETS)
-
-
-
-
