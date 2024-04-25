@@ -1,8 +1,17 @@
 .cache
 
 l1tf
-half_spectre_leak
+kvm_leak
+cache_eviction
 
 obj/
+
+*.cmd
+*.o
+*.ko
+*.mod
+*.mod.c
+Module.symvers
+modules.order
 
 compile_commands.json
