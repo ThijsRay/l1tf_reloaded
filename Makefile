@@ -1,8 +1,8 @@
-PROGRAMS = l1tf half_spectre_leak cache_eviction
+PROGRAMS = l1tf kvm_leak cache_eviction
 
 l1tf_OBJS = l1tf.o flush_and_reload.o statistics.o
 
-half_spectre_leak_OBJS = half_spectre_leak.o time_deque.o
+kvm_leak_OBJS = kvm_leak.o time_deque.o
 
 cache_eviction_OBJS = cache_eviction.o
 
@@ -20,7 +20,7 @@ OBJ_FILES = $(patsubst $(SRC_DIR)%.c,$(OBJ_DIR)%.o,$(SRC_FILES))
 INC_FILES = $(wildcard ($INC_DIR)/*.h)
 
 .PHONY: all
-all: $(PROGRAMS) hypercall
+all: $(PROGRAMS) modules
 
 # Adapted from https://www.gnu.org/software/make/manual/html_node/Eval-Function.html
 define PROGRAM_template =
@@ -40,10 +40,14 @@ $(ALL_OBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_FILES) Makefile
 .PHONY: clean
 clean:
 	$(RM) -r obj $(PROGRAMS)
-	$(MAKE) -C $(SRC_DIR)/hypercall clean
+	$(MAKE) -C $(SRC_DIR)/modules clean
 
-.PHONY: hypercall
-hypercall:
-	$(MAKE) -C $(SRC_DIR)/hypercall
+.PHONY: modules
+modules:
+	$(MAKE) -C $(SRC_DIR)/modules
+
+.PHONY: insert_modules
+insert_modules:
+	$(MAKE) -C $(SRC_DIR)/modules insert
 
 print-%: ; @echo $*=$($*)

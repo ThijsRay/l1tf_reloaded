@@ -52,6 +52,7 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
                : "+a"(type), "+b"(opts.real.mask_low), "+c"(opts.real.mask_low), "+d"(opts.real.min),
                  "+S"(opts.real.icr.raw_icr));
 
+  confuse_branch_predictor();
   disable_smap();
 
   // Do the vmcall, this time with the mispredicted buffer
