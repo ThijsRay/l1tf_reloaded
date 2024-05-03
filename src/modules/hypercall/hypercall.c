@@ -75,9 +75,9 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
   return time;
 }
 
-static inline __attribute__((always_inline)) size_t
-measure_vmcall_timing(int hypercall_number, unsigned long rbx, unsigned long rcx, unsigned long rdx,
-                      unsigned long rsi) {
+static noinline size_t measure_vmcall_timing(int hypercall_number, unsigned long rbx, unsigned long rcx,
+                                             unsigned long rdx, unsigned long rsi) {
+  confuse_branch_predictor();
   volatile unsigned long time = hypercall_number;
   asm volatile(
       // rdtsc overwrites these, but they are also needed by the vmcall
@@ -139,17 +139,6 @@ static void prune_set_indices(const char __user *buf, struct hc_set_indices **x,
     size_t after = -1;
 
     for (size_t i = 0; i < iterations; ++i) {
-      confuse_branch_predictor();
-
-      // First, capture the base line
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
       measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
       measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
       size_t before_time = measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);

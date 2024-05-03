@@ -172,24 +172,24 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
 
   printf("Reading needle...\n");
   char needle[128];
-  ssize_t needle_size = read(STDIN_FILENO, needle, 128);
-  if (needle_size <= 0) {
-    err(errno, "No l1tf needle");
-  }
-  memcpy(leak_page, needle, needle_size);
+  // ssize_t needle_size = read(STDIN_FILENO, needle, 128);
+  // if (needle_size <= 0) {
+  //   err(errno, "No l1tf needle");
+  // }
+  // memcpy(leak_page, needle, needle_size);
   clflush(leak_page);
 
-  const size_t iterations = 10000;
+  const size_t iterations = 300;
   printf("Doing %ld iterations\n", iterations);
   for (int set_idx = 0; set_idx < 1; ++set_idx) {
 
-    size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
     size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
+    size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
 
     printf("%d\tMiss: %ld\tHit: %ld\n", set_idx, miss, hit);
   }
 
-  memset(leak_page, 0, needle_size);
+  // memset(leak_page, 0, needle_size);
 }
 
 int main(int argc, char *argv[argc]) {
