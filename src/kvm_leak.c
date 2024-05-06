@@ -179,12 +179,13 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   // memcpy(leak_page, needle, needle_size);
   clflush(leak_page);
 
-  const size_t iterations = 300;
+  const size_t iterations = 1000;
   printf("Doing %ld iterations\n", iterations);
   for (int set_idx = 0; set_idx < 1; ++set_idx) {
 
-    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
+    access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
     size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
+    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
 
     printf("%d\tMiss: %ld\tHit: %ld\n", set_idx, miss, hit);
   }
