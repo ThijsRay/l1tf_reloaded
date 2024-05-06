@@ -171,7 +171,7 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   }
 
   printf("Reading needle...\n");
-  char needle[128];
+  // char needle[128];
   // ssize_t needle_size = read(STDIN_FILENO, needle, 128);
   // if (needle_size <= 0) {
   //   err(errno, "No l1tf needle");
