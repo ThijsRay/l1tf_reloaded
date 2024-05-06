@@ -34,8 +34,8 @@ INC_FILES += $(INC_DIR)/ptedit_header.h
 $(INC_DIR)/evsets_api.h $(INC_DIR)/public_structs.h: $(EVSETS_DIR)
 	$(MAKE) -C $(EVSETS_DIR) libevsets.so
 	mkdir -p $(INC_DIR)/evsets
-	ln -sf ../$(EVSETS_DIR)/evsets_api.h $(INC_DIR)/evsets/evsets_api.h
-	ln -sf ../$(EVSETS_DIR)/public_structs.h $(INC_DIR)/evsets/public_structs.h
+	ln -sf ../../$(EVSETS_DIR)/evsets_api.h $(INC_DIR)/evsets/evsets_api.h
+	ln -sf ../../$(EVSETS_DIR)/public_structs.h $(INC_DIR)/evsets/public_structs.h
 
 INC_FILES += $(INC_DIR)/evsets_api.h $(INC_DIR)/public_structs.h
 
