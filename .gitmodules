@@ -3,4 +3,4 @@
 	url = https://github.com/ThijsRay/PTEditor.git
 [submodule "deps/evsets"]
 	path = deps/evsets
-	url = https://github.com/cgvwzq/evsets
+	url = https://github.com/ThijsRay/evsets
