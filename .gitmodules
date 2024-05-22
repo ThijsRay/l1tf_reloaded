@@ -4,3 +4,6 @@
 [submodule "deps/evsets"]
 	path = deps/evsets
 	url = https://github.com/ThijsRay/evsets
+[submodule "deps/prune-plumtree"]
+	path = deps/prune-plumtree
+	url = https://github.com/ThijsRay/Prune-PlumTree---Finding-Eviction-Sets-at-Scale
