@@ -11,10 +11,10 @@
 #include <unistd.h>
 
 #include "asm.h"
+#include "cache_eviction.h"
 #include "constants.h"
 #include "hypercall.h"
 #include "time_deque.h"
-#include "timing.h"
 
 int hypercall(struct send_ipi_hypercall *opts) {
   const char *hypercall_path = "/proc/hypercall/send_ipi";
@@ -32,6 +32,8 @@ int hypercall(struct send_ipi_hypercall *opts) {
 }
 
 void determine_cache_eviction(void *leak) {
+  build_eviction_sets();
+  return;
   const char *hypercall_path = "/proc/hypercall/measure_cache_eviction_set";
   int fd = open(hypercall_path, O_WRONLY);
   if (fd < 0) {

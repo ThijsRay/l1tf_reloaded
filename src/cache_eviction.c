@@ -1,44 +1,56 @@
 #include "cache_eviction.h"
-#include "constants.h"
-#include "timing.h"
-#include <assert.h>
+#include "plumtree.h"
 #include <err.h>
-#include <errno.h>
-#include <stddef.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/mman.h>
 
-int main() {
-  void *huge_page = mmap(NULL, HUGE_PAGE_SIZE, PROT_READ | PROT_WRITE,
-                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB | MAP_POPULATE, 0, 0);
-  if (huge_page == (void *)-1) {
-    err(errno, "mmap failed (do 'echo 1 | sudo tee /proc/sys/vm/nr_hugepages' first)");
-  }
-  printf("Addr is %p\n", huge_page);
+void *plumtree_thread_entry(void *d) {
+  int *arg = (int *)d;
+  return plumtree_main(*arg);
+}
 
-  char *variable = malloc(64);
-  assert(variable);
+struct eviction_sets parse_eviction_sets(char const *const data) {
+  struct eviction_sets ev = {0};
+  return ev;
+}
 
-  const size_t iters = 10000;
+void build_eviction_sets(void) {
+  pthread_t thread;
+  pthread_attr_t attr;
+  char *status = NULL;
 
-  for (size_t set_idx = 0; set_idx < 1024; ++set_idx) {
-    size_t before = -1;
-    size_t after = -1;
-    for (size_t i = 0; i < iters; ++i) {
-      size_t before_time = access_time(variable);
-      evict_l1d(huge_page, set_idx);
-      evict_l2(huge_page, set_idx);
-      size_t after_time = access_time(variable);
-
-      before = before_time < before ? before_time : before;
-      after = after_time < after ? after_time : after;
+  do {
+    if (pthread_attr_init(&attr) != 0) {
+      err(EXIT_FAILURE, "Failed to initialize phtread attributes");
     }
-    if (after > before) {
-      printf("%ld\tBefore: %ld\tAfter: %ld\n", set_idx, before, after);
-    }
-  }
 
-  free(variable);
-  munmap(huge_page, HUGE_PAGE_SIZE);
+    int option = 2;
+    if (pthread_create(&thread, &attr, &plumtree_thread_entry, &option) != 0) {
+      err(EXIT_FAILURE, "Failed to create phtread");
+    }
+
+    int rc;
+    pthread_attr_destroy(&attr);
+    if (rc = pthread_join(thread, (void **)&status), rc != 0) {
+      err(EXIT_FAILURE, "plumtree did not succeed: error code %d", rc);
+    }
+
+    if (status == NULL) {
+      continue;
+    }
+
+    parse_eviction_sets(status);
+
+  } while (status == NULL);
+
+  printf("%s\n", (char *)status);
+}
+
+void free_eviction_sets(struct eviction_sets sets) {
+  for (size_t set_idx = 0; set_idx < sets.len; ++set_idx) {
+    struct eviction_set *set = sets.sets[set_idx];
+    free(set->ptrs);
+  }
+  free(sets.sets);
 }

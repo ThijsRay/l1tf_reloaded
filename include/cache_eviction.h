@@ -1,35 +1,15 @@
 #pragma once
+#include <stdlib.h>
 
-#if __has_include(<stdint.h>)
-#include <stdint.h>
-#include <stdio.h>
-#else
-#include <linux/types.h>
-#endif
+struct eviction_set {
+  size_t len;
+  void *ptrs[];
+};
 
-#define deref_as_char_ptr(ptr) (*((volatile char *)(ptr)));
-static inline __attribute__((always_inline)) void evict_l1d(const char *buf, const size_t set_index) {
-  const size_t cache_line_size = 64;
-  const size_t sets = 64;
-  const size_t stride = cache_line_size * sets;
-  const size_t ways = 16;
+struct eviction_sets {
+  size_t len;
+  struct eviction_set *sets[];
+} __attribute__((deallocated_by(free_eviction_sets)));
 
-  for (size_t way = 0; way < ways; ++way) {
-    size_t idx = (way * stride) + (set_index * cache_line_size);
-    deref_as_char_ptr(&buf[idx]);
-  }
-  asm volatile("mfence\n");
-}
-
-static inline __attribute__((always_inline)) void evict_l2(const char *buf, const size_t set_index) {
-  const size_t cache_line_size = 64;
-  const size_t sets = 1024;
-  const size_t stride = cache_line_size * sets;
-  const size_t ways = 16;
-
-  for (size_t way = 0; way < ways; ++way) {
-    size_t idx = (way * stride) + (set_index * cache_line_size);
-    deref_as_char_ptr(&buf[idx]);
-  }
-  asm volatile("mfence\n");
-}
+void build_eviction_sets(void);
+void free_eviction_sets(struct eviction_sets);
