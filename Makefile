@@ -7,7 +7,7 @@ clean:
 	$(MAKE) -C build clean
 	rm -rf build
 
-%:
+%: build
 	$(MAKE) -C build
 
 .PHONY: modules
