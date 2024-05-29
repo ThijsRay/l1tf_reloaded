@@ -15,6 +15,7 @@
 #include "constants.h"
 #include "hypercall.h"
 #include "time_deque.h"
+#include "timing.h"
 
 int hypercall(struct send_ipi_hypercall *opts) {
   const char *hypercall_path = "/proc/hypercall/send_ipi";
@@ -32,7 +33,19 @@ int hypercall(struct send_ipi_hypercall *opts) {
 }
 
 void determine_cache_eviction(void *leak) {
-  build_eviction_sets();
+  uint64_t variable;
+
+  struct eviction_sets ev = build_eviction_sets();
+  for (size_t i = 0; i < ev.len; ++i) {
+    printf("%p\t", (void *)&variable);
+    maccess(&variable);
+    size_t before = access_time(&variable);
+    evict_set(&ev, i);
+    size_t after = access_time(&variable);
+    printf("B: %ld\tAfter: %ld\t", before, after);
+    printf("cache %p\n", ev.sets[i].ptrs[0]);
+  }
+
   return;
   const char *hypercall_path = "/proc/hypercall/measure_cache_eviction_set";
   int fd = open(hypercall_path, O_WRONLY);
