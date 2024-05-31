@@ -14,15 +14,19 @@ add_executable(kvm_leak
   src/kvm_leak.c
   src/time_deque.c
   src/cache_eviction.c
-  deps/prune-plumtree/plumtree.c
-  deps/prune-plumtree/plumtree_utils.c
+  src/l1tf.c
 )
 target_link_libraries(kvm_leak rt m)
-target_include_directories(kvm_leak PRIVATE include deps/prune-plumtree)
+target_include_directories(kvm_leak PRIVATE include deps/PTEditor)
 
 add_custom_target(pteditor.ko
   WORKING_DIRECTORY ../deps/PTEditor
   COMMAND make pteditor
+)
+
+add_custom_target(ptedit_header.h
+  WORKING_DIRECTORY ../deps/PTEditor
+  COMMAND make header
 )
 
 add_custom_target(modules

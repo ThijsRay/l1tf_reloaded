@@ -5,10 +5,8 @@ build: CMakeLists.txt
 .PHONY: clean
 clean:
 	$(MAKE) -C build clean
+	$(MAKE) -C src/modules clean
 	rm -rf build
-
-%: build
-	$(MAKE) -C build
 
 .PHONY: modules
 modules: pteditor.ko
@@ -16,10 +14,13 @@ modules: pteditor.ko
 
 .PHONY: insert_modules
 insert_modules: modules pteditor.ko
-	insmod $(SRC_DIR)/modules/hypercall/hypercall.ko
-	insmod $(PTEDIT_DIR)/module/pteditor.ko
+	insmod src/modules/hypercall/hypercall.ko
+	insmod deps/PTEditor/module/pteditor.ko
 
 .PHONY: remove_modules
 remove_modules:
 	rmmod hypercall
 	rmmod pteditor
+
+%:
+	$(MAKE) -C build

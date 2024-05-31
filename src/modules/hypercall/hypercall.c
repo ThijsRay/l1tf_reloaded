@@ -124,55 +124,10 @@ void push_set_index(struct hc_set_indices *x, size_t idx) {
   x->size++;
 }
 
-static void prune_set_indices(const char __user *buf, struct hc_set_indices **x, const size_t iterations) {
-  struct hc_set_indices *new_set = kzalloc(sizeof(struct hc_set_indices), GFP_KERNEL);
-  BUG_ON(!new_set);
-
-  struct hc_set_indices *current_set = *x;
-
-  pr_info("hypercall: new pruning round with %ld candidates\n", current_set->size);
-
-  for (size_t set_idx = 0; set_idx < current_set->size; ++set_idx) {
-    disable_smap();
-
-    size_t before = -1;
-    size_t after = -1;
-
-    for (size_t i = 0; i < iterations; ++i) {
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-      size_t before_time = measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, 0, 0);
-
-      // Then, evict and do it again
-      evict_l2(buf, set_idx);
-      size_t after_time = measure_vmcall_timing(KVM_HC_SEND_IPI, -1, 0, -1, 0);
-
-      before = before_time < before ? before_time : before;
-      after = after_time < after ? after_time : after;
-    }
-
-    enable_smap();
-
-    if (after > before) {
-      push_set_index(new_set, set_idx);
-      pr_info("hypercall:\tidx %.4ld\tBefore: %ld\tAfter: %ld\n", set_idx, before, after);
-    }
-
-    cond_resched();
-  }
-
-  *x = new_set;
-  kfree(current_set);
-}
-
 static ssize_t measure_cache_evict(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
   struct hc_set_indices *set = kzalloc(sizeof(struct hc_set_indices), GFP_KERNEL);
   for (size_t i = 0; i < L2_NR_OF_SETS; ++i) {
     push_set_index(set, i);
-  }
-
-  for (size_t i = 1; i < 12; ++i) {
-    prune_set_indices(buf, &set, 100 * i);
   }
 
   for (size_t i = 0; i < set->size; ++i) {

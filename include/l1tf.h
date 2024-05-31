@@ -147,9 +147,11 @@ typedef struct {
   size_t stride;
 } scan_opts_t;
 
-leak_addr_t l1tf_leak_buffer_create();
+leak_addr_t l1tf_leak_buffer_create(void);
 void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr);
 void l1tf_leak_buffer_free(leak_addr_t *leak);
 
-reload_buffer_t *l1tf_reload_buffer_create();
+reload_buffer_t *l1tf_reload_buffer_create(void);
 void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer);
+
+void *l1tf_spawn_leak_page(void);
