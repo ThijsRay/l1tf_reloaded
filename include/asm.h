@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-
 static inline __attribute__((always_inline)) void clflush(void *p) {
   __asm__ volatile("clflush (%0)\n" ::"r"(p));
 }
