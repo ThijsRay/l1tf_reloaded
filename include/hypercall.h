@@ -77,9 +77,10 @@ struct send_ipi_hypercall {
   struct send_ipi_hypercall_opts real;
   struct send_ipi_hypercall_opts mispredicted;
   void *ptr;
-  int cache_set_idx;
 };
 
-struct sched_yield_opts {
-  unsigned long dest_id;
+struct sched_yield_hypercall {
+  unsigned long current_cpu_id;
+  unsigned long speculated_cpu_id;
+  void *ptr;
 };

