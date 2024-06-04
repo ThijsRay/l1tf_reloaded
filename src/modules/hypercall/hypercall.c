@@ -21,7 +21,7 @@ static inline __attribute__((always_inline)) void confuse_branch_predictor(void)
   // Bring the branch predictor into a known state of history
   asm volatile("movq $0, %%rcx\n"
                "cmpq $0, %%rcx\n"
-               ".rept 300\n" // TODO: optimize this, maybe 300 is too much/too little?
+               ".rept 150\n" // TODO: optimize this, maybe 150 is too much/too little?
                "je 1f\n"
                "1:\n"
                ".endr\n" ::
@@ -97,8 +97,6 @@ static ssize_t sched_yield_write(struct file *file, const char __user *buff, siz
   }
 
   int type = KVM_HC_SCHED_YIELD;
-  vmcall1(type, opts.current_cpu_id);
-  vmcall1(type, opts.current_cpu_id);
   vmcall1(type, opts.current_cpu_id);
   vmcall1(type, opts.current_cpu_id);
 

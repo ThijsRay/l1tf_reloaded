@@ -103,7 +103,7 @@ size_t find_min(void *buf) {
         size_t time = access_buffer_with_spectre(buf, idx, 1);
         if (time < 220) {
           time = access_buffer_with_spectre(buf, idx, 1000);
-          if (time < 100) {
+          if (time < CACHE_HIT_THRESHOLD) {
             printf("\nhit: %lx %ld\n", idx, time);
             return idx;
           }
