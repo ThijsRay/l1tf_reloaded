@@ -99,6 +99,8 @@ static ssize_t sched_yield_write(struct file *file, const char __user *buff, siz
   int type = KVM_HC_SCHED_YIELD;
   vmcall1(type, opts.current_cpu_id);
   vmcall1(type, opts.current_cpu_id);
+  vmcall1(type, opts.current_cpu_id);
+  vmcall1(type, opts.current_cpu_id);
 
   // Do the mispredicted vmcall!
   disable_smap();
