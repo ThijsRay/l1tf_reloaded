@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "msr.h"
 #include <bits/time.h>
 #include <err.h>
 #include <errno.h>
@@ -260,6 +261,16 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
+  } else if (!strcmp(argv[1], "apic")) {
+    const long msr = 0x1B;
+    long nr_of_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    if (nr_of_cpus < 0) {
+      err(EXIT_FAILURE, "Failed to get nr of CPUs");
+    }
+    for (size_t cpu = 0; cpu < (size_t)nr_of_cpus; ++cpu) {
+      uint64_t value = read_msr(cpu, msr) & 0xfffff000;
+      printf("CPU %ld: %lx\n", cpu, value);
+    }
   }
 
   munmap(leak_page, PAGE_SIZE);
