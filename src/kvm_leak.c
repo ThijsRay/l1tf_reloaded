@@ -271,6 +271,10 @@ int main(int argc, char *argv[argc]) {
       uint64_t value = read_msr(cpu, msr) & 0xfffff000;
       printf("CPU %ld: %lx\n", cpu, value);
     }
+  } else if (!strcmp(argv[1], "l1tf")) {
+    return l1tf_main(argc - 1, &argv[1]);
+  } else {
+    warnx("Unknown command!");
   }
 
   munmap(leak_page, PAGE_SIZE);

@@ -17,6 +17,7 @@ add_executable(kvm_leak
   src/l1tf.c
   src/msr.c
 )
+
 target_link_libraries(kvm_leak rt m)
 target_include_directories(kvm_leak PRIVATE include deps/PTEditor)
 

