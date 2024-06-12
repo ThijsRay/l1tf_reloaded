@@ -73,6 +73,10 @@ struct send_ipi_hypercall_opts {
   uint32_t min;
 };
 
+struct self_send_ipi_hypercall {
+  uint32_t min;
+};
+
 struct send_ipi_hypercall {
   struct send_ipi_hypercall_opts real;
   struct send_ipi_hypercall_opts mispredicted;
