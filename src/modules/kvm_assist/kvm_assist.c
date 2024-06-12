@@ -53,10 +53,12 @@ static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs) {
   }
 
   MAP_ADDR = (uintptr_t)&map->phys_map[0];
-  pr_info("map->phys_map[0] is at %px\n", (void *)MAP_ADDR);
+  pr_info("map->phys_map[0] is at %px (phys addr: %px)\n", (void *)MAP_ADDR,
+          (void *)virt_to_phys((void *)MAP_ADDR));
 
   if (MAP_ADDR && PAGE_ADDR) {
-    pr_info("index into map->phys_map is 0x%lx\n", calculate_min(PAGE_ADDR, MAP_ADDR));
+    pr_info("index into map->phys_map is 0x%lx (phys addr: %px)\n", calculate_min(PAGE_ADDR, MAP_ADDR),
+            (void *)virt_to_phys((void *)PAGE_ADDR));
   }
   return 0;
 }

