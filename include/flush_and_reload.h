@@ -15,14 +15,14 @@ static inline __attribute__((always_inline)) void flush(const size_t nr_values, 
   }
 }
 
-static inline __attribute__((always_inline)) size_t reload(const size_t nr_values, const size_t stride,
-                                                           const uint8_t buffer[nr_values * stride],
-                                                           const size_t threshold) {
+static inline __attribute__((always_inline)) ssize_t reload(const size_t nr_values, const size_t stride,
+                                                            const uint8_t buffer[nr_values * stride],
+                                                            const size_t threshold) {
   for (size_t i = 0; i < nr_values; ++i) {
     size_t time = access_time((void *)&buffer[i * stride]);
     if (time < threshold) {
       return i;
     }
   }
-  return 0;
+  return -1;
 }

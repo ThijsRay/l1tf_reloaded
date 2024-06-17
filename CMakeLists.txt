@@ -16,6 +16,7 @@ add_executable(kvm_leak
   src/cache_eviction.c
   src/l1tf.c
   src/msr.c
+  src/statistics.c
 )
 
 target_link_libraries(kvm_leak rt m)
