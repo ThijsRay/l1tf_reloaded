@@ -128,9 +128,9 @@ size_t find_min(void *buf) {
     double time_left = batches_left * avg_time;
 
     // Print the remaining time
-    fprintf(stderr, "\r%lx / %lx (%.4f%%) (%dh %.2dm %.2ds remaining)\r", batch, (uint64_t)MAX_IDX,
-            (float)batch / (float)((uint64_t)MAX_IDX), (int)(time_left / 3600), (int)(time_left / 60) % 60,
-            (int)time_left % 60);
+    fprintf(stderr, "\r%lx / %lx (%.2f%%) (%dh %.2dm %.2ds remaining)\r", batch, (uint64_t)MAX_IDX,
+            100.0f * ((float)batch / (float)((uint64_t)MAX_IDX)), (int)(time_left / 3600),
+            (int)(time_left / 60) % 60, (int)time_left % 60);
 
     for (int64_t offset = ELEMENTS_PER_PAGE - 4; offset >= 0; offset -= 4) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
