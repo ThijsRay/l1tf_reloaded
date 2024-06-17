@@ -471,27 +471,63 @@ int l1tf_main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t
 }
 
 void *l1tf_spawn_leak_page(void) {
-  int fd = shm_open("/l1tf_leak_page", O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+  FILE *rand_file = NULL;
+  const char *leak_page_name = "/l1tf_leak_page";
+
+  int fd = shm_open(leak_page_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
   if (fd < 0) {
     // It already exists, so let's reuse it!
     if (errno != EEXIST) {
       err(EXIT_FAILURE, "Failed to open leak shm page");
     }
 
-    fd = shm_open("/l1tf_leak_page", O_RDWR, S_IRUSR | S_IWUSR);
+    fd = shm_open(leak_page_name, O_RDWR, S_IRUSR | S_IWUSR);
     if (fd < 0) {
       err(EXIT_FAILURE, "Failed to open existing leak shm page");
     }
-  }
+    printf("Opened existing leak page!\n");
+  } else {
+    printf("Creating new leak page!\n");
+    // Make sure the shared memory region is page in size
+    if (ftruncate(fd, PAGE_SIZE) != 0) {
+      int e = errno;
+      if (shm_unlink(leak_page_name) != 0) {
+        err(EXIT_FAILURE, "Failed to unlink %s", leak_page_name);
+      };
+      errno = e;
+      err(EXIT_FAILURE, "Failed to resize shared memory");
+    }
 
-  // Make sure the shared memory region is page in size
-  if (ftruncate(fd, PAGE_SIZE) != 0) {
-    err(EXIT_FAILURE, "Failed to resize shared memory");
+    // Fill the newly opened page with random data
+    rand_file = fopen("/dev/random", "r");
+    if (rand_file == NULL) {
+      int e = errno;
+      if (shm_unlink(leak_page_name) != 0) {
+        err(EXIT_FAILURE, "Failed to unlink %s", leak_page_name);
+      };
+      errno = e;
+      err(EXIT_FAILURE, "Failed to open /dev/random");
+    }
   }
 
   void *leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
   if (leak_page == (void *)-1) {
-    err(errno, "mmap of leak page failed");
+    err(EXIT_FAILURE, "mmap of leak page failed");
+  }
+
+  if (rand_file != NULL) {
+    if (fread(leak_page, PAGE_SIZE, 1, rand_file) != 1) {
+      int e = errno;
+      if (shm_unlink(leak_page_name) != 0) {
+        err(EXIT_FAILURE, "Failed to unlink %s", leak_page_name);
+      };
+      errno = e;
+      err(EXIT_FAILURE, "Failed to read from /dev/random into leak page");
+    };
+
+    if (fclose(rand_file) != 0) {
+      err(EXIT_FAILURE, "Failed to close rand_file");
+    }
   }
   return leak_page;
 }
