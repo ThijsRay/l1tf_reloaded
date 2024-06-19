@@ -263,12 +263,24 @@ void pin_cpu(void) {
   sched_setaffinity(0, sizeof(cpu_set_t), &s);
 }
 
+void usage(void) {
+  warnx("Unknown command! Supported commands are\n"
+        "\tdetermine\n"
+        "\tcalc\n"
+        "\ttest_specte\n"
+        "\taccess_min\n"
+        "\tfind_min\n"
+        "\tapic\n"
+        "\tl1tf");
+}
+
 int main(int argc, char *argv[argc]) {
   struct time_deque d;
   time_deque_init(&d);
 
   if (argc < 2) {
     errno = EINVAL;
+    usage();
     err(errno, "Invalid usage");
   }
 
@@ -285,7 +297,7 @@ int main(int argc, char *argv[argc]) {
   // kvm_assist.ko module in the hypervisor
   if (!strcmp(argv[1], "determine")) {
     cmd_determine(leak_page);
-  } else if (!strcmp(argv[1], "calc_min")) {
+  } else if (!strcmp(argv[1], "calc")) {
     cmd_calc_min(argc, argv);
   } else if (!strcmp(argv[1], "test_spectre")) {
     cmd_test_spectre(argc, argv, leak_page);
@@ -307,8 +319,7 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "l1tf")) {
     return l1tf_main(argc - 1, &argv[1]);
   } else {
-    warnx("Unknown command! Supported commands "
-          "are\n\tdetermine\n\tcalc_min\n\ttest_specte\n\taccess_min\n\tfind_min\n\tapic\n\tl1tf");
+    usage();
   }
 
   munmap(leak_page, PAGE_SIZE);
