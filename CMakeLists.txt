@@ -22,6 +22,11 @@ add_executable(kvm_leak
 target_link_libraries(kvm_leak rt m)
 target_include_directories(kvm_leak PRIVATE include deps/PTEditor)
 
+add_executable(victim
+  src/victim.c
+)
+target_include_directories(victim PRIVATE include)
+
 add_custom_target(pteditor.ko
   WORKING_DIRECTORY ../deps/PTEditor
   COMMAND make pteditor
