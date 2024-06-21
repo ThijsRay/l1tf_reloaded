@@ -23,4 +23,4 @@ remove_modules:
 	rmmod pteditor
 
 %:
-	$(MAKE) -C build
+	$(MAKE) -C build $@
