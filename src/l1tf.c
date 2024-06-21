@@ -686,7 +686,7 @@ int l1tf_main(int argc, char *argv[argc]) {
   if (argc >= 2) {
     if (!strcmp("leak", argv[1])) {
       return l1tf_main_leak(argc, argv, l1tf_do_leak);
-    } else if (!strcmp("leak_bitwise", argv[1])) {
+    } else if (!strcmp("leak_repeat", argv[1])) {
       return l1tf_main_leak(argc, argv, l1tf_do_leak_nibblewise);
     } else if (!strcmp("scan", argv[1])) {
       return l1tf_main_scan(argc, argv);
@@ -697,7 +697,7 @@ int l1tf_main(int argc, char *argv[argc]) {
   fprintf(stderr,
           "Usage\n"
           "\t%s leak\n"
-          "\t%s leak_nibblewise\n"
+          "\t%s leak_repeat\n"
           "\t%s scan\n",
           name, name, name);
   exit(1);

