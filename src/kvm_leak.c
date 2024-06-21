@@ -279,7 +279,7 @@ void usage(void) {
         "\tdetermine\n"
         "\tinform_kvm_assist\n"
         "\tcalc\n"
-        "\ttest_specte\n"
+        "\ttest_spectre\n"
         "\taccess_min\n"
         "\tfind_min\n"
         "\tapic\n"
