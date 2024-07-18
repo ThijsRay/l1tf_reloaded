@@ -133,7 +133,7 @@ size_t find_min(void *buf) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
 
-        size_t time = access_buffer_with_spectre(buf, idx, 1000);
+        size_t time = access_buffer_with_spectre(buf, idx, 50);
         if (time < 220) {
           time = access_buffer_with_spectre(buf, idx, 10000);
           if (time < 200) {
