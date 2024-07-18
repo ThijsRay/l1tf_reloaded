@@ -9,7 +9,7 @@
 #define L2_WAYS (4)
 #define CACHE_LINE_SIZE (64)
 
-#define CACHE_HIT_THRESHOLD (170)
+#define CACHE_HIT_THRESHOLD (160)
 
 // 32 GiB
 #define HOST_MEMORY_SIZE (34359738368)
