@@ -19,8 +19,6 @@ static inline __attribute__((always_inline)) void disable_smap(void) {
 #if HAS_SMAP
   __asm__ volatile("stac" ::: "cc");
 }
-#else
-#error "SMAP has to be enabled!"
 #endif
 
 static inline __attribute__((always_inline)) void enable_smap(void) {
