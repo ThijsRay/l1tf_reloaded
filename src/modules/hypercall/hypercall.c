@@ -16,13 +16,13 @@ static struct proc_dir_entry *proc_send_ipi;
 static struct proc_dir_entry *proc_sched_yield;
 
 static inline __attribute__((always_inline)) void disable_smap(void) {
-#ifdef HAS_SMAP
+#if (HAS_SMAP + 0)
   __asm__ volatile("stac" ::: "cc");
 #endif
 }
 
 static inline __attribute__((always_inline)) void enable_smap(void) {
-#ifdef HAS_SMAP
+#if (HAS_SMAP + 0)
   __asm__ volatile("clac" ::: "cc");
 #endif
 }
