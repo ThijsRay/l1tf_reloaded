@@ -15,8 +15,19 @@ static struct proc_dir_entry *proc_self_send_ipi;
 static struct proc_dir_entry *proc_send_ipi;
 static struct proc_dir_entry *proc_sched_yield;
 
-static inline __attribute__((always_inline)) void disable_smap(void) { __asm__ volatile("stac" ::: "cc"); }
-static inline __attribute__((always_inline)) void enable_smap(void) { __asm__ volatile("clac" ::: "cc"); }
+static inline __attribute__((always_inline)) void disable_smap(void) {
+#if HAS_SMAP
+  __asm__ volatile("stac" ::: "cc");
+}
+#else
+#error "SMAP has to be enabled!"
+#endif
+
+static inline __attribute__((always_inline)) void enable_smap(void) {
+#if HAS_SMAP
+  __asm__ volatile("clac" ::: "cc");
+#endif
+}
 
 static inline __attribute__((always_inline)) void confuse_branch_predictor(void) {
   // Bring the branch predictor into a known state of history
