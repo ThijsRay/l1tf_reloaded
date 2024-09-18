@@ -60,6 +60,12 @@ static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs) {
   pr_info("map->phys_map[0] is at %px (phys addr: %px)\n", (void *)MAP_ADDR,
           (void *)virt_to_phys((void *)MAP_ADDR));
 
+  if (MAP_ADDR) {
+    for (size_t i = 0; i <= map->max_apic_id; ++i) {
+      pr_info("Content of map->phys_map[%d] is %px", i, map->phys_map[i]);
+    }
+  }
+
   if (MAP_ADDR && PAGE_ADDR) {
     pr_info("index into map->phys_map is 0x%lx (phys addr: %px)\n", calculate_min(PAGE_ADDR, MAP_ADDR),
             (void *)virt_to_phys((void *)PAGE_ADDR));
