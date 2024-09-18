@@ -62,7 +62,7 @@ static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
   if (MAP_ADDR) {
     for (size_t i = 0; i <= map->max_apic_id; ++i) {
-      pr_info("Content of map->phys_map[%d] is %px", i, map->phys_map[i]);
+      pr_info("Content of map->phys_map[%ld] is %px", i, map->phys_map[i]);
     }
   }
 
