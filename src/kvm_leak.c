@@ -250,7 +250,7 @@ void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
 
   printf("Accessing 0x%lx...\n", min);
   while (1) {
-    access_buffer_with_spectre(leak_page, min, 10000000);
+    access_buffer_with_spectre(leak_page, min, 10000);
   }
 }
 
