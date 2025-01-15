@@ -95,7 +95,8 @@ static ssize_t search_for_page(struct file *file, const char __user *buff, size_
 
     if (value == page_value) {
       PAGE_ADDR = page;
-      pr_info("kvm_assist: leak page is at %px\n", (void *)PAGE_ADDR);
+      pr_info("kvm_assist: leak page is at %px (phys addr: %px)\n", (void *)PAGE_ADDR,
+              (void *)virt_to_phys((void *)PAGE_ADDR));
       return 0;
     }
   }
