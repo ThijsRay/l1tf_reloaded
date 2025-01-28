@@ -79,6 +79,14 @@ int main(void) {
   printf("Virt %p, Phys: 0x%lx\nData:\n", buffer, virt_to_phys(buffer));
   dump_memory((void *)buffer, sizeof(test));
 
+  printf("accessing the entire buffer...\n");
+  while(1) {
+    for (size_t i = 0; i < sizeof(test); ++i) {
+      *(volatile char *)&test[i];
+      *(volatile char *)&buffer[i];
+    }
+  }
+
   printf("clflushing the entire buffer...\n");
   for (size_t i = 0; i < sizeof(test); ++i) {
     clflush((void *)&test[i]);
