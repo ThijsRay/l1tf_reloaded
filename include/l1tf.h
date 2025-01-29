@@ -13,9 +13,9 @@
 // The tradeoff is that we require a larger speculative window, and need
 // some additional post processing to reconstruct the data.
 #define AMOUNT_OF_OPTIONS_IN_NIBBLE 16
-#define AMOUNT_OF_NIBBLES_PER_RELOAD 2
+#define AMOUNT_OF_NIBBLES_PER_RELOAD 1
 #define AMOUNT_OF_RELOAD_PAGES (AMOUNT_OF_OPTIONS_IN_NIBBLE * AMOUNT_OF_NIBBLES_PER_RELOAD)
-typedef uint8_t reload_buffer_t[AMOUNT_OF_NIBBLES_PER_RELOAD][AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
+typedef uint8_t reload_buffer_t[AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
 
 #define AMOUNT_OF_BYTE_OPTIONS 256
 typedef uint8_t full_reload_buffer_t[AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
