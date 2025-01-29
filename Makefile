@@ -1,26 +1,36 @@
+.PHONY: all
+all: build
+	$(MAKE) kvm_leak
+	$(MAKE) victim
+	$(MAKE) hypercall
+	$(MAKE) kvm_assist
+	$(MAKE) pteditor.ko
+
+.PHONY: load_modules
+load_modules: hypercall pteditor.ko
+	sudo insmod deps/PTEditor/module/pteditor.ko
+	sudo insmod build/hypercall/hypercall.ko
+
+.PHONY: unload_modules
+unload_modules:
+	sudo rmmod pteditor
+	sudo rmmod hypercall
+
+.PHONY: load_kvm_assist
+load_kvm_assist: kvm_assist
+	sudo insmod build/kvm_assist/kvm_assist.ko
+
+.PHONY: unload_kvm_assist
+unload_kvm_assist:
+	sudo rmmod kvm_assist
+
 .PHONY: build
 build: CMakeLists.txt
 	mkdir -p build && cd build && cmake ..
 
 .PHONY: clean
 clean:
-	$(MAKE) -C build clean
-	$(MAKE) -C src/modules clean
-	rm -rf build
-
-.PHONY: modules
-modules: pteditor.ko
-	$(MAKE) -C src/modules
-
-.PHONY: insert_modules
-insert_modules: modules pteditor.ko
-	insmod src/modules/hypercall/hypercall.ko
-	insmod deps/PTEditor/module/pteditor.ko
-
-.PHONY: remove_modules
-remove_modules:
-	rmmod hypercall
-	rmmod pteditor
+	$(RM) -r build
 
 %:
 	$(MAKE) -C build $@
