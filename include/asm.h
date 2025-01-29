@@ -22,16 +22,3 @@ static inline __attribute__((always_inline)) void maccess(void *ptr) {
 static inline void cpuid(int code, uint32_t *a, uint32_t *d) {
   __asm__ volatile("cpuid" : "=a"(*a), "=d"(*d) : "0"(code) : "ebx", "ecx");
 }
-
-static inline __attribute__((always_inline)) void leak_read(void *leak_buffer, void *reload_buffer) {
-  __asm__ volatile(
-      // "clflush (%0)\n"
-      // "sfence\n"
-      "movq (%0), %%rax\n"
-      "andq $0xff, %%rax\n"
-      "shlq $0xa, %%rax\n"
-      "prefetcht0 (%1, %%rax)\n"
-      "movq (%1, %%rax), %%rax\n" ::"r"(leak_buffer),
-      "r"(reload_buffer)
-      : "rax");
-}

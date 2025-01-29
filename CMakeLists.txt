@@ -13,7 +13,6 @@ add_compile_options(
 add_executable(kvm_leak
   src/kvm_leak.c
   src/time_deque.c
-  src/cache_eviction.c
   src/l1tf.c
   src/msr.c
   src/statistics.c
