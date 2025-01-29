@@ -9,12 +9,6 @@ To run this in an attacker VM, make sure you have the following things setup:
 - `gcc`, we used version `gcc (GCC) 14.2.1 20240910`
 - Headers for your Linux kernel, compiled with the patch from Figure 6 of the paper.
 
-Then, download the git submodules
-
-```sh
-git submodule update --init --recursive
-```
-
 ## Building
 
 To build everything, just run

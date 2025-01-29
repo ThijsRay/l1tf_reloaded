@@ -24,8 +24,10 @@ load_kvm_assist: kvm_assist
 unload_kvm_assist:
 	sudo rmmod kvm_assist
 
-.PHONY: build
-build: CMakeLists.txt
+deps/PTEditor/ptedit_header.h:
+	git submodule update --init --recursive
+
+build: CMakeLists.txt deps/PTEditor/ptedit_header.h
 	mkdir -p build && cd build && cmake ..
 
 .PHONY: clean
