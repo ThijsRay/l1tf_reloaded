@@ -19,6 +19,7 @@ typedef uint8_t reload_buffer_t[AMOUNT_OF_OPTIONS_IN_NIBBLE][PAGE_SIZE];
 
 #define AMOUNT_OF_BYTE_OPTIONS 256
 typedef uint8_t full_reload_buffer_t[AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
+typedef uint8_t two_byte_reload_buffer[AMOUNT_OF_BYTE_OPTIONS * AMOUNT_OF_BYTE_OPTIONS][PAGE_SIZE];
 
 static inline __attribute__((always_inline)) void asm_l1tf_leak_high_nibble(void *leak_addr,
                                                                             reload_buffer_t reload_buffer) {
@@ -182,7 +183,7 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_b
 reload_buffer_t *l1tf_reload_buffer_create(void);
 void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer);
 
-void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]);
+void find_ffff_values(scan_opts_t scan_opts);
 
 void *l1tf_spawn_leak_page(void);
 

