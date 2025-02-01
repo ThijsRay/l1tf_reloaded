@@ -101,11 +101,12 @@ int main(void) {
     clflush((void *)&buffer[i]);
   }
 
-  printf("The data is still in memory, but not in cache. It will not be\n"
-         "accessed anymore from now on. Going into an infinite loop...\n");
+  printf("The data is still in memory, but not in cache.\n"
+         "It will not be accessed anymore by the victim from now on.\n"
+         "Going into an infinite loop...\n");
 
   while (1) {
-    sched_yield();
+    sleep(1);
   }
 
   return 0;
