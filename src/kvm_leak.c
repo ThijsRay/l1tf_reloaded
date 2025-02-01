@@ -317,7 +317,7 @@ void *find_base(void *buf) {
   opts.start = 0x218;
   opts.end = 34359738368; // 32 GiB
   opts.stride = 4096;
-  find_ffff_values(opts);
+  l1tf_find_ffff_values(opts);
 
   return NULL;
 }

