@@ -76,7 +76,12 @@ int main(void) {
   char *buffer = aligned_alloc(PAGE_SIZE, sizeof(test));
   memcpy(buffer, (void *)SECRET_DATA, sizeof(test));
 
-  printf("Virt %p, Phys: 0x%lx\nData:\n", buffer, virt_to_phys(buffer));
+  uintptr_t phys_addr = virt_to_phys(buffer);
+  if (phys_addr != 0) {
+    printf("Phys: 0x%lx\n", virt_to_phys(buffer));
+  }
+
+  printf("Data:\n");
   dump_memory((void *)buffer, sizeof(test));
 
   printf("clflushing the entire buffer...\n");
