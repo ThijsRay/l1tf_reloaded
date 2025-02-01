@@ -17,3 +17,69 @@ volatile uint8_t SECRET_DATA[] = {
     0x3b, 0xd1, 0x05, 0xed, 0xdc, 0x31, 0xe9, 0x34, 0x62, 0xcc, 0xc3, 0xd4, 0x18, 0xb9, 0x0e, 0x06,
     0x39, 0xce, 0xb6, 0x07, 0x26, 0xd3, 0x62, 0x45, 0x51, 0xbd, 0x8f, 0x26, 0x85, 0x5c, 0x01, 0x91,
 };
+
+// If we're printing all characters AS IS, then we might modify things like
+// the current cursor position of the terminal.
+void escape_ascii(char in, char out[3]) {
+  switch (in) {
+  case 0:
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+  case 14:
+  case 15:
+  case 16:
+  case 17:
+  case 18:
+  case 19:
+  case 20:
+  case 21:
+  case 22:
+  case 23:
+  case 24:
+  case 25:
+  case 26:
+  case 27:
+  case 28:
+  case 29:
+  case 30:
+  case 31:
+  case 127:
+    out[0] = ' ';
+    break;
+  case 7:
+    out[0] = '\\';
+    out[1] = 'a';
+    break;
+  case 8:
+    out[0] = '\\';
+    out[1] = 'b';
+    break;
+  case 9:
+    out[0] = '\\';
+    out[1] = 't';
+    break;
+  case 10:
+    out[0] = '\\';
+    out[1] = 'n';
+    break;
+  case 11:
+    out[0] = '\\';
+    out[1] = 'v';
+    break;
+  case 12:
+    out[0] = '\\';
+    out[1] = 'f';
+    break;
+  case 13:
+    out[0] = '\\';
+    out[1] = 'r';
+    break;
+  default:
+    out[0] = in;
+    break;
+  }
+}
