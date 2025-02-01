@@ -34,5 +34,5 @@ build: CMakeLists.txt deps/PTEditor/ptedit_header.h
 clean:
 	$(RM) -r build
 
-%:
+%: build
 	$(MAKE) -C build $@
