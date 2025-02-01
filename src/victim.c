@@ -60,16 +60,27 @@ uint64_t virt_to_phys(volatile void *virtual_address) {
 volatile uint8_t test[sizeof(SECRET_DATA)] = {0};
 
 void dump_memory(volatile uint8_t *ptr, uint32_t size) {
-  uint64_t i = 0;
+  const size_t line_size = 0x10;
+  size_t i = 0;
 
-  for (i = 0; i < size; i += 1) {
-    if (i % 0x10 == 0 && i != 0) {
+  for (i = 0; i <= size; i += 1) {
+    if (i % line_size == 0 && i != 0) {
+
+      printf("\t");
+      for (size_t j = i - line_size; j < i; ++j) {
+        char out[3];
+        escape_ascii(ptr[j], out);
+        printf("%s", out);
+      }
+
       printf("\n");
+
+      if (i == size) {
+        break;
+      }
     }
     printf("%02x ", ptr[i]);
   }
-
-  printf("\n");
 }
 
 int main(void) {
@@ -81,10 +92,10 @@ int main(void) {
     printf("Phys: 0x%lx\n", virt_to_phys(buffer));
   }
 
-  printf("Data:\n");
+  printf("\nData (hex):\t\t\t\t\t\tData (ASCII):\n");
   dump_memory((void *)buffer, sizeof(test));
 
-  printf("clflushing the entire buffer...\n");
+  printf("\nclflushing the entire buffer...\n");
   for (size_t i = 0; i < sizeof(test); ++i) {
     clflush((void *)&test[i]);
     clflush((void *)&buffer[i]);
