@@ -190,15 +190,16 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
       if (i % (2 * bytes_per_line) == ((2 * bytes_per_line) - 2)) {
         // We would like to compare the results to the ground truth, to see the accuracy
-        printf("\t( ");
+        printf("\t");
         size_t line = i / (2 * bytes_per_line);
         for (size_t byte = 0; byte < bytes_per_line; ++byte) {
           size_t idx = byte + (line * bytes_per_line);
-          char secret_byte = SECRET_DATA[idx];
-          printf("%c%c ", ((assembled_results[idx] & 0xf0) == (secret_byte & 0xf0) ? '.' : 'X'),
-                 ((assembled_results[idx] & 0xf) == (secret_byte & 0xf) ? '.' : 'X'));
+          char out[3];
+          escape_ascii(assembled_results[idx], out);
+          printf("%s", out);
         }
-        printf(")");
+
+        printf("          ");
 
         printf("\n\r");
       }

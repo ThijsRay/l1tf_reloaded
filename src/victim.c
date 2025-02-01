@@ -83,8 +83,10 @@ void dump_memory(volatile uint8_t *ptr, uint32_t size) {
   }
 }
 
+char *buffer = NULL;
+
 int main(void) {
-  char *buffer = aligned_alloc(PAGE_SIZE, sizeof(test));
+  buffer = aligned_alloc(PAGE_SIZE, sizeof(test));
   memcpy(buffer, (void *)SECRET_DATA, sizeof(test));
 
   uintptr_t phys_addr = virt_to_phys(buffer);
