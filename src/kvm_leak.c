@@ -28,7 +28,6 @@ enum half_spectre_method {
 };
 static const enum half_spectre_method method = METHOD_SELF_SEND_IPI;
 
-#define HYPERCALL_PATH_SIZE 127
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
   static int fd_sched_yield = -1;
   static int fd_send_ipi = -1;
