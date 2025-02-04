@@ -62,8 +62,9 @@ static ssize_t self_send_ipi_write(struct file *file, const char __user *buff, s
     return -EFAULT;
   }
 
-  int type = KVM_HC_SEND_IPI;
-  vmcall4(type, 1, 0, opts.min, 0);
+  for (int i = 0; i < opts.repeat; i++)
+    vmcall4(KVM_HC_SEND_IPI, 1, 0, opts.min, 0);
+
   return len;
 }
 

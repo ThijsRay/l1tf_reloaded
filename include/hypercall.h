@@ -73,6 +73,7 @@ struct send_ipi_hypercall_opts {
 
 struct self_send_ipi_hypercall {
   uint32_t min;
+  int repeat;
 };
 
 struct send_ipi_hypercall {
