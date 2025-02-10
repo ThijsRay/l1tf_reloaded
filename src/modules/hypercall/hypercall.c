@@ -47,6 +47,7 @@ static noinline void vmcall4(int hypercall_number, unsigned long rbx, unsigned l
                              unsigned long rsi) {
   confuse_branch_predictor();
   asm volatile("vmcall" : "+a"(hypercall_number), "+b"(rbx), "+c"(rcx), "+d"(rdx), "+S"(rsi));
+  pr_info("vmcall4 result: %ld\n", hypercall_number);
 }
 
 static ssize_t self_send_ipi_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
