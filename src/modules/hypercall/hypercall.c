@@ -11,6 +11,7 @@
 #include "timing.h"
 
 static struct proc_dir_entry *proc_root;
+static struct proc_dir_entry *proc_halt;
 static struct proc_dir_entry *proc_self_send_ipi;
 static struct proc_dir_entry *proc_send_ipi;
 static struct proc_dir_entry *proc_sched_yield;
@@ -47,7 +48,7 @@ static noinline void vmcall4(int hypercall_number, unsigned long rbx, unsigned l
                              unsigned long rsi) {
   confuse_branch_predictor();
   asm volatile("vmcall" : "+a"(hypercall_number), "+b"(rbx), "+c"(rcx), "+d"(rdx), "+S"(rsi));
-  pr_info("vmcall4 result: %ld\n", hypercall_number);
+  pr_info("vmcall4 result: %d\n", hypercall_number);
 }
 
 static ssize_t self_send_ipi_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
@@ -144,6 +145,19 @@ static ssize_t sched_yield_write(struct file *file, const char __user *buff, siz
   return time;
 }
 
+static ssize_t write_halt(struct file *file, const char __user *buff, size_t len, loff_t *off)
+{
+  pr_info("write_halt: before halt\n");
+  asm volatile ("hlt");
+  pr_info("write_halt: after halt\n");
+  *off += len;
+  return len;
+}
+
+static const struct proc_ops halt_fops = {
+    .proc_write = write_halt,
+};
+
 static const struct proc_ops send_ipi_fops = {
     .proc_write = send_ipi_write,
 };
@@ -169,6 +183,8 @@ static int __init hypercall_main(void) {
     pr_alert("hypercall: Error: Could not initialize /proc/%s\n", procfs_root_name);
     return -ENOMEM;
   }
+
+  proc_halt = proc_create("halt", 0666, proc_root, &halt_fops);
 
   // Initialize the send_ipi entry
   proc_send_ipi = proc_create(procfs_ipi_name, 0666, proc_root, &send_ipi_fops);
@@ -210,6 +226,7 @@ static void __exit hypercall_exit(void) {
   proc_remove(proc_self_send_ipi);
   proc_remove(proc_sched_yield);
   proc_remove(proc_send_ipi);
+  proc_remove(proc_halt);
   proc_remove(proc_root);
   pr_info("hypercall: procfs entries removed\n");
 }

