@@ -20,14 +20,18 @@ add_executable(kvm_leak
   src/spectre.c
 )
 
+target_link_libraries(kvm_leak rt m)
+target_include_directories(kvm_leak PRIVATE include deps/PTEditor)
+
 add_executable(exploit
   src/exploit.c
   src/l1tf.c
   src/helpers.c
+  src/statistics.c
 )
 
-target_link_libraries(kvm_leak rt m)
-target_include_directories(kvm_leak PRIVATE include deps/PTEditor)
+target_link_libraries(exploit rt m)
+target_include_directories(exploit PRIVATE include deps/PTEditor)
 
 add_executable(victim
   src/victim.c

