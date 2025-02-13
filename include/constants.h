@@ -1,6 +1,6 @@
 #pragma once
 #define PAGE_SIZE (4096)
-#define HUGE_PAGE_SIZE (2097152) // 2MiB
+#define HUGE_PAGE_SIZE (2 * 1024*1024)
 #define VALUES_IN_BYTE (256)
 
 #define L1_SETS (64)
@@ -11,7 +11,6 @@
 
 #define CACHE_HIT_THRESHOLD (160)
 
-// 32 GiB
-#define HOST_MEMORY_SIZE (34359738368)
+#define HOST_MEMORY_SIZE (32 * 1024ULL*1024*1024)
 
 #define STRIDE (PAGE_SIZE + CACHE_LINE_SIZE)

@@ -16,6 +16,14 @@ add_executable(kvm_leak
   src/l1tf.c
   src/msr.c
   src/statistics.c
+  src/helpers.c
+  src/spectre.c
+)
+
+add_executable(exploit
+  src/exploit.c
+  src/l1tf.c
+  src/helpers.c
 )
 
 target_link_libraries(kvm_leak rt m)

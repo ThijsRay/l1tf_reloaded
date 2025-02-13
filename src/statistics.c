@@ -118,3 +118,8 @@ size_t threshold_deviate_from_median(const size_t n, const size_t low[n],
   size_t median = low[n / 2];
   return median + (median * allowed_error);
 }
+
+long rand64(void)
+{
+  return ((long)rand() << 32) | rand();
+}

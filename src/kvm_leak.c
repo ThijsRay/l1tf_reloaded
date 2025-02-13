@@ -20,15 +20,16 @@
 #include "hypercall.h"
 #include "l1tf.h"
 #include "time_deque.h"
+#include "helpers.h"
 
 enum half_spectre_method {
   METHOD_IPI,
   METHOD_YIELD,
   METHOD_SELF_SEND_IPI,
 };
-static const enum half_spectre_method method = METHOD_SELF_SEND_IPI;
 
 size_t access_buffer_with_spectre(void *buf, const size_t idx, const size_t iters) {
+  static const enum half_spectre_method method = METHOD_SELF_SEND_IPI;
   static int fd_sched_yield = -1;
   static int fd_send_ipi = -1;
   static int fd_self_send_ipi = -1;
@@ -368,6 +369,8 @@ void usage(void) {
 int main(int argc, char *argv[argc]) {
   struct time_deque d;
   time_deque_init(&d);
+
+  srand(time(0));
 
   if (argc < 2) {
     errno = EINVAL;

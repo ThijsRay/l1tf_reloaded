@@ -19,3 +19,5 @@ size_t threshold_with_least_error(const size_t n, const size_t low[n],
 
 size_t threshold_deviate_from_median(const size_t n, const size_t low[n],
                                      const float allowed_error);
+
+long rand64(void);
