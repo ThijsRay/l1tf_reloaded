@@ -629,8 +629,10 @@ uintptr_t l1tf_find_page_pa(void *p)
 {
   const int verbose = 1;
 
+#if DEBUG
   uintptr_t real_pa = helper_find_page_pa(p);
   if (verbose) printf("l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
+#endif
 
   uint64_t t_start = clock_read();
 
