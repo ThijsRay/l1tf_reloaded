@@ -3,4 +3,5 @@
 #include "hypercall.h"
 
 void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base);
-
+void spectre_touch_base_start(void);
+void spectre_touch_base_stop(void);

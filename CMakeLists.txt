@@ -13,8 +13,9 @@ add_compile_options(
 
 add_executable(exploit
   src/exploit.c
-  src/l1tf.c
   src/helpers.c
+  src/l1tf.c
+  src/spectre.c
   src/statistics.c
   src/util.c
 )
