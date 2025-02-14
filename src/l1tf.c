@@ -625,6 +625,15 @@ static int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch
   return hits;
 }
 
+void l1tf_test(void *va, uintptr_t pa, int iters)
+{
+  *(uint64_t *)va = rand64();
+  uint64_t t_start = clock_read();
+  int hits = l1tf_oracle16(*(uint64_t *)va, pa, iters, va);
+  double time = (clock_read()-t_start)/1000000000.0;
+  printf("l1tf_test: hits %d / %d (%.1f%%) | hits/sec %.1f | iters/sec %.1f\n", hits, iters, 100.0*hits/iters, hits/time, iters/time);
+}
+
 uintptr_t l1tf_find_page_pa(void *p)
 {
   const int verbose = 2;

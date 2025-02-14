@@ -182,6 +182,7 @@ int l1tf_main(int argc, char *argv[argc]);
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void l1tf_test(void *va, uintptr_t pa, int iters);
 uintptr_t l1tf_find_page_pa(void *p);
 uintptr_t l1tf_find_base(void);
 void l1tf_init(void);
