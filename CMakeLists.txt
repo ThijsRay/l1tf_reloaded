@@ -8,7 +8,7 @@ add_compile_options(
   -Wformat=2 -Wno-unused-parameter -Wshadow
   -Wwrite-strings -Wstrict-prototypes -Wold-style-definition
   -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
-  -DDEBUG=0
+  -DDEBUG=1
 )
 
 add_executable(kvm_leak
