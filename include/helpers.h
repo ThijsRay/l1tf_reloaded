@@ -7,3 +7,4 @@ uint64_t hc_read_pa(uintptr_t pa);
 uintptr_t hc_phys_map_base(void);
 uintptr_t hc_direct_map(void);
 uintptr_t helper_find_page_pa(void *page);
+uintptr_t helper_base_pa(void);

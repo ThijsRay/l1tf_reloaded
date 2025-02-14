@@ -9,6 +9,8 @@
 #define L2_WAYS (4)
 #define CACHE_LINE_SIZE (64)
 
+#define CPU 0
+
 #define CACHE_HIT_THRESHOLD (160)
 
 #define HOST_MEMORY_SIZE (32 * 1024ULL*1024*1024)

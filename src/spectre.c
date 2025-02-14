@@ -10,6 +10,7 @@
 #include "constants.h"
 #include "spectre.h"
 #include "timing.h"
+#include "util.h"
 
 pthread_t sibling = -1;
 int sibling_stop = 0;
@@ -76,20 +77,21 @@ static void do_spectre_touch_base(int repeat) {
 static void *spectre_touch_base(void *data)
 {
 	const int verbose = 1;
-	if (verbose) printf("[sibling] starting spectre_touch_base\n");
+	set_cpu_affinity(get_sibling(CPU));
+	if (verbose >= 1) printf("[sibling] starting spectre_touch_base\n");
 	static int triggers = 0;
 	uint64_t start = clock_read();
 	while (!sibling_stop) {
 		do_spectre_touch_base(1000);
 		triggers += 1000;
-		if (verbose) if (triggers % 100000 == 0) {
+		if (verbose >= 2) if (triggers % 100000 == 0) {
 			double duration = (clock_read() - start) / 1000000000.0;
 			printf("[sibling] spectre_touch_base: triggers = %10d   triggers/sec: %.1f K", triggers, 0.001*triggers/duration);
 			fflush(stdout);
 			printf("\33[2K\r");
 		}
 	}
-	if (verbose) printf("[sibling] exiting spectre_touch_base\n");
+	if (verbose >= 1) printf("[sibling] exiting spectre_touch_base\n");
 	return NULL;
 }
 

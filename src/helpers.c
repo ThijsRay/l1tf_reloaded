@@ -52,3 +52,8 @@ uintptr_t helper_find_page_pa(void *page)
 	} while (hc_read_pa(pa) != *p);
 	return pa;
 }
+
+uintptr_t helper_base_pa(void)
+{
+	return hc_phys_map_base() - hc_direct_map();
+}
