@@ -22,19 +22,10 @@ static int half_spectre_raw(void *buf, const size_t idx, const size_t iters) {
 		.ptr = NULL
 	};
 	if (opts.current_cpu_id == -1ULL) {
-		// Get current cpu.
 		unsigned int cpu = 0;
 		if (getcpu(&cpu, NULL) == -1) {
 			err(EXIT_FAILURE, "Failed to get CPU");
 		}
-
-		// Pin ourselves to that cpu.
-		cpu_set_t s;
-		CPU_ZERO(&s);
-		CPU_SET(cpu, &s);
-		sched_setaffinity(0, sizeof(cpu_set_t), &s);
-
-		// Save it.
 		opts.current_cpu_id = cpu;
 	}
 

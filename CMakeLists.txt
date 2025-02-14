@@ -11,6 +11,17 @@ add_compile_options(
   -DDEBUG=0
 )
 
+add_executable(exploit
+  src/exploit.c
+  src/l1tf.c
+  src/helpers.c
+  src/statistics.c
+  src/util.c
+)
+
+target_link_libraries(exploit rt m)
+target_include_directories(exploit PRIVATE include deps/PTEditor)
+
 add_executable(kvm_leak
   src/kvm_leak.c
   src/time_deque.c
@@ -23,16 +34,6 @@ add_executable(kvm_leak
 
 target_link_libraries(kvm_leak rt m)
 target_include_directories(kvm_leak PRIVATE include deps/PTEditor)
-
-add_executable(exploit
-  src/exploit.c
-  src/l1tf.c
-  src/helpers.c
-  src/statistics.c
-)
-
-target_link_libraries(exploit rt m)
-target_include_directories(exploit PRIVATE include deps/PTEditor)
 
 add_executable(victim
   src/victim.c
