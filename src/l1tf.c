@@ -638,8 +638,6 @@ uintptr_t l1tf_find_page_pa(void *p)
 
   *(uint64_t *)p = rand64();
 
-  int ok = 0;
-  int error = 0;
 
   for (int run = 0; run < 100; run++) {
     uintptr_t start = 0; uintptr_t end = HOST_MEMORY_SIZE;
@@ -666,16 +664,10 @@ uintptr_t l1tf_find_page_pa(void *p)
           uintptr_t len = (pa-start) + run*(end-start);
           printf("l1tf_find_page_pa: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
         }
-        if (pa == real_pa)
-          ok++;
-        else
-          error++;
+        return pa;
       }
     }
   }
-
-  printf("ok = %d,   error = %d\n", ok, error);
-
   return -1;
 }
 
