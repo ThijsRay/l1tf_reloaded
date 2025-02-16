@@ -61,6 +61,8 @@ void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 	}
 }
 
+int spectres_per_halt = 100;
+
 static void do_spectre_touch_base(int repeat) {
 	static int halt_counter = 1;
 	static int fd_halt = -1;
@@ -80,7 +82,7 @@ static void do_spectre_touch_base(int repeat) {
 
 	halt_counter -= repeat;
 	if (halt_counter <= 0) {
-		halt_counter = 700;
+		halt_counter = spectres_per_halt;
 		for (int r = 0; r < 2; r++)
 			assert(write(fd_halt, NULL, 0) == 0);
 	}

