@@ -631,7 +631,17 @@ void l1tf_test(void *va, uintptr_t pa, int iters)
   uint64_t t_start = clock_read();
   int hits = l1tf_oracle16(*(uint64_t *)va, pa, iters, va);
   double time = (clock_read()-t_start)/1000000000.0;
-  printf("l1tf_test: hits %d / %d (%.1f%%) | hits/sec %.1f | iters/sec %.1f\n", hits, iters, 100.0*hits/iters, hits/time, iters/time);
+  printf("l1tf_test: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
+      hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
+}
+
+void l1tf_test_base(uintptr_t pa, int iters)
+{
+  uint64_t t_start = clock_read();
+  int hits = l1tf_oracle16(0xffff, pa, iters, NULL);
+  double time = (clock_read()-t_start)/1000000000.0;
+  printf("l1tf_test_base: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
+      hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
 }
 
 uintptr_t l1tf_find_page_pa(void *p)

