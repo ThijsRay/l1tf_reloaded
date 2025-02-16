@@ -61,8 +61,6 @@ void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 	}
 }
 
-int spectres_per_halt = 100;
-
 static void do_spectre_touch_base(int repeat) {
 	static int halt_counter = 1;
 	static int fd_halt = -1;
@@ -82,7 +80,7 @@ static void do_spectre_touch_base(int repeat) {
 
 	halt_counter -= repeat;
 	if (halt_counter <= 0) {
-		halt_counter = spectres_per_halt;
+		halt_counter = 1100;
 		for (int r = 0; r < 2; r++)
 			assert(write(fd_halt, NULL, 0) == 0);
 	}
@@ -90,7 +88,7 @@ static void do_spectre_touch_base(int repeat) {
 
 static void *spectre_touch_base(void *data)
 {
-	const int verbose = 2;
+	const int verbose = 1;
 	set_cpu_affinity(get_sibling(CPU));
 	if (verbose >= 1) printf("[sibling] starting spectre_touch_base\n");
 	static int triggers = 0;

