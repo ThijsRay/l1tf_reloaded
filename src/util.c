@@ -45,6 +45,7 @@ int get_sibling(int cpu_id)
         assert(fscanf(f, "%d", &brother) == 1);
 	fgetc(f);
         assert(fscanf(f, "%d", &sister) == 1);
+        fclose(f);
         if (brother == cpu_id)
                 return sister;
         if (sister == cpu_id)

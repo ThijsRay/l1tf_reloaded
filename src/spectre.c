@@ -56,7 +56,7 @@ void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 		for (int delta_off = 0; delta_off <= 0x200; delta_off += 0x200) {
 			uint64_t off = pa_p - pa_base + delta_off;
 			printf("half_spectre | pa_base = %lx | p's pa = %lx | offset = %lx | idx = %lx ", pa_base, pa_p+delta_p, off, off/8);
-			printf("| hits = %d / 10M\n", half_spectre_raw(p + delta_p, off/8, 10000000));
+			printf("| hits = %d / 1M\n", half_spectre_raw(p + delta_p, off/8, 1000000));
 		}
 	}
 }
@@ -88,7 +88,7 @@ static void do_spectre_touch_base(int repeat) {
 
 static void *spectre_touch_base(void *data)
 {
-	const int verbose = 1;
+	const int verbose = 0;
 	set_cpu_affinity(get_sibling(CPU));
 	if (verbose >= 1) printf("[sibling] starting spectre_touch_base\n");
 	static int triggers = 0;

@@ -1,4 +1,8 @@
-.PHONY: all
+.PHONY: run_exploit
+run_exploit:
+	make exploit
+	stdbuf -oL ./build/exploit | tee -a output.txt
+
 all: build
 	$(MAKE) kvm_leak
 	$(MAKE) victim
