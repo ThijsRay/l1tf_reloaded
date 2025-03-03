@@ -138,7 +138,7 @@ void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer) {
 }
 
 void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
-  initialize_pteditor_lib();
+  // initialize_pteditor_lib();
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
   fprintf(stderr, "Request leak and reload buffers\n");
