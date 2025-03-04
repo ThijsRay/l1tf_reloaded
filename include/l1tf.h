@@ -164,6 +164,8 @@ typedef struct {
   size_t stride;
 } scan_opts_t;
 
+void l1tf_do_leak(const uintptr_t phys_addr, const size_t length);
+
 leak_addr_t l1tf_leak_buffer_create(void);
 void l1tf_leak_buffer_modify(leak_addr_t *leak, uintptr_t ptr);
 void l1tf_leak_buffer_free(leak_addr_t *leak);
