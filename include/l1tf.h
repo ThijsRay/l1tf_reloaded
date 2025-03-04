@@ -182,6 +182,7 @@ int l1tf_main(int argc, char *argv[argc]);
 
 ////////////////////////////////////////////////////////////////////////////////
 
+char *l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes);
 int l1tf_test(void *va, uintptr_t pa, int iters);
 int l1tf_test_base(uintptr_t pa, int iters);
 uintptr_t l1tf_find_page_pa(void *p);

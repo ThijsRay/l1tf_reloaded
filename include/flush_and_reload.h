@@ -5,6 +5,7 @@
 #include "timing.h"
 #include <sched.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
 

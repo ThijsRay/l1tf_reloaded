@@ -17,6 +17,19 @@ size_t maximum(const size_t n, const size_t x[n]) {
   return max_idx;
 }
 
+int max_idx(int *A, int N)
+{
+  int m = -1;
+  int mi = -1;
+  for (int i = 0; i < N; i++) {
+    if (A[i] > m) {
+      m = A[i];
+      mi = i;
+    }
+  }
+  return mi;
+}
+
 size_t mean(const size_t n, const size_t samples[n]) {
   size_t sum = 0;
   for (size_t i = 0; i < n; ++i) {

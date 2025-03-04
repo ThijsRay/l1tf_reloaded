@@ -167,10 +167,10 @@ void spectre_touch_base_stop(void)
 
 static void *half_spectre(void *data)
 {
-	const int verbose = 0;
+	const int verbose = 1;
 	uint64_t idx = (uint64_t)data;
 	set_cpu_affinity(get_sibling(CPU));
-	if (verbose >= 1) printf("[sibling] starting half_spectre\n");
+	if (verbose >= 1) printf("[sibling] starting half_spectre with idx = %lx\n", idx);
 	static int triggers = 0;
 	uint64_t start = clock_read();
 	while (!sibling_stop) {
@@ -189,7 +189,6 @@ static void *half_spectre(void *data)
 
 void half_spectre_start(uintptr_t base, uintptr_t pa)
 {
-	assert(pa >= base);
 	uint64_t idx = (pa - base) / 8;
 	if (sibling == -1LU) {
 		sibling_stop = 0;
@@ -199,7 +198,7 @@ void half_spectre_start(uintptr_t base, uintptr_t pa)
 		printf("WARNING: half_spectre_start while sibling is already busy\n");
 }
 
-void half_spectre_stop(uintptr_t base, uintptr_t pa)
+void half_spectre_stop(void)
 {
 	sibling_stop = 1;
 	assert(pthread_join(sibling, NULL) == 0);

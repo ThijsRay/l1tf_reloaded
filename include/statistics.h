@@ -3,6 +3,8 @@
 
 size_t maximum(const size_t n, const size_t x[n]);
 
+int max_idx(int *A, int N);
+
 size_t mean(const size_t n, const size_t samples[n]);
 
 double variance(const size_t n, const size_t samples[n]);
