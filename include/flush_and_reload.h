@@ -19,12 +19,17 @@ static inline __attribute__((always_inline)) void flush(const size_t nr_values,
 
 static inline __attribute__((always_inline)) ssize_t reload(const size_t nr_values,
                                                             const uint8_t buffer[nr_values * STRIDE],
-                                                            const size_t threshold) {
+                                                            const size_t threshold)
+{
+  ssize_t r = -1;
   for (size_t i = 0; i < nr_values; ++i) {
+  // for (int i = (int)nr_values-1; i >= 0; i--) {
     size_t time = access_time((void *)&buffer[i * STRIDE]);
     if (time < threshold) {
-      return i;
+      // if (r != -1)
+      //   printf("reload: prev hit %2lx, next hit %2lx\n", r, i);
+      r = i;
     }
   }
-  return -1;
+  return r;
 }
