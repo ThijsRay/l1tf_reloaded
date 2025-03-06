@@ -40,6 +40,16 @@ uintptr_t hc_direct_map(void)
 	return vmcall4(97, 105, 0, 0, 0);
 }
 
+uint64_t hc_read_va(uintptr_t va)
+{
+	return vmcall4(97, 106, va, 0, 0);
+}
+
+uintptr_t hc_translate_va(uintptr_t va)
+{
+	return vmcall4(97, 107, va, 0, 0);
+}
+
 uintptr_t helper_find_page_pa(void *page)
 {
 	uint64_t *p = (uint64_t *)page;
