@@ -167,7 +167,7 @@ void spectre_touch_base_stop(void)
 
 static void *half_spectre(void *data)
 {
-	const int verbose = 1;
+	const int verbose = 0;
 	uint64_t idx = (uint64_t)data;
 	set_cpu_affinity(get_sibling(CPU));
 	if (verbose >= 1) printf("[sibling] starting half_spectre with idx = %lx\n", idx);

