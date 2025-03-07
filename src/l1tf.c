@@ -233,6 +233,8 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
 char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t length)
 {
+  assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
+
 	half_spectre_start(base, phys_addr);
 
   reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();

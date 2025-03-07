@@ -18,6 +18,8 @@ add_executable(exploit
   src/spectre.c
   src/statistics.c
   src/util.c
+  src/reverse.c
+  src/benchmark.c
 )
 
 target_link_libraries(exploit rt m)
