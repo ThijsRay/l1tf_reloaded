@@ -184,11 +184,13 @@ int l1tf_main(int argc, char *argv[argc]);
 ////////////////////////////////////////////////////////////////////////////////
 
 void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length);
-char *thijs_l1tf_leak(uintptr_t base, const uintptr_t phys_addr, const size_t length);
+void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length);
 
-char *l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes);
+char *mathe_l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes);
 int l1tf_test(void *va, uintptr_t pa, int iters);
 int l1tf_test_base(uintptr_t pa, int iters);
 uintptr_t l1tf_find_page_pa(void *p);
 uintptr_t l1tf_find_base(void);
 void l1tf_init(void);
+void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len);
+void l1tf_leak_multi(char *data, uintptr_t base, uintptr_t pa, uintptr_t len, int iters);
