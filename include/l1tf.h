@@ -193,4 +193,3 @@ uintptr_t l1tf_find_page_pa(void *p);
 uintptr_t l1tf_find_base(void);
 void l1tf_init(void);
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len);
-void l1tf_leak_multi(char *data, uintptr_t base, uintptr_t pa, uintptr_t len, int iters);

