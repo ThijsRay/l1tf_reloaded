@@ -251,7 +251,7 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
   memset(results, 0, results_size);
 
   size_t start = (phys_addr & 0xfff);
-  assert(start + length < 0xfff);
+  assert(start + length <= 0x1000);
 
   for (int x = 0; x < 5000; ++x) {
     for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {

