@@ -57,12 +57,11 @@ uintptr_t procfs_get_physaddr(uintptr_t uaddr)
     return file_read_lx("/proc/preload_time/phys_addr");
 }
 
-uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
+uintptr_t get_feeling_translate_va(uintptr_t l0_pa, uintptr_t va)
 {
-	printf("get_feeling_translate_va(l0 = %lx, va = %lx)\n", l0, va);
-	// l0 -= hc_direct_map();
-	dump(l0);
-	uintptr_t pgd_pa = l0 + 8 * BITS(va, 48, 39);
+	printf("get_feeling_translate_va(l0_pa = %lx, va = %lx)\n", l0_pa, va);
+	dump(l0_pa);
+	uintptr_t pgd_pa = l0_pa + 8 * BITS(va, 48, 39);
 	dump(pgd_pa);
 	uintptr_t pgd = hc_read_pa(pgd_pa);
 	dump(pgd);
@@ -98,6 +97,60 @@ uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
 	uintptr_t pte_pa = l3 + 8 * BITS(va, 21, 12);
 	dump(pte_pa);
 	uintptr_t pte = hc_read_pa(pte_pa);
+	dump(pte);
+	uintptr_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
+	dump(pa);
+	printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+	return pa;
+}
+
+uintptr_t get_feeling_translate_gva(uintptr_t hl0_hpa, uintptr_t gl0_hpa, uintptr_t va)
+{
+	printf("get_feeling_translate_gva(hl0_hpa = %lx, gl0_hpa = %lx, va = %lx)\n", hl0_hpa, gl0_hpa, va);
+	uintptr_t pgd_pa = gl0_hpa + 8 * BITS(va, 48, 39);
+	dump(pgd_pa);
+	uintptr_t gpgd = hc_read_pa(pgd_pa);
+	dump(gpgd);
+	uintptr_t pgd = get_feeling_translate_va(hl0_hpa, gpgd);
+	dump(pgd);
+
+	uintptr_t l1 = pgd & PFN_MASK;
+	dump(l1);
+	uintptr_t pud_pa = l1 + 8 * BITS(va, 39, 30);
+	dump(pud_pa);
+	uintptr_t gpud = hc_read_pa(pud_pa);
+	dump(gpud);
+	uintptr_t pud = get_feeling_translate_va(hl0_hpa, gpud);
+	dump(pud);
+	if (IS_HUGE(pud)) {
+		uintptr_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
+		dump(pa);
+		printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+		return pa;
+	}
+
+	uintptr_t l2 = pud & PFN_MASK;
+	dump(l2);
+	uintptr_t pmd_pa = l2 + 8 * BITS(va, 30, 21);
+	dump(pmd_pa);
+	uintptr_t gpmd = hc_read_pa(pmd_pa);
+	dump(gpmd);
+	uintptr_t pmd = get_feeling_translate_va(hl0_hpa, gpmd);
+	dump(pmd);
+	if (IS_HUGE(pmd)) {
+		uintptr_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
+		dump(pa);
+		printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+		return pa;
+	}
+
+	uintptr_t l3 = pmd & PFN_MASK;
+	dump(l3);
+	uintptr_t pte_pa = l3 + 8 * BITS(va, 21, 12);
+	dump(pte_pa);
+	uintptr_t gpte = hc_read_pa(pte_pa);
+	dump(gpte);
+	uintptr_t pte = get_feeling_translate_va(hl0_hpa, gpte);
 	dump(pte);
 	uintptr_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	dump(pa);
@@ -288,8 +341,8 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	}
 	printf("\n");
 
-	get_feeling_translate_va(pgd, 0xffffffffc1119c78);
-	get_feeling_translate_va(pgd, direct_map+0x1234 + (10UL << 30));
+	get_feeling_translate_va(pgd - direct_map, 0xffffffffc1119c78);
+	get_feeling_translate_va(pgd - direct_map, direct_map+0x1234 + (10UL << 30));
 
 	uintptr_t kvm_arch = kvm + 0x12a0;
 	dump(kvm_arch);
@@ -391,6 +444,30 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	dump(p_pa);
 	dump(p_hpa);
 	dump(hc_read_pa(p_hpa));
+	memset(p, 0x79, 0x1000);
+	dump(hc_read_pa(p_hpa));
+	printf("\n");
+
+	dump(kvm_vcpu_arch);
+	for (int off = 0x80; off < 0xd0; off += 8) {
+		printf("kvm_vcpu_arch+%3x = %16lx\n", off, hc_read_va(kvm_vcpu_arch+off));
+	}
+	printf("\n");
+
+	uintptr_t cr3 = hc_read_va(kvm_vcpu_arch+0xa0);
+	dump(cr3);
+	cr3 &= PFN_MASK;
+	dump(cr3);
+	uintptr_t cr3_hpa = get_feeling_translate_va(hpa, cr3);
+	dump(cr3_hpa);
+	for (int off = 0xfe0; off < 0x1000; off += 8) {
+		printf("cr3_hpa+%3x = %16lx\n", off, hc_read_pa(cr3_hpa+off));
+	}
+	printf("\n");
+
+	uintptr_t text = 0xffffffffa4c00000;
+	uintptr_t pa = get_feeling_translate_gva(hpa, cr3_hpa, text);
+	dump(hc_read_pa(pa));
 }
 
 void reverse_host_kernel_data_structures(void)
