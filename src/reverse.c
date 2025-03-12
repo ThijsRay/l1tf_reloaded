@@ -17,6 +17,10 @@
 #include "timing.h"
 #include "reverse.h"
 #include "benchmark.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 
 #define STR(a) STRSTR(a)
 #define STRSTR(a) #a
@@ -28,10 +32,35 @@
 
 #define IS_HUGE(pte) (pte & (1ULL << 7))
 
+uint64_t file_read_lx(const char *filename)
+{
+    char buf[32];
+    int fd = open(filename, O_RDONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
+    int rv = read(fd, buf, 32);  if (rv < 0) { printf("error read %s", filename); exit(1); }
+    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
+    return strtoull(buf, NULL, 16);
+}
+
+static uint64_t file_write_lx(const char *filename, uint64_t uaddr)
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%lx\n", uaddr);
+    int fd = open(filename, O_WRONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
+    int rv = write(fd, buf, 32); if (rv < 0) { printf("error write %s", filename); exit(1); }
+    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
+    return 0;
+}
+
+uintptr_t procfs_get_physaddr(uintptr_t uaddr)
+{
+    file_write_lx("/proc/preload_time/phys_addr", uaddr);
+    return file_read_lx("/proc/preload_time/phys_addr");
+}
+
 uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
 {
 	printf("get_feeling_translate_va(l0 = %lx, va = %lx)\n", l0, va);
-	l0 -= hc_direct_map();
+	// l0 -= hc_direct_map();
 	dump(l0);
 	uintptr_t pgd_pa = l0 + 8 * BITS(va, 48, 39);
 	dump(pgd_pa);
@@ -217,24 +246,30 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	} while (task_struct != start);
 	printf("nr_processes: %d\n\n", nr_processes);
 
+	#define KVM_MID 0x8b8 // 0x1178
+	#define KVM_RAD 0x20
 	uintptr_t kvm = hc_read_va(kvm_vcpu);
 	dump(kvm);
 	dump(hc_translate_va(kvm));
-	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+	for (int off = KVM_MID-KVM_RAD; off < KVM_MID+KVM_RAD; off += 8) {
 		printf("kvm+%3x = %16lx\n", off, hc_read_va(kvm+off));
 	}
-	printf("\n");
+	printf("...\n");
+	// for (int off = 0x9b70-0x40; off < 0x9b70+0x40; off += 8) {
+	// 	printf("kvm+%3x = %16lx\n", off, hc_read_va(kvm+off));
+	// }
+	// printf("\n");
 
 	uintptr_t kvm_next = hc_read_va(kvm + 0x1178) - 0x1178;
 	dump(kvm_next);
-	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+	for (int off = KVM_MID-KVM_RAD; off < KVM_MID+KVM_RAD; off += 8) {
 		printf("kvm_next+%3x = %16lx\n", off, hc_read_va(kvm_next+off));
 	}
 	printf("\n");
 
 	uintptr_t kvm_prev = hc_read_va(kvm + 0x1178+8) - 0x1178;
 	dump(kvm_prev);
-	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+	for (int off = KVM_MID-KVM_RAD; off < KVM_MID+KVM_RAD; off += 8) {
 		printf("kvm_prev+%3x = %16lx\n", off, hc_read_va(kvm_prev+off));
 	}
 	printf("\n");
@@ -256,6 +291,106 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	get_feeling_translate_va(pgd, 0xffffffffc1119c78);
 	get_feeling_translate_va(pgd, direct_map+0x1234 + (10UL << 30));
 
+	uintptr_t kvm_arch = kvm + 0x12a0;
+	dump(kvm_arch);
+	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+		printf("kvm_arch+%3x = %16lx\n", off, hc_read_va(kvm_arch+off));
+	}
+	printf("\n");
+	uintptr_t after_kvm_vcpu = kvm_vcpu + 0x19d8;
+	dump(after_kvm_vcpu);
+	for (int off = 0; off < 0x100; off += 8) {
+		printf("after_kvm_vcpu+%3x = %16lx\n", off, hc_read_va(after_kvm_vcpu+off));
+	}
+	printf("\n");
+
+	uintptr_t vmcs01 = kvm_vcpu + 0x1a28;
+	dump(vmcs01);
+	uintptr_t loaded_vmcs = kvm_vcpu + 0x1ac8;
+	dump(loaded_vmcs);
+	dump(hc_read_va(loaded_vmcs));
+	printf("\n");
+
+	uintptr_t vmcs = hc_read_va(vmcs01);
+	dump(vmcs);
+	for (int off = 0; off < 0x100; off += 8) {
+		printf("vmcs+%3x = %16lx\n", off, hc_read_va(vmcs+off));
+	}
+	printf("\n");
+
+
+	// Finding EPTP:
+	// 	u64 root_hpa = vcpu->arch.mmu->root.hpa;
+
+	uintptr_t kvm_vcpu_arch = kvm_vcpu + 0x120;
+	uintptr_t mmu = kvm_vcpu_arch + 0x168;
+	dump(mmu);
+	for (int off = -0x40; off < 0x40; off += 8) {
+		printf("mmu+%3x = %16lx\n", off, hc_read_va(mmu+off));
+	}
+	printf("\n");
+
+	uintptr_t kvm_mmu = hc_read_va(mmu);
+	dump(kvm_mmu);
+	for (int off = 0; off < 0x80; off += 8) {
+		printf("kvm_mmu+%3x = %16lx\n", off, hc_read_va(kvm_mmu+off));
+	}
+	printf("\n");
+
+	uintptr_t hpa = hc_read_va(kvm_mmu + 0x38);
+	dump(hpa);
+	printf("hpa is the EPTP without the flags, i.e. the phsyical address of EPT PML4\n");
+	printf("\n");
+
+	uintptr_t ept_l0 = hc_read_pa(hpa);
+	dump(ept_l0);
+	ept_l0 &= PFN_MASK;
+	dump(ept_l0);
+	for (int off = 0; off < 0x60; off += 8) {
+		printf("ept_l0+%3x = %16lx\n", off, hc_read_pa(ept_l0+off));
+	}
+	printf("\n");
+
+	uintptr_t ept_l1 = hc_read_pa(ept_l0+5*8);
+	dump(ept_l1);
+	ept_l1 &= PFN_MASK;
+	dump(ept_l1);
+	for (int off = 0; off < 0x60; off += 8) {
+		printf("ept_l1+%3x = %16lx\n", off, hc_read_pa(ept_l1+off));
+	}
+	printf("\n");
+
+	uintptr_t ept_l2 = hc_read_pa(ept_l1+9*8);
+	dump(ept_l2);
+	ept_l2 &= PFN_MASK;
+	dump(ept_l2);
+	for (int off = 0x7f0; off < 0x830; off += 8) {
+		printf("ept_l2+%3x = %16lx\n", off, hc_read_pa(ept_l2+off));
+	}
+	printf("\n");
+
+	uintptr_t ept_l3 = hc_read_pa(ept_l2+0x800);
+	dump(ept_l3);
+	ept_l3 &= PFN_MASK;
+	dump(ept_l3);
+	for (int off = 0; off < 0x40; off += 8) {
+		printf("ept_l3+%3x = %16lx\n", off, hc_read_pa(ept_l3+off));
+	}
+	printf("\n");
+
+	uintptr_t va = (0x5ULL << 30) | (0x9ULL << 21);
+	get_feeling_translate_va(hpa, va);
+
+	void *p = mmap(NULL, 0x1000, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
+	assert(p != MAP_FAILED);
+	memset(p, 0x97, 0x1000);
+	uintptr_t p_va = (uintptr_t)p;
+	uintptr_t p_pa = procfs_get_physaddr(p_va);
+	uintptr_t p_hpa = get_feeling_translate_va(hpa, p_pa);
+	dump(p_va);
+	dump(p_pa);
+	dump(p_hpa);
+	dump(hc_read_pa(p_hpa));
 }
 
 void reverse_host_kernel_data_structures(void)
