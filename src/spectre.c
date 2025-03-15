@@ -78,7 +78,7 @@ void test_half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 uintptr_t spectre_find_base(char *p, uintptr_t pa_p)
 {
 	const int verbose = 2;
-#if DEBUG
+#if HELPERS
 	if (verbose >= 1) printf("spectre_find_base:     real base = %10lx\n", helper_base_pa());
 	if (verbose >= 1) printf("spectre_find_base:   correct off = %10lx\n", pa_p-helper_base_pa());
 #endif

@@ -2,9 +2,11 @@
 #include <stdio.h>
 #include "helpers.h"
 #include "statistics.h"
+#include "config.h"
 
 static uint64_t vmcall4(unsigned long rax, unsigned long rbx, unsigned long rcx,
-								unsigned long rdx, unsigned long rsi) {
+                        unsigned long rdx, unsigned long rsi) {
+	assert(HELPERS);
 	asm volatile(
 		"vmcall \n\t"
 		"mov %%rax, %0 \n\t"

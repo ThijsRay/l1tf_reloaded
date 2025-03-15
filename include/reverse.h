@@ -1,4 +1,5 @@
 #pragma once
+#include "config.h"
 
 typedef uint64_t u64; // virtual address
 typedef unsigned long va_t; // virtual address
@@ -35,7 +36,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Victim Host Kernel Layout  *************************
  ******************************************************************************/
 
-#if DEBUG
+#if MACHINE == FATHER
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
@@ -92,7 +93,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_XARRAY_HEAD		0x8	// void __rcu *xa_head
 // };
 
-#else // DEBUG
+#elif MACHINE == GCE
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
@@ -149,7 +150,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_XARRAY_HEAD		0x8	// void __rcu *xa_head
 // };
 
-#endif // DEBUG
+#endif // MACHINE
 
 
 void get_feeling_for_kernel_kvm_data_structures(void);

@@ -8,7 +8,6 @@ add_compile_options(
   -Wformat=2 -Wno-unused-parameter -Wshadow
   -Wwrite-strings -Wstrict-prototypes -Wold-style-definition
   -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
-  -DDEBUG=0
 )
 
 add_executable(exploit

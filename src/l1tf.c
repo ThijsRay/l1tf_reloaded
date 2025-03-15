@@ -892,7 +892,7 @@ uintptr_t l1tf_find_page_pa(void *p)
 {
   const int verbose = 1;
 
-#if DEBUG
+#if HELPERS
   uintptr_t real_pa = helper_find_page_pa(p);
   if (verbose >= 1) printf("l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
 #endif
@@ -939,7 +939,7 @@ uintptr_t l1tf_find_base(void)
 {
   const int verbose = 1;
 
-#if DEBUG
+#if HELPERS
   uintptr_t real_pa = helper_base_pa();
   if (verbose >= 1) printf("l1tf_find_base: base's real pa is %10lx\n", real_pa);
 #endif
