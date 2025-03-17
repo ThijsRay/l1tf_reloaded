@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "config.h"
 
 // This is fake "secret" data that is only known by the victim.
 // After the attacker has leaked everything, we use this data to show to

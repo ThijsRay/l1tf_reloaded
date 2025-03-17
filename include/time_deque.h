@@ -1,5 +1,6 @@
 #pragma once
 #include <time.h>
+#include "config.h"
 
 #define TIME_DEQUE_NSEC_DIV 1000000000
 #define TIME_DEQUE_SIZE 100

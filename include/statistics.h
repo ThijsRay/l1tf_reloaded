@@ -1,5 +1,6 @@
 #pragma once
 #include <stddef.h>
+#include "config.h"
 
 size_t maximum(const size_t n, const size_t x[n]);
 

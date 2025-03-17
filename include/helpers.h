@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "config.h"
 
 uintptr_t hc_find_magic(uint64_t magic);
 int hc_single_task_running(void);

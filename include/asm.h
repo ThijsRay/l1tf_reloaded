@@ -1,4 +1,5 @@
 #pragma once
+#include "config.h"
 
 #include <stdint.h>
 static inline __attribute__((always_inline)) void clflush(void *p) {

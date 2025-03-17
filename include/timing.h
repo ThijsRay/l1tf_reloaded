@@ -3,6 +3,7 @@
 #if __has_include(<stddef.h>)
 #include <stddef.h>
 #include <time.h>
+#include "config.h"
 
 static inline __attribute__((always_inline)) uint64_t clock_read(void)
 {

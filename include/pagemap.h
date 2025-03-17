@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "config.h"
 
 #define GET_PHYS_FAILED 0xffffffffffffff
 

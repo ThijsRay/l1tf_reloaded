@@ -3,6 +3,7 @@
 #include "asm.h"
 #include "constants.h"
 #include "timing.h"
+#include "config.h"
 #include <sched.h>
 #include <stddef.h>
 #include <stdio.h>

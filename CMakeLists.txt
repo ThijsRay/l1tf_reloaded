@@ -19,6 +19,7 @@ add_executable(exploit
   src/util.c
   src/reverse.c
   src/benchmark.c
+  src/leak.c
 )
 
 target_link_libraries(exploit rt m)

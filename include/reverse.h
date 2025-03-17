@@ -1,5 +1,7 @@
 #pragma once
+#include <stdint.h>
 #include "config.h"
+#include "helpers.h"
 
 typedef uint64_t u64; // virtual address
 typedef unsigned long va_t; // virtual address
@@ -9,6 +11,7 @@ typedef unsigned long gpa_t; // guest physical address
 typedef unsigned long hva_t; // host virtual address
 typedef unsigned long hpa_t; // host physical address
 typedef unsigned long pte_t; // page table entry - pfn is host physical
+
 
 /******************************************************************************
  ************************  Victim Guest Kernel Layout  ************************
@@ -151,6 +154,24 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // };
 
 #endif // MACHINE
+
+
+/******************************************************************************
+ ************************  Previously Leaked Results  *************************
+ ******************************************************************************/
+
+#if LEAK == SKIP
+
+#if MACHINE == FATHER
+#define BASE (hc_phys_map_base())
+#elif MACHINE == GCE
+#define BASE 0x88d43f218
+#define OWN_TASK 0xffff936a91dba000
+#elif MACHINE == AWS
+#define BASE 0xa1d34218
+#endif // MACHINE
+
+#endif // LEAK == SKIP
 
 
 void get_feeling_for_kernel_kvm_data_structures(void);

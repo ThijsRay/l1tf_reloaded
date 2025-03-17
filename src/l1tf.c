@@ -7,6 +7,7 @@
 #include "spectre.h"
 #include "statistics.h"
 #include "benchmark.h"
+#include "reverse.h"
 #include <asm-generic/errno-base.h>
 #include <bits/time.h>
 #include <bits/types/siginfo_t.h>

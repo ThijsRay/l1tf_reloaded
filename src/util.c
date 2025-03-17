@@ -21,6 +21,7 @@
 #include <sys/vfs.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include "util.h"
 
 void set_cpu_affinity(int cpu_id) {
 	cpu_set_t set;
@@ -51,4 +52,45 @@ int get_sibling(int cpu_id)
         if (sister == cpu_id)
                 return brother;
         err(EXIT_FAILURE, "Could not find cpu id %d in file %s\n", cpu_id, fname);
+}
+
+
+uint64_t file_read_lx(const char *filename)
+{
+    char buf[32];
+    int fd = open(filename, O_RDONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
+    int rv = read(fd, buf, 32);  if (rv < 0) { printf("error read %s", filename); exit(1); }
+    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
+    return strtoull(buf, NULL, 16);
+}
+
+uint64_t file_write_lx(const char *filename, uint64_t uaddr)
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%lx\n", uaddr);
+    int fd = open(filename, O_WRONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
+    u64 rv = write(fd, buf, 32);
+    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
+    return rv;
+}
+
+uintptr_t procfs_direct_map(void)
+{
+    return file_read_lx("/proc/preload_time/direct_map");
+}
+
+uintptr_t procfs_pgd(void)
+{
+    return file_read_lx("/proc/preload_time/pgd");
+}
+
+uintptr_t procfs_get_physaddr(gva_t uaddr)
+{
+    file_write_lx("/proc/preload_time/phys_addr", uaddr);
+    return file_read_lx("/proc/preload_time/phys_addr");
+}
+
+u64 procfs_get_data(gva_t addr)
+{
+    return file_write_lx("/proc/preload_time/data", addr);
 }

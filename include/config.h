@@ -19,12 +19,15 @@
 #endif
 
 #define L1TF 0
-#define CHEAT 1
+#define SKIP 1
+#define CHEAT 2
 #if !defined(LEAK)
-#define LEAK CHEAT
+#define LEAK SKIP
 #endif
 #if LEAK == L1TF
 #define LEAK_STR "L1TF"
+#elif LEAK == SKIP
+#define LEAK_STR "SKIP"
 #elif LEAK == CHEAT
 #define LEAK_STR "CHEAT"
 #endif

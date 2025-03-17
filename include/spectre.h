@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "hypercall.h"
+#include "config.h"
 
 void test_half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base);
 uintptr_t spectre_find_base(char *p, uintptr_t pa_p);

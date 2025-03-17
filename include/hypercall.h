@@ -1,4 +1,5 @@
 #pragma once
+#include "config.h"
 
 #if __has_include(<stdint.h>)
 #include <stdbool.h>
