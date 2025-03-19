@@ -26,7 +26,7 @@
 
 uintptr_t get_feeling_translate_va(uintptr_t l0_pa, uintptr_t va)
 {
-	const int verbose = 0;
+	const int verbose = 1;
 	if (verbose >= 2) printf("get_feeling_translate_va(l0_pa = %lx, va = %lx)\n", l0_pa, va);
 	if (verbose >= 2) dumpp(l0_pa);
 	uintptr_t pgd_pa = l0_pa + 8 * BITS(va, 48, 39);
@@ -74,7 +74,7 @@ uintptr_t get_feeling_translate_va(uintptr_t l0_pa, uintptr_t va)
 
 hpa_t get_feeling_translate_gva(gva_t va, hpa_t gcr3, hpa_t eptp)
 {
-	const int verbose = 0;
+	const int verbose = 1;
 	if (verbose >= 2) printf("get_feeling_translate_gva(eptp = %lx, gcr3 = %lx, va = %lx)\n", eptp, gcr3, va);
 	uintptr_t pgd_pa = gcr3 + 8 * BITS(va, 48, 39);
 	if (verbose >= 2) dump(pgd_pa);
@@ -264,16 +264,27 @@ void translator_exam_feeling(hpa_t base, hva_t hdm, hpa_t eptp, hpa_t hcr3, hpa_
 	dump(get_feeling_translate_va(hcr3, hdm + (3UL << 32) + 0x123456));
 	printf("\n");
 
-	gva_t dm_gva = procfs_direct_map() + 0x123;
+	gva_t dm_gva = procfs_direct_map() + 0x12345;
 	dump(dm_gva); printf("\n");
 	hpa_t dm_hpa = get_feeling_translate_gva(dm_gva, gcr3, eptp);
 	dump(dm_hpa);
-	dump(procfs_get_data(dm_gva));
 	dump(hc_read_pa(dm_hpa));
+	dump(procfs_get_data(dm_gva));
 	printf("\n");
 
+	dump(text);
+	hpa_t text_hpa = get_feeling_translate_gva(text, gcr3, eptp);
+	dump(text_hpa);
+	dump(procfs_get_data(text));
+	dump(hc_read_pa(text_hpa));
+	printf("\n");
+	exit(0);
+
+	dump(gcr3);
+	// print_page_table(base, gcr3);
 	gcr3 = get_feeling_translate_gva((gva_t)(procfs_pgd()), gcr3, eptp);
 	dump(gcr3);
+	// print_page_table(base, gcr3);
 	printf("\n");
 
 	void *p = mmap(NULL, 0x1000, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
@@ -674,7 +685,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	// init_mm +   88:     2f5408000c40
 
 
-
+	printf("eptp = %lx \n gcr3_hpa = %lx\n", eptp, gcr3_hpa);
 }
 
 void reverse_host_kernel_data_structures(void)
@@ -1153,6 +1164,8 @@ void reverse_host_kernel_data_structures(void)
 	// }
 	// printf("\n");
 
+
+	printf("hcr3 = %lx, cr3 = %lx, hpa = %lx\n", hcr3, cr3, hpa);
 
 
 // =============================================================================

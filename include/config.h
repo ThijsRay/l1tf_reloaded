@@ -22,7 +22,7 @@
 #define SKIP 1
 #define CHEAT 2
 #if !defined(LEAK)
-#define LEAK SKIP
+#define LEAK CHEAT
 #endif
 #if LEAK == L1TF
 #define LEAK_STR "L1TF"
