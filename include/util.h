@@ -19,3 +19,5 @@ uintptr_t procfs_get_physaddr(gva_t uaddr);
 u64 procfs_get_data(gva_t addr);
 void print_page_table(hpa_t base, hpa_t page_table);
 void dump_page_table_mappings(hpa_t base, hpa_t root_page_table, hpa_t eptp);
+int nr_letters_equal(const char *str1, const char *str2);
+

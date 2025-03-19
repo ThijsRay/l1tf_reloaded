@@ -199,3 +199,14 @@ void dump_page_table_mappings(hpa_t base, hpa_t root_page_table, hpa_t eptp)
     if (start != -1ULL)
         print_region(start, end);
 }
+
+int nr_letters_equal(const char *str1, const char *str2)
+{
+    int i = 0;
+    int nr_equal = 0;
+    while (str1[i] && str2[i]) {
+        nr_equal += str1[i] == str2[i];
+        i++;
+    }
+    return nr_equal;
+}

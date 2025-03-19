@@ -17,6 +17,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Victim Guest Kernel Layout  ************************
  ******************************************************************************/
 
+#define G_INIT_NAME		"swapper/"
 #define G_TEXT_INIT_TASK	0x1c112c0	// struct task_struct init_task
 
 // struct task_struct {
@@ -187,6 +188,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define VICTIM_VCPU	0xffffa03509694600
 #define EPTP		0x10209e000
 #define GTEXT		0xffffffffa7c00000
+#define INIT_COMM	0x34f211e68
 #define NGINX		0x1f93dc100
 #elif MACHINE == GCE
 #define BASE 0x88d43f218
