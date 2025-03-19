@@ -34,8 +34,8 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_MM_HEAP		0x158	// unsigned long start_brk
 // };
 
-#define NGINX_SSLKEY		0x8b9a3
-#define SSLKEY_LEN		(128 + 4 + 128) // prime1 + magic + prime2
+#define NGINX_SSLKEY		0x8b99f
+#define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
 
 #if MACHINE == FATHER

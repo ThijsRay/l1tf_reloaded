@@ -23,7 +23,7 @@
 #define CHEAT 2
 #define CHEAT_NOISY 3
 #if !defined(LEAK)
-#define LEAK CHEAT_NOISY
+#define LEAK L1TF
 #endif
 #if LEAK == L1TF
 #define LEAK_STR "L1TF"

