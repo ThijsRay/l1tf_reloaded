@@ -47,7 +47,7 @@ uint64_t hc_read_va(uintptr_t va)
 	return vmcall4(97, 106, va, 0, 0);
 }
 
-uintptr_t hc_translate_va(uintptr_t va)
+uintptr_t hc_translate(uintptr_t va)
 {
 	return vmcall4(97, 107, va, 0, 0);
 }

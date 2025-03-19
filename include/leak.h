@@ -13,5 +13,5 @@ hpa_t gadget_base(void);
 void leak(void *data, hpa_t base, hpa_t pa, int len);
 u64 leak64(hpa_t base, hpa_t pa);
 pte_t leak_pte(hpa_t base, hpa_t pa);
-hpa_t translate_va(hpa_t base, hva_t va, hpa_t cr3);
-hpa_t translate_nested(hpa_t base, gva_t va, hpa_t gcr3, hpa_t eptp);
+hpa_t translate(hpa_t base, hva_t va, hpa_t cr3);
+hpa_t translate_tdp(hpa_t base, gva_t va, hpa_t gcr3, hpa_t eptp);

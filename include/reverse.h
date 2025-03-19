@@ -181,6 +181,8 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define HOST_DIRECT_MAP	0xffffa03300000000
 #define OWN_VCPU	0xffffa03509eea300
 #define OWN_TASK	0xffffa0340565afb0
+#define OWN_KVM		0xffffb1b08d9f5000
+#define VICTIM_KVM	0xffffb1b08ef31000
 #define HCR3		0x426d18000
 #define VICTIM_VCPU	0xffffa03509694600
 #define EPTP		0x10209e000
