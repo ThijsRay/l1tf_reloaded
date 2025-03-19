@@ -174,7 +174,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Previously Leaked Results  *************************
  ******************************************************************************/
 
-#if LEAK == SKIP || LEAK == CHEAT_NOISY
+#if LEAK == SKIP || HELPERS
 
 #if MACHINE == FATHER
 #define BASE		0x2dd2ae218
@@ -186,7 +186,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define HCR3		0x426d18000
 #define VICTIM_VCPU	0xffffa03509694600
 #define EPTP		0x10209e000
-#define GCR3		0x279a42000
 #define GTEXT		0xffffffffa7c00000
 #define NGINX		0x1f93dc100
 #elif MACHINE == GCE
