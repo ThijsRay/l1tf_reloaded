@@ -189,7 +189,10 @@ static void *half_spectre(void *data)
 
 void half_spectre_start(uintptr_t base, uintptr_t pa)
 {
+	const int verbose = 0;
+
 	uint64_t idx = (pa - base) / 8;
+	if (verbose) printf("half_spectre_start: idx = %lx, half-Specre will touch pa %lx\n", idx, base + 8*idx);
 	if (sibling == -1LU) {
 		sibling_stop = 0;
 		assert(pthread_create(&sibling, NULL, half_spectre, (void *)idx) == 0);

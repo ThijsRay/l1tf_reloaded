@@ -1059,13 +1059,29 @@ static char node_aggregate(node_t *node)
   return (nibble_pick(node->high) << 4) | nibble_pick(node->low);
 }
 
+static void node_print(node_t *node)
+{
+  printf("node @pa %10lx agg=%02x high={", node->pa, (uint8_t)node_aggregate(node));
+  for (int i = 0; i < 16; i++)
+    if (node->high[i])
+      printf("%hux%x,", node->high[i], i);
+  printf("} low={");
+      for (int i = 0; i < 16; i++)
+        if (node->low[i])
+        printf("%hux%x,", node->low[i], i);
+  printf("}\n");
+}
+
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
+  const int verbose = 0;
+  if (verbose) printf("\n");
   _l1tf_leak(data, base, pa, len);
   for (unsigned long i = 0; i < len; i++) {
     node_t *node = hc_map_node(pa + i);
     node->low[(uint8_t)(data[i] & 0x0f)]++;
     node->high[(uint8_t)(data[i] & 0xf0) >> 4]++;
     data[i] = node_aggregate(node);
+    if (verbose) node_print(node);
   }
 }
