@@ -43,7 +43,7 @@ void display(void *data, int len)
 		c(p[8*i+0]), c(p[8*i+1]), c(p[8*i+2]), c(p[8*i+3]), c(p[8*i+4]), c(p[8*i+5]), c(p[8*i+6]), c(p[8*i+7]));
 	}
 	if (len > 8*i) {
-		printf("%4x:                  ", 8*i);
+		printf("%4x:                     ", 8*i);
 		for (int j = 8*i; j < len; j++)
 			printf("%02x ", p[8*i+j]);
 		for (int j = len; j < 9*i; j++)

@@ -168,6 +168,65 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_XARRAY_HEAD		0x8	// void __rcu *xa_head
 // };
 
+#elif MACHINE == AWS
+
+#define OWN_TASK_NAME		"dom:44959644165"
+
+// struct kvm_apic_map {
+#define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
+// };
+
+// struct kvm_lapic {
+#define H_LAPIC_BASE_ADDR	0x0	// u64 base_address == 0xfee00000
+#define H_LAPIC_VCPU		0x98	// struct kvm_vcpu *vcpu
+// };
+
+// struct kvm_vcpu {
+#define H_VCPU_KVM		0x0	// struct kvm *kvm
+#define H_VCPU_PID		0x90	// struct pid *pid
+#define H_VCPU_ARCH		0x120	// struct kvm_vcpu_arch arch
+// };
+
+// struct pid {
+#define H_PID_TASKS		0x10	// struct hlist_head tasks[PIDTYPE_MAX] --> TASK_PID_LINKS
+// };
+
+// struct task_struct {
+#define H_TASK_PRIOS		0x64	// int static_prio, normal_prio, rt_priority
+#define H_TASK_TASKS		0x908	// struct list_head tasks
+#define H_TASK_MM		0x958	// struct mm_struct *mm
+#define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+#define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
+// };
+#define H_TASK_COMM_LEN		0x10
+
+// struct mm_struct {
+#define H_MM_PGD		0x80	// pgd_t *pgd
+// };
+
+// struct kvm_vcpu_arch {
+#define H_ARCH_CR3		0xa0	// unsigned long cr3
+#define H_ARCH_MMU		0x168	// struct kvm_mmu *mmu --> ARCH_ROOT_MMU
+#define H_ARCH_ROOT_MMU		0x170	// struct kvm_mmu root_mmu
+// }
+
+// struct kvm_mmu {
+#define H_MMU_ROOT		0x40	// struct kvm_mmu_root_info root;
+// }
+
+// struct kvm_mmu_root_info {
+#define H_INFO_HPA		0x8	// hpa_t hpa;
+// };
+
+// struct kvm { // TODO: THESE ARE ONLY THE PUXS:~/GIT/LINUX OFFSETS!!!
+#define H_KVM_VCPU_ARRAY	0x1128	// struct xarray vcpu_array
+#define H_KVM_VM_LIST		0x1178	// struct list_head vm_list
+// };
+
+// struct xarray {
+#define H_XARRAY_HEAD		0x8	// void __rcu *xa_head
+// };
+
 #endif // MACHINE
 
 
@@ -194,7 +253,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define BASE 0x88d43f218
 #define OWN_TASK 0xffff936a91dba000
 #elif MACHINE == AWS
-#define BASE 0xa1d34218
+#define BASE            0xa1d35218ULL
+// #define HOST_DIRECT_MAP 0xffff93e3c0000000
+// #define OWN_VCPU        0xffff93e461290000
+// #define OWN_TASK	0xffff93e46128b2a0
 #endif // MACHINE
 
 #elif LEAK == CHEAT || LEAK == CHEAT_NOISY
@@ -206,4 +268,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 
 void get_feeling_for_kernel_kvm_data_structures(void);
+void reverse_host_kernel_data_structures_aws(void);
 void reverse_host_kernel_data_structures(void);
+void reverse_around(hpa_t base, hpa_t pa);

