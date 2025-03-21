@@ -45,12 +45,11 @@ u64 leak64(hpa_t base, hpa_t pa)
 
 pte_t leak_pte(hpa_t base, hpa_t pa)
 {
-	const int verbose = 0;
-
 	pte_t pte = 0;
 	leak(&pte, base, pa, 5);
 
 #if HELPERS
+	const int verbose = 0;
 	if (verbose) {
 		u64 true = hc_read_pa(pa);
 		int error = (true & 0xffffffffff) != pte;

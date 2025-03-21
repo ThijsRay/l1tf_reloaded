@@ -4,18 +4,20 @@
 #define GCE 1
 #define AWS 2
 #if !defined(MACHINE)
-#define MACHINE FATHER
+        // Pick the physical machine you are attacking.
+        #define MACHINE GCE
 #endif
 #if MACHINE == FATHER
-#define MACHINE_STR "FATHER"
+        #define MACHINE_STR "FATHER"
 #elif MACHINE == GCE
-#define MACHINE_STR "GCE"
+        #define MACHINE_STR "GCE"
 #elif MACHINE == AWS
-#define MACHINE_STR "AWS"
+        #define MACHINE_STR "AWS"
 #endif
 
 #if !defined(HELPERS)
-#define HELPERS 1
+        // Are there helper-hypercalls installed on the host?
+        #define HELPERS 0
 #endif
 
 #define L1TF 0
@@ -23,18 +25,15 @@
 #define CHEAT 2
 #define CHEAT_NOISY 3
 #if !defined(LEAK)
-#define LEAK SKIP
+        // Pick your data leaking method.
+        #define LEAK SKIP
 #endif
 #if LEAK == L1TF
-#define LEAK_STR "L1TF"
+        #define LEAK_STR "L1TF"
 #elif LEAK == SKIP
-#define LEAK_STR "SKIP"
+        #define LEAK_STR "SKIP"
 #elif LEAK == CHEAT
-#define LEAK_STR "CHEAT"
+        #define LEAK_STR "CHEAT"
 #elif LEAK == CHEAT_NOISY
-#define LEAK_STR "CHEAT_NOISY"
-#endif
-
-#if !HELPERS
-static_assert(LEAK == L1TF || LEAK == SKIP);
+        #define LEAK_STR "CHEAT_NOISY"
 #endif

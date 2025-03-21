@@ -797,7 +797,7 @@ void reverse_host_kernel_data_structures(void)
 	//    2000000000000    5a8ebfbf27dce
 	//                0              695
 	// 8000000000000000        100000000
-	//               10 ffff9352eff70e40 <-- should be kvm_lapic's vcpu, at 0x88
+	//               10 ffff9352eff70e40 <-- should be kvm_lapic's vcpu, at 0x98
 	//        100000101         ffffffff
 	// ffff934164541000                0
 	//                0                0
@@ -1318,7 +1318,7 @@ void reverse_host_kernel_data_structures(void)
 	// 	}
 	// }
 
-	printf("hcr3 = %lx, cr3 = %lx, hpa = %lx\n", hcr3, cr3, hpa);
+	printf("base = %lx, hcr3 = %lx, cr3 = %lx, hpa = %lx\n", base, hcr3, cr3, hpa);
 
 
 // =============================================================================
