@@ -9,6 +9,18 @@
 #define dumpp(x) printf("\t%30s = %16lx\n", STR(x), x)
 #define BITS(x, n, m) ((x & BITS_MASK(n, m)) >> m)
 
+/* for loop with iterator `name` ranging as:
+ *      name = center
+ *      name = center + step
+ *      name = center - step
+ *      name = center + 2*step
+ *      name = center - 2*step
+ *      ...
+ */
+#define for_each_around(name, center, radius, step) \
+        for (long name = (center), delta = (step); name < (center) + (radius); name += delta, delta = -delta + (delta > 0 ? -(step) : (step)))
+
+
 void set_cpu_affinity(int cpu_id);
 int get_sibling(int cpu_id);
 uint64_t file_read_lx(const char *filename);
