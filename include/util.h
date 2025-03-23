@@ -3,6 +3,7 @@
 #include "config.h"
 #include "reverse.h"
 
+#define CLEAR_LINE "\33[2K\r"
 #define STR(a) STRSTR(a)
 #define STRSTR(a) #a
 #define dump(x) printf("%30s = %16lx\n", STR(x), x)

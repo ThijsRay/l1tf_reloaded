@@ -87,4 +87,5 @@ struct sched_yield_hypercall {
   unsigned long current_cpu_id;
   unsigned long speculated_cpu_id;
   void *ptr;
+  int evict_amount;
 };

