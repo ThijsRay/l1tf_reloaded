@@ -277,8 +277,6 @@ void translator_exam_feeling(hpa_t base, hva_t hdm, hpa_t eptp, hpa_t hcr3, hpa_
 	dump(text_hpa);
 	dump(procfs_get_data(text));
 	dump(hc_read_pa(text_hpa));
-	printf("\n");
-	exit(0);
 
 	dump(gcr3);
 	// print_page_table(base, gcr3);
@@ -684,8 +682,49 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	// init_mm +   80:        100000000
 	// init_mm +   88:     2f5408000c40
 
-
 	printf("eptp = %lx \n gcr3_hpa = %lx\n", eptp, gcr3_hpa);
+
+	printf("===================================================================\n");
+	printf("===================================================================\n");
+	printf("===================================================================\n");
+
+	printf(">>> Own kvm and kvm_vcpu strucutres:\n");
+	dump(kvm);
+	dump(kvm_vcpu);
+	printf("\n>>> Chose all kvm and kvm_vcpu strucutres:\n");
+
+	// Walk all kvm structs in the vm_list:
+	hva_t cur_kvm = kvm; // own kvm
+	do {
+		dump(cur_kvm);
+
+		if ((cur_kvm >> 32) == 0xffffffff) {
+			printf("VM_LIST global entry, skipping kvm print\n");
+			cur_kvm = hc_read_va(cur_kvm + H_KVM_VM_LIST) - H_KVM_VM_LIST;
+			continue;
+		}
+
+		// Get the kvm_vcpu structs:
+
+		hva_t head = hc_read_va(cur_kvm + H_KVM_VCPU_ARRAY + H_XARRAY_HEAD);
+		// dumpp(head);
+		u64 entry = hc_read_va(head + 0x18);
+		// dumpp(entry);
+		hva_t ptr = (entry << 16) | (entry >> 48); // Crazy xarray stuff.
+		// dumpp(ptr);
+
+		hva_t vcpu1 = hc_read_va(ptr + 0x10);
+		dumpp(vcpu1);
+		hva_t vcpu2 = hc_read_va(ptr + 0x18);
+		dumpp(vcpu2);
+
+		assert(hc_read_va(vcpu1) == cur_kvm);
+		assert(hc_read_va(vcpu2) == cur_kvm);
+		printf("[OK] vcpu1 and vcpu2 indeed below to cur_kvm\n");
+
+		cur_kvm = hc_read_va(cur_kvm + H_KVM_VM_LIST) - H_KVM_VM_LIST;
+	} while (cur_kvm != kvm);
+
 }
 
 void reverse_host_kernel_data_structures_aws(void)

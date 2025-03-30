@@ -1160,7 +1160,7 @@ void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
     if (verbose) node_print(node);
   }
 
-  if (confidently_cached(pa, len))
+  if (verbose && confidently_cached(pa, len))
     printf("condifently cached results already; skipped extra l1tf leaking (CACHED)\n");
 }
 
