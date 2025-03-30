@@ -259,7 +259,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // ---------[ rain-vm-gce ]---------
 #define BASE		0x88d43f218UL
 #define HOST_DIRECT_MAP	0xffff934040000000
-#define OWN_VCPU	0xffff9352eff70e40
+#define OWN_VCPU	0xffff9352eff70e40 // 0xffff934153430e80
 #define OWN_TASK	0xffff936a91dba000
 #define HCR3		0x111cf6000UL
 #define OWN_KVM		0xffff9584f2d71000
