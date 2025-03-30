@@ -1144,7 +1144,7 @@ int confidently_cached(hpa_t pa, u64 len)
 
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
-  const int verbose = 1;
+  const int verbose = 0;
   if (verbose) printf("\n");
 
   if (!confidently_cached(pa, len))
