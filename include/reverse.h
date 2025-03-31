@@ -77,6 +77,19 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_TASK_PID		(0x890+0xd0) // 0x9c0	// pid_t pid, tgid
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
+#define H_TASK_FILES		0xc38   // struct files_struct *files TODO
+// };
+
+// struct files_struct {
+#define H_FILES_FDT		0x20	// struct fdtable *fdt TODO
+// };
+
+// struct fdtable {
+#define H_FDTABLE_FD		0x8	// struct file **fd TODO
+// };
+
+// struct file {
+#define H_FILE_PRIV		0x20	// void *private_data TODO
 // };
 
 // struct mm_struct {
@@ -334,9 +347,9 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #define BASE		0xa1d35218UL
 #define HOST_DIRECT_MAP	0xffff93e3c0000000
-#define OWN_VCPU	0xffff93e461290000
-#define OWN_TASK	0xffff93f671ad4ce0
-#define HCR3		0xa1278000UL
+// #define OWN_VCPU	0xffff93e461290000
+// #define OWN_TASK	0xffff93f671ad4ce0
+// #define HCR3		0xa1278000UL
 
 #endif // MACHINE
 

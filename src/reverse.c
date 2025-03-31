@@ -770,10 +770,12 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	}
 	// --> #define H_FILE_PRIV 0x20
 
+#if !defined(OWN_KVM)
+#define OWN_KVM -1UL
+#endif
 	for (int i = 0; i < 0x28; i++) {
 		hva_t file = hc_read_va(fd+i*8);
 		for (int off = 0x20; off < 0x28; off += 8) {
-			u64 data = hc_read_va(file+off);
 			printf("fd[%2x] = %16lx | fd[%2x]->private_data = %16lx %s\n", i, file, i, hc_read_va(file+H_FILE_PRIV),
 				hc_read_va(file+H_FILE_PRIV) == OWN_KVM ? "<-- struct kvm *OWN_KVM" : "");
 		}
