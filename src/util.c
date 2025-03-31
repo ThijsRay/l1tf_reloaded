@@ -210,3 +210,14 @@ int nr_letters_equal(const char *str1, const char *str2)
     }
     return nr_equal;
 }
+
+int hamming_dist(u64 a, u64 b)
+{
+    u64 x = a ^ b;
+    int dist = 0;
+    do {
+        dist += x & 1;
+        x >>= 1;
+    } while (x);
+    return dist;
+}

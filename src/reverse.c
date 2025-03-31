@@ -706,7 +706,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 		// Get the kvm_vcpu structs:
 
-		hva_t head = hc_read_va(cur_kvm + H_KVM_VCPU_ARRAY + H_XARRAY_HEAD);
+		/*hva_t*/ head = hc_read_va(cur_kvm + H_KVM_VCPU_ARRAY + H_XARRAY_HEAD);
 		// dumpp(head);
 		u64 entry = hc_read_va(head + 0x18);
 		// dumpp(entry);
