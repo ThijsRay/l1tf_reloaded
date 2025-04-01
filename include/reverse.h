@@ -255,19 +255,19 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PID		0x9d8	// pid_t pid, tgid
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
-#define H_TASK_FILES		0xc78   // struct files_struct *files TODO
+#define H_TASK_FILES		0xc78   // struct files_struct *files
 // };
 
 // struct files_struct {
-#define H_FILES_FDT		0x20	// struct fdtable *fdt TODO
+#define H_FILES_FDT		0x20	// struct fdtable *fdt
 // };
 
 // struct fdtable {
-#define H_FDTABLE_FD		0x8	// struct file **fd TODO
+#define H_FDTABLE_FD		0x8	// struct file **fd
 // };
 
 // struct file {
-#define H_FILE_PRIV		0xc8	// void *private_data TODO
+#define H_FILE_PRIV		0xc0	// void *private_data
 // };
 
 // struct mm_struct {
