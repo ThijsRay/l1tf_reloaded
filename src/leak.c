@@ -82,10 +82,10 @@ hva_t host_leak_ptr(hpa_t base, hva_t hdm, hpa_t pa, int (*check)(va_t, va_t))
 
 	do {
 		hva_t ptr = leak64(base, pa);
-		if (verbose)
-			dump(ptr);
 		if (check(ptr, hdm))
 			return ptr;
+		if (verbose)
+			printf("host_leak_ptr: retrying erronous ptr %lx\n", ptr);
 	} while (++nr_tries < 100);
 
 	err(1, "host_leak_ptr(base=%lx, hdm=%lx, pa=%lx): stuck! (%d)\n", base, hdm, pa, nr_tries);
