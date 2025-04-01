@@ -119,7 +119,7 @@ void print_region(va_t start, va_t end)
             start, end, si, sj, sk, sl, ei, ej, ek, el);
 }
 
-void dump_page_table_mappings(hpa_t base, hpa_t root_page_table, hpa_t eptp)
+void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_t eptp)
 {
     const int verbose = 0;
     pte_t pgd[0x200];
@@ -133,7 +133,7 @@ void dump_page_table_mappings(hpa_t base, hpa_t root_page_table, hpa_t eptp)
         if (!(pgd[i] & 1))
             continue;
         next_page_table = pgd[i] & PFN_MASK;
-        if (eptp) next_page_table = translate(base, next_page_table, eptp) & PFN_MASK;
+        if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm) & PFN_MASK;
         leak(&pud, base, next_page_table, 0x1000);
         for (long j = 0x100; j < 0x200; j++) {
             if (!(pud[j] & 1)) {
@@ -154,7 +154,7 @@ void dump_page_table_mappings(hpa_t base, hpa_t root_page_table, hpa_t eptp)
                 continue;
             }
             next_page_table = pud[j] & PFN_MASK;
-            if (eptp) next_page_table = translate(base, next_page_table, eptp) & PFN_MASK;
+            if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm) & PFN_MASK;
             leak(&pmd, base, next_page_table, 0x1000);
             for (long k = 0; k < 0x200; k++) {
                 if (!(pmd[k] & 1)) {
@@ -175,7 +175,7 @@ void dump_page_table_mappings(hpa_t base, hpa_t root_page_table, hpa_t eptp)
                     continue;
                 }
                 next_page_table = pmd[k] & PFN_MASK;
-                if (eptp) next_page_table = translate(base, next_page_table, eptp) & PFN_MASK;
+                if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm) & PFN_MASK;
                 leak(&pte, base, next_page_table, 0x1000);
                 for (long l = 0; l < 0x200; l++) {
                     if (!(pte[l] & 1)) {

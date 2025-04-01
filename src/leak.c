@@ -61,7 +61,8 @@ u64 leak64(hpa_t base, hpa_t pa)
 
 int in_direct_map(va_t va, va_t dm)
 {
-	return (va >> 40) == (dm >> 40);
+	// Note: for guest's direct map, this is an overapproximation.
+	return dm <= va && va < dm+HOST_MEMORY_SIZE;
 }
 
 int in_vmalloc(va_t va, va_t dm)
@@ -122,13 +123,14 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	return pte;
 }
 
-// TODO optimize: give translate{,_tdp} access to {h,g}direct_map, to skip those traslations.
-
-hpa_t translate(hpa_t base, hva_t va, hpa_t cr3)
+hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm)
 {
 	#define RETRY_THRES 3
 	const int verbose = 1;
-	if (verbose >= 2) printf("\ttranslate(base=%lx, va=%lx, cr3=%lx)\n", base, va, cr3);
+	if (verbose >= 2) printf("\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
+
+	if (hdm && in_direct_map(va, hdm))
+		return va - hdm;
 
 	u64 tries_pgd = 0, tries_pud = 0, tries_pmd = 0, tries_pte = 0;
 	hpa_t pgd_pa;
@@ -228,12 +230,17 @@ retry_pte:
 /* Translate a guest virtual address via Two Dimensional Paging into a host
  * physical adddress.
  */
-hpa_t translate_tdp(hpa_t base, gva_t va, hpa_t gcr3, hpa_t eptp)
+hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 {
 	#define RETRY_THRES 3
 	const int verbose = 1;
-	if (verbose >= 2) printf("translate_tdp(base=%lx, va=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gcr3, eptp);
+	if (verbose >= 2) printf("translate_tdp(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
+
+	if (gdm && in_direct_map(va, gdm)) {
+		if (verbose >= 1) { printf(" --{gdm}--> gpa %lx ", va-gdm); fflush(stdout); }
+		return translate(base, va-gdm, eptp, 0);
+	}
 
 	hpa_t gpgd_pa = gcr3 + 8 * BITS(va, 48, 39);
 retry_gpgd:
@@ -248,7 +255,7 @@ retry_gpgd:
 	if (verbose >= 2) dump(gpgd);
 	if ((gpgd & 0xfff) != 0x067)
 		goto retry_gpgd;
-	pte_t pgd = translate(base, gpgd, eptp);
+	pte_t pgd = translate(base, gpgd, eptp, 0);
 	if (verbose >= 2) dump(pgd);
 	if (pgd == -1ULL)
 		goto retry_gpgd;
@@ -274,13 +281,13 @@ retry_gpud:
 	if (IS_HUGE(gpud)) {
 		gpa_t gpa = (gpud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
 		if (verbose >= 2) dump(gpa);
-		hpa_t hpa = translate(base, gpa, eptp);
+		hpa_t hpa = translate(base, gpa, eptp, 0);
 		if (verbose >= 2) dump(hpa);
 		if (hpa == -1ULL)
 			goto retry_gpud;
 		return hpa;
 	}
-	pte_t pud = translate(base, gpud, eptp);
+	pte_t pud = translate(base, gpud, eptp, 0);
 	if (verbose >= 2) dump(pud);
 	if (pud == -1ULL)
 		goto retry_gpud;
@@ -306,13 +313,13 @@ retry_gpmd:
 	if (IS_HUGE(gpmd)) {
 		gpa_t gpa = (gpmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
 		if (verbose >= 2) dump(gpa);
-		hpa_t hpa = translate(base, gpa, eptp);
+		hpa_t hpa = translate(base, gpa, eptp, 0);
 		if (verbose >= 2) dump(hpa);
 		if (hpa == -1ULL)
 			goto retry_gpmd;
 		return hpa;
 	}
-	pte_t pmd = translate(base, gpmd, eptp);
+	pte_t pmd = translate(base, gpmd, eptp, 0);
 	if (verbose >= 2) dump(pmd);
 	if (pmd == -1ULL)
 		goto retry_gpmd;
@@ -337,7 +344,7 @@ retry_gpte:
 	}
 	gpa_t gpa = (gpte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dump(gpa);
-	hpa_t hpa = translate(base, gpa, eptp);
+	hpa_t hpa = translate(base, gpa, eptp, 0);
 	if (verbose >= 2) dump(hpa);
 	if (hpa == -1ULL)
 		goto retry_gpte;

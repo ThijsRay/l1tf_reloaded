@@ -16,5 +16,5 @@ int in_direct_map(va_t va, va_t dm);
 int in_vmalloc(va_t va, va_t dm);
 hva_t host_leak_ptr(hpa_t base, hva_t hdm, hpa_t pa, int (*check)(va_t, va_t));
 pte_t leak_pte(hpa_t base, hpa_t pa);
-hpa_t translate(hpa_t base, hva_t va, hpa_t cr3);
-hpa_t translate_tdp(hpa_t base, gva_t va, hpa_t gcr3, hpa_t eptp);
+hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm);
+hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp);
