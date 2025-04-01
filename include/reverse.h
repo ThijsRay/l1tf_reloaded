@@ -325,12 +325,18 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #elif MACHINE == GCE
 
 // ---------[ rain-vm-gce ]---------
-#define BASE		0x88d43f218UL
+#define BASE		0x11f73d218UL
 #define HOST_DIRECT_MAP	0xffff934040000000
-#define OWN_VCPU	0xffff9352eff70e40 // 0xffff934153430e80
-#define OWN_TASK	0xffff936a91dba000
+#define OWN_VCPU	0xffff934153430e80
+#define OWN_TASK	0xffff936fa3088040
 #define HCR3		0x111cf6000UL
-#define OWN_KVM		0xffff9584f2d71000
+// ---------[ old (pre-reboot) rain-vm-gce ]---------
+// #define BASE		0x88d43f218UL
+// #define HOST_DIRECT_MAP	0xffff934040000000
+// #define OWN_VCPU	0xffff9352eff70e40 // 0xffff934153430e80
+// #define OWN_TASK	0xffff936a91dba000
+// #define HCR3		0x111cf6000UL
+// #define OWN_KVM		0xffff9584f2d71000
 // #define VICTIM_VCPU	0xffff934214b80f40
 // #define EPTP		0x12cc82000UL
 // #define GCR3		0x3987106000UL
