@@ -252,7 +252,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PRIOS		0x64	// int static_prio, normal_prio, rt_priority
 #define H_TASK_TASKS		0x908	// struct list_head tasks
 #define H_TASK_MM		0x958	// struct mm_struct *mm
-#define H_TASK_PID		0x9d8	// pid_t pid, tgid
+#define H_TASK_PID		0xa08	// pid_t pid, tgid
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
 #define H_TASK_FILES		0xc78   // struct files_struct *files

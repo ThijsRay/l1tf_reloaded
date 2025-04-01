@@ -129,8 +129,10 @@ hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm)
 	const int verbose = 1;
 	if (verbose >= 2) printf("\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
 
-	if (hdm && in_direct_map(va, hdm))
+	if (hdm && in_direct_map(va, hdm)) {
+		if (verbose >= 1) { printf(" --{hdm}--> pa %lx\n", va-hdm); fflush(stdout); }
 		return va - hdm;
+	}
 
 	u64 tries_pgd = 0, tries_pud = 0, tries_pmd = 0, tries_pte = 0;
 	hpa_t pgd_pa;
