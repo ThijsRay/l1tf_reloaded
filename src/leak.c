@@ -74,22 +74,23 @@ int in_vmalloc(va_t va, va_t dm)
 hva_t host_leak_ptr(hpa_t base, hva_t hdm, hpa_t pa, int (*check)(va_t, va_t))
 {
 	const int verbose = 1;
-	static int nr_tries = 0;
+	static int nr_tries_global = 0;
 	static hpa_t last_pa = 0;
 
 	if (pa != last_pa)
-		nr_tries = 0;
+		nr_tries_global = 0;
 	last_pa = pa;
 
-	do {
+	for (int i = 0; i < 20; i++) {
 		hva_t ptr = leak64(base, pa);
 		if (check(ptr, hdm))
 			return ptr;
 		if (verbose)
 			printf("host_leak_ptr: retrying erronous ptr %lx\n", ptr);
-	} while (++nr_tries < 100);
+		if (++nr_tries_global >= 100)
+			err(1, "host_leak_ptr(base=%lx, hdm=%lx, pa=%lx): stuck! (%d)\n", base, hdm, pa, nr_tries_global);
+	}
 
-	err(1, "host_leak_ptr(base=%lx, hdm=%lx, pa=%lx): stuck! (%d)\n", base, hdm, pa, nr_tries);
 	return -1;
 }
 

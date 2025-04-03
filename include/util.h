@@ -21,7 +21,12 @@
 #define for_each_around(name, center, radius, step) \
         for (long name = (center), delta = (step); name < (center) + (radius); name += delta, delta = -delta + (delta > 0 ? -(step) : (step)))
 
+#define for_each_around_range(name, center, start, end, step) \
+        for (long name = (center), delta = (step); ((start) <= name && name < (end)) || ((start) <= (name+delta) && (name+delta) < (end)); name += delta, delta = -delta + (delta > 0 ? -(step) : (step))) \
+                if ((start) <= name && name < (end))
+
 #define HLINE "--------------------------------------------------------------------------------\n"
+#define INDENT "    "
 
 void set_cpu_affinity(int cpu_id);
 int get_sibling(int cpu_id);
