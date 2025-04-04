@@ -195,6 +195,7 @@ int l1tf_test(void *va, uintptr_t pa, int iters);
 int l1tf_test_base(uintptr_t pa, int iters);
 uintptr_t l1tf_find_page_pa(void *p);
 uintptr_t l1tf_find_base(void);
+int l1tf_oracle16(uint16_t magic, uintptr_t pa, int nr_tries, void *touch);
 hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int step, int iters);
 void l1tf_init(void);
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len);
