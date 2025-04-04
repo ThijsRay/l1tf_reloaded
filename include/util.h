@@ -1,14 +1,16 @@
 #pragma once
 #include <stdio.h>
+#include <stdarg.h>
 #include "config.h"
 #include "reverse.h"
+
 
 
 #define CLEAR_LINE "\33[2K\r"
 #define STR(a) STRSTR(a)
 #define STRSTR(a) #a
-#define dump(x) printf("%30s = %16lx\n", STR(x), x)
-#define dumpp(x) printf("\t%30s = %16lx\n", STR(x), x)
+#define dump(x) fprintf(stderr, "%30s = %16lx\n", STR(x), x)
+#define dumpp(x) fprintf(stderr, "\t%30s = %16lx\n", STR(x), x)
 #define BITS(x, n, m) ((x & BITS_MASK(n, m)) >> m)
 
 /* for loop with iterator `name` ranging as:
@@ -38,6 +40,8 @@ static inline __attribute__((always_inline)) u64 rdrand(void) {
 	return rand;
 }
 
+
+void pr_dub(const char *format, ...);
 void set_cpu_affinity(int cpu_id);
 int get_sibling(int cpu_id);
 uint64_t file_read_lx(const char *filename);

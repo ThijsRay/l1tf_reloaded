@@ -11,7 +11,7 @@ pid_t spawn_child() {
   pid_t pid;
   pid = fork();
   if (pid == 0) {
-    printf("Spawned pid %d\n", getpid());
+    fprintf(stderr, "Spawned pid %d\n", getpid());
     system("sshpass -p 'test' -- ssh -T -o NumberOfPasswordPrompts=1 "
            "nobody@local_victim");
     exit(0);

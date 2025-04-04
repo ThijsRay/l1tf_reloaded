@@ -24,6 +24,17 @@
 #include "util.h"
 #include "leak.h"
 
+void pr_dub(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    va_start(args, format);
+    vfprintf(stdout, format, args);
+    va_end(args);
+}
+
 void set_cpu_affinity(int cpu_id) {
 	cpu_set_t set;
 	CPU_ZERO(&set);
@@ -59,9 +70,9 @@ int get_sibling(int cpu_id)
 uint64_t file_read_lx(const char *filename)
 {
     char buf[32];
-    int fd = open(filename, O_RDONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
-    int rv = read(fd, buf, 32);  if (rv < 0) { printf("error read %s", filename); exit(1); }
-    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
+    int fd = open(filename, O_RDONLY); if (fd < 0) { fprintf(stderr, "error open %s", filename); exit(1); }
+    int rv = read(fd, buf, 32);  if (rv < 0) { fprintf(stderr, "error read %s", filename); exit(1); }
+    int cv = close(fd); if (cv < 0) { fprintf(stderr, "error close %s", filename); exit(1); }
     return strtoull(buf, NULL, 16);
 }
 
@@ -69,9 +80,9 @@ uint64_t file_write_lx(const char *filename, uint64_t uaddr)
 {
     char buf[32];
     snprintf(buf, sizeof(buf), "%lx\n", uaddr);
-    int fd = open(filename, O_WRONLY); if (fd < 0) { printf("error open %s", filename); exit(1); }
+    int fd = open(filename, O_WRONLY); if (fd < 0) { fprintf(stderr, "error open %s", filename); exit(1); }
     u64 rv = write(fd, buf, 32);
-    int cv = close(fd); if (cv < 0) { printf("error close %s", filename); exit(1); }
+    int cv = close(fd); if (cv < 0) { fprintf(stderr, "error close %s", filename); exit(1); }
     return rv;
 }
 
@@ -102,7 +113,7 @@ void print_page_table(hpa_t base, hpa_t page_table)
     leak(data, base, page_table, 0x1000);
     for (pte_t *pte = (pte_t *)data; (u64)pte < (u64)data+0x1000; pte++)
         if (*pte & 1)
-            printf("[%4lx] --> %16lx\n", pte-(u64 *)data, *pte);
+            fprintf(stderr, "[%4lx] --> %16lx\n", pte-(u64 *)data, *pte);
 }
 
 void print_region(va_t start, va_t end)
@@ -115,7 +126,7 @@ void print_region(va_t start, va_t end)
     long ej = BITS(end, 39, 30);
     long ek = BITS(end, 30, 21);
     long el = BITS(end, 21, 12);
-    printf("[%16lx, %16lx) [%3lx/%3lx/%3lx/%3lx, %3lx/%3lx/%3lx/%3lx)\n",
+    fprintf(stderr, "[%16lx, %16lx) [%3lx/%3lx/%3lx/%3lx, %3lx/%3lx/%3lx/%3lx)\n",
             start, end, si, sj, sk, sl, ei, ej, ek, el);
 }
 
@@ -144,7 +155,7 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
             }
             if (IS_HUGE(pud[j])) {
                 va_t va = ((i & 0x100) ? (0xffffULL << 48) : 0) | (i << 39) | (j << 30);
-                if (verbose) { printf("pgd[%3lx] pud[%3lx] (1GB) ", i, j); print_region(va, va + (1UL << 30)); }
+                if (verbose) { fprintf(stderr, "pgd[%3lx] pud[%3lx] (1GB) ", i, j); print_region(va, va + (1UL << 30)); }
                 if (start == -1ULL || va != end) {
                     if (start != -1ULL)
                         print_region(start, end);
@@ -165,7 +176,7 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
                 }
                 if (IS_HUGE(pmd[k])) {
                     va_t va = ((i & 0x100) ? (0xffffULL << 48) : 0) | (i << 39) | (j << 30) | (k << 21);
-                    if (verbose) { printf("pgd[%3lx] pud[%3lx] pmd[%3lx] (2MB) ", i, j, k); print_region(va, va + (1UL << 21)); }
+                    if (verbose) { fprintf(stderr, "pgd[%3lx] pud[%3lx] pmd[%3lx] (2MB) ", i, j, k); print_region(va, va + (1UL << 21)); }
                     if (start == -1ULL || va != end) {
                         if (start != -1ULL)
                             print_region(start, end);
@@ -185,7 +196,7 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
                         continue;
                     }
                     va_t va = ((i & 0x100) ? (0xffffULL << 48) : 0) | (i << 39) | (j << 30) | (k << 21) | (l << 12);
-                    if (verbose) { printf("pgd[%3lx] pud[%3lx] pmd[%3lx] pte[%3lx] ", i, j, k, l); print_region(va, va + (1UL << 12)); }
+                    if (verbose) { fprintf(stderr, "pgd[%3lx] pud[%3lx] pmd[%3lx] pte[%3lx] ", i, j, k, l); print_region(va, va + (1UL << 12)); }
                     if (start == -1ULL || va != end) {
                         if (start != -1ULL)
                             print_region(start, end);

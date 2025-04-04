@@ -25,7 +25,7 @@ size_t measure_in_cache_threshold_time(void *ptr) {
     }
 
     in_cache_variance = variance(n, in_cache_times);
-    printf("Variance: %ld\n", in_cache_variance);
+    fprintf(stderr, "Variance: %ld\n", in_cache_variance);
     sched_yield();
   } while (in_cache_variance > 200);
 

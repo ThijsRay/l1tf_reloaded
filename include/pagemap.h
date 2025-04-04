@@ -68,6 +68,6 @@ uintptr_t get_physical_addresss(pid_t pid, void *virtual_address) {
   pagemap_entry_t entry = get_pagemap_entry(pid, virtual_address);
   uintptr_t offset = (uintptr_t)virtual_address % getpagesize();
   uint64_t pfn = entry.pfn;
-  printf("entry: %lx\tpfn: %lx\n", *(uint64_t *)&entry, pfn);
+  fprintf(stderr, "entry: %lx\tpfn: %lx\n", *(uint64_t *)&entry, pfn);
   return (entry.pfn * getpagesize()) + offset;
 }

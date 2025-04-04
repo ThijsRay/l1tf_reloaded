@@ -13,7 +13,7 @@ struct cpuid_t {
 };
 
 void print_cpuid(struct cpuid_t *c) {
-  printf("eax: %x\nebx: %x\necx: %x\nedx: %x\n", c->eax, c->ebx, c->ecx,
+  fprintf(stderr, "eax: %x\nebx: %x\necx: %x\nedx: %x\n", c->eax, c->ebx, c->ecx,
          c->edx);
 }
 
@@ -37,7 +37,7 @@ void print_cpuid(struct cpuid_t *c) {
 #define KVM_FEATURE_CLOCKSOURCE_STABLE_BIT 24
 #define CHECK_AND_PRINT_KVM_FEATURE(feature)                                   \
   if (c->eax & (1 << feature)) {                                               \
-    printf(#feature "\n");                                                     \
+    fprintf(stderr, #feature "\n");                                                     \
   }
 
 void print_kvm_features(struct cpuid_t *c) {

@@ -28,7 +28,7 @@ static inline __attribute__((always_inline)) ssize_t reload(const size_t nr_valu
     size_t time = access_time((void *)&buffer[i * STRIDE]);
     if (time < threshold) {
       // if (r != -1)
-      //   printf("reload: prev hit %2lx, next hit %2lx\n", r, i);
+      //   fprintf(stderr, "reload: prev hit %2lx, next hit %2lx\n", r, i);
       r = i;
     }
   }

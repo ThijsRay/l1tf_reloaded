@@ -38,27 +38,27 @@ void display(void *data, int len)
 	uint8_t *p = data;
 	int i;
 	for (i = 0; i < len/8; i++) {
-		printf("%4x:  %16lx   %02x %02x %02x %02x %02x %02x %02x %02x %c%c%c%c%c%c%c%c\n", 8*i, *(uint64_t *)(p+8*i),
+		fprintf(stderr, "%4x:  %16lx   %02x %02x %02x %02x %02x %02x %02x %02x %c%c%c%c%c%c%c%c\n", 8*i, *(uint64_t *)(p+8*i),
 		p[8*i+0], p[8*i+1], p[8*i+2], p[8*i+3], p[8*i+4], p[8*i+5], p[8*i+6], p[8*i+7],
 		c(p[8*i+0]), c(p[8*i+1]), c(p[8*i+2]), c(p[8*i+3]), c(p[8*i+4]), c(p[8*i+5]), c(p[8*i+6]), c(p[8*i+7]));
 	}
 	if (len > 8*i) {
-		printf("%4x:                     ", 8*i);
+		fprintf(stderr, "%4x:                     ", 8*i);
 		for (int j = 8*i; j < len; j++)
-			printf("%02x ", p[8*i+j]);
+			fprintf(stderr, "%02x ", p[8*i+j]);
 		for (int j = len; j < 9*i; j++)
-			printf("   ");
-		printf("  ");
+			fprintf(stderr, "   ");
+		fprintf(stderr, "  ");
 		for (int j = 8*i; j < len; j++)
-			printf("%c", c(p[8*i+j]));
-		printf("\n");
+			fprintf(stderr, "%c", c(p[8*i+j]));
+		fprintf(stderr, "\n");
 	}
 }
 
 void display_data(char *data)
 {
 	for (int i = 0; i < 4; i++)
-		printf("%16lx %16lx\n", *(uint64_t *)(data+i*0x10), *(uint64_t *)(data+i*0x10+8));
+		fprintf(stderr, "%16lx %16lx\n", *(uint64_t *)(data+i*0x10), *(uint64_t *)(data+i*0x10+8));
 }
 
 int check_correctness(char *data)
@@ -84,7 +84,7 @@ int check_correctness(char *data)
 	for (int i = 0; i < 64; i++)
 		for (int b = 0; b < 8; b++)
 			correct_bits += (data[i] & (1 << b)) == (secret[i] & (1 << b));
-	if (verbose) printf("all:            %2d / %2d bytes,  %3d / %2d nibbles,  %3d / %3d bits\n", correct_bytes, 64, correct_nibbles, 2*64, correct_bits, 8*64);
+	if (verbose) fprintf(stderr, "all:            %2d / %2d bytes,  %3d / %2d nibbles,  %3d / %3d bits\n", correct_bytes, 64, correct_nibbles, 2*64, correct_bits, 8*64);
 
 	correct_bytes = 0;
 	int nonzero_bytes = 0;
@@ -106,7 +106,7 @@ int check_correctness(char *data)
 		if (secret[i] != 0)
 			for (int b = 0; b < 8; b++)
 				correct_bits += (data[i] & (1 << b)) == (secret[i] & (1 << b));
-	if (verbose) printf("non-zero bytes: %2d / %2d bytes,  %3d / %2d nibbles,  %3d / %3d bits\n", correct_bytes, nonzero_bytes, correct_nibbles, 2*nonzero_bytes, correct_bits, 8*nonzero_bytes);
+	if (verbose) fprintf(stderr, "non-zero bytes: %2d / %2d bytes,  %3d / %2d nibbles,  %3d / %3d bits\n", correct_bytes, nonzero_bytes, correct_nibbles, 2*nonzero_bytes, correct_bits, 8*nonzero_bytes);
 
 	return errors;
 }
@@ -125,6 +125,6 @@ void benchmark_leakage_primitive(uintptr_t base)
 		thijs_l1tf_leak(data, base, leak_pa + 0x40, 0x40);
 		time = (clock_read()-t0)/1000000000.0;
 		errors = check_correctness(data);
-		printf("time = %8.1f | errors = %3d\n", time, errors);
+		fprintf(stderr, "time = %8.1f | errors = %3d\n", time, errors);
 	}
 }

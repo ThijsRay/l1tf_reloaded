@@ -66,20 +66,20 @@ void dump_memory(volatile uint8_t *ptr, uint32_t size) {
   for (i = 0; i <= size; i += 1) {
     if (i % line_size == 0 && i != 0) {
 
-      printf("\t");
+      fprintf(stderr, "\t");
       for (size_t j = i - line_size; j < i; ++j) {
         char out[3];
         escape_ascii(ptr[j], out);
-        printf("%s", out);
+        fprintf(stderr, "%s", out);
       }
 
-      printf("\n");
+      fprintf(stderr, "\n");
 
       if (i == size) {
         break;
       }
     }
-    printf("%02x ", ptr[i]);
+    fprintf(stderr, "%02x ", ptr[i]);
   }
 }
 
@@ -91,19 +91,19 @@ int main(void) {
 
   uintptr_t phys_addr = virt_to_phys(buffer);
   if (phys_addr != 0) {
-    printf("Phys: 0x%lx\n", virt_to_phys(buffer));
+    fprintf(stderr, "Phys: 0x%lx\n", virt_to_phys(buffer));
   }
 
-  printf("\nData (hex):\t\t\t\t\t\tData (ASCII):\n");
+  fprintf(stderr, "\nData (hex):\t\t\t\t\t\tData (ASCII):\n");
   dump_memory((void *)buffer, sizeof(test));
 
-  printf("\nclflushing the entire buffer...\n");
+  fprintf(stderr, "\nclflushing the entire buffer...\n");
   for (size_t i = 0; i < sizeof(test); ++i) {
     clflush((void *)&test[i]);
     clflush((void *)&buffer[i]);
   }
 
-  printf("The data is still in memory, but not in cache.\n"
+  fprintf(stderr, "The data is still in memory, but not in cache.\n"
          "It will not be accessed anymore by the victim from now on.\n"
          "Going into an infinite loop...\n");
 
