@@ -3,6 +3,7 @@
 #include "config.h"
 #include "reverse.h"
 
+
 #define CLEAR_LINE "\33[2K\r"
 #define STR(a) STRSTR(a)
 #define STRSTR(a) #a
@@ -27,6 +28,15 @@
 
 #define HLINE "--------------------------------------------------------------------------------\n"
 #define INDENT "    "
+
+static inline __attribute__((always_inline)) u64 rdrand(void) {
+	unsigned char success;
+	u64 rand;
+	do {
+		asm volatile("rdrand %%rax; setc %1": "=a" (rand), "=qm"(success) ::);
+	} while (!success);
+	return rand;
+}
 
 void set_cpu_affinity(int cpu_id);
 int get_sibling(int cpu_id);

@@ -343,7 +343,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define GCR3		0x279a42000UL
 #define GTEXT		0xffffffffa7c00000
 #define INIT_COMM	0x34f211e68UL
-// #define NGINX		0x1f93dc100
+#define NGINX		0x1f93dc100
 
 #elif MACHINE == GCE
 

