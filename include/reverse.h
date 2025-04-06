@@ -333,16 +333,17 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define BASE		0x2dd2ae218UL
 #define HOST_DIRECT_MAP	0xffffa03300000000
 #define OWN_VCPU	0xffffa03509eea300
-#define OWN_TASK	0xffffa0340565afc0
-#define HCR3		0x426d18000UL
+#define OWN_TASK	0xffffa03706e28000
+#define HCR3		0x587fa6000UL
 #define OWN_KVM		0xffffb1b08d9f5000
-// #define VICTIM_KVM	0xffffb1b08ef31000
-// #define VICTIM_VCPU	0xffffa03509694600
-// #define EPTP		0x10209e000UL
-// #define GCR3		0x279a42000UL
-// #define GTEXT		0xffffffffa7c00000
-// #define INIT_COMM	0x34f211e68UL
-// #define NGINX		0xffff8fb5ca5dc100
+#define VICTIM_TASK     0xffff929245ad4100
+#define VICTIM_KVM	0xffffb1b08ef31000
+#define VICTIM_VCPU	0xffffa03509694600
+#define EPTP		0x19b9f2000UL
+#define GCR3		0x295b40000UL
+#define GTEXT		0xffffffffb3400000
+#define INIT_COMM	0x34f211e68UL
+// #define NGINX		0xffff929245ad4100
 
 #elif MACHINE == GCE
 
