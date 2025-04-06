@@ -15,7 +15,7 @@ char *stringify_bignum(void *buf, int len)
 
         uint8_t *num = buf;
         for (int i = 0; i < len; i++)
-                snprintf(&str[2*i], sizeof(str), "%02hhx", num[i]);
+                snprintf(&str[2*i], 3, "%02hhx", num[i]);
 
         return str;
 }
@@ -51,7 +51,8 @@ void test_prime(void)
         // Convert the two primes into a PEM file and print it to stdout.
         char cmd[0x1000] = {0};
         snprintf(cmd, sizeof(cmd), "./scripts/pem.py %s %s", p, q);
-        system(cmd);
+        int r = system(cmd);
+        printf("r = %d\n", r);
 
         free(p);
         free(q);

@@ -20,9 +20,10 @@ add_executable(exploit
   src/reverse.c
   src/benchmark.c
   src/leak.c
+  src/prime.c
 )
 
-target_link_libraries(exploit rt m)
+target_link_libraries(exploit rt m gmp)
 target_include_directories(exploit PRIVATE include deps/PTEditor)
 
 add_executable(kvm_leak
