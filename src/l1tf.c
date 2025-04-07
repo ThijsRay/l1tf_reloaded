@@ -242,6 +242,8 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
   assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
 
 	half_spectre_start(base, phys_addr);
+	// half_spectre_start(base, 0x17a101f91000 + (phys_addr-0x9e177000)); TODO IMPLEMENT VIRTUALLY INDEXED HALF-SPECTRE/L1TF
+	// half_spectre_start(base, 0x17a101fa8000 + (phys_addr-0x9e092000));
 
   reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
 

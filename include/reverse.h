@@ -55,9 +55,9 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_TASK_TASKS		0x890	// struct list_head tasks
 #define G_TASK_MM		0x940	// struct mm_struct *mm
 #define G_TASK_PID		0x960	// pid_t pid, tgid
-#define G_TASK_PARENT		0x970	// struct task_struct *real_parent
-#define G_TASK_CHILDREN		0x980	// struct list_head children
-#define G_TASK_SIBLING		0x990	// struct list_head sibling
+#define G_TASK_PARENT		0x970	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
+#define G_TASK_CHILDREN		0x980	// struct list_head children TODO THIS IS ONLY GUESS
+#define G_TASK_SIBLING		0x990	// struct list_head sibling TODO THIS IS ONLY GUESS
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
 // };
@@ -79,6 +79,9 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // struct task_struct {
 #define G_TASK_TASKS		0x890	// struct list_head tasks
 #define G_TASK_MM		0x940	// struct mm_struct *mm
+#define G_TASK_PARENT		0x950	// struct task_struct *real_parent
+#define G_TASK_CHILDREN		0x960	// struct list_head children
+#define G_TASK_SIBLING		0x970	// struct list_head sibling
 #define G_TASK_PID		(0x890+0xd0) // 0x9c0	// pid_t pid, tgid
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
@@ -263,7 +266,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // struct kvm_vcpu {
 #define H_VCPU_KVM		0x0	// struct kvm *kvm
 #define H_VCPU_PID		0x90	// struct pid *pid
-#define H_VCPU_ARCH		0x120	// struct kvm_vcpu_arch arch
+#define H_VCPU_ARCH		0x1b0	// struct kvm_vcpu_arch arch
 // };
 
 // struct pid {
@@ -303,16 +306,16 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // }
 
 // struct kvm_mmu {
-#define H_MMU_ROOT		0x40	// struct kvm_mmu_root_info root;
+#define H_MMU_ROOT		0x38	// struct kvm_mmu_root_info root;
 // }
 
 // struct kvm_mmu_root_info {
 #define H_INFO_HPA		0x8	// hpa_t hpa;
 // };
 
-// struct kvm { // TODO: THESE ARE ONLY THE PUXS:~/GIT/LINUX OFFSETS!!!
-#define H_KVM_VCPU_ARRAY	0x1128	// struct xarray vcpu_array
-#define H_KVM_VM_LIST		0x1178	// struct list_head vm_list
+// struct kvm {
+#define H_KVM_VCPU_ARRAY	0x48	// struct xarray vcpu_array
+#define H_KVM_VM_LIST		-1	// struct list_head vm_list // TODO DOESNT EXIST!?!
 // };
 
 // struct xarray {
@@ -374,12 +377,28 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #elif MACHINE == AWS
 
-#define BASE		0xa1d35218UL
-#define HOST_DIRECT_MAP	0xffff93e3c0000000
-#define OWN_VCPU	0xffff93e461290000
-#define OWN_TASK	0xffff93f671ad4ce0
-#define HCR3		0xa1278000UL
-#define OWN_KVM         0xffffab3801795000
+// #define BASE		0xa1d35218UL
+// #define HOST_DIRECT_MAP	0xffff93e3c0000000
+// #define OWN_VCPU	0xffff93e461290000
+// #define OWN_TASK	0xffff93f671ad4ce0
+// #define HCR3		0xa1278000UL
+// #define OWN_KVM         0xffffab3801795000
+// --------[ rain-vm-aws-c5-extra ]----------
+#define BASE            0x9e39e218UL
+#define HOST_DIRECT_MAP	0xffff9868c0000000
+#define OWN_VCPU        0xffff98695f2137c0
+#define OWN_TASK        0xffff98695f1eb2a0
+#define HCR3            0x9e154000UL
+#define VICTIM_TASK     0xffff987b61afb2a0
+#define VICTIM_VCPU     0xffff98695f2137c0 // 0xffff98695f20b7c0 // 0xffff98695f1f0000
+#define EPTP            0x9f333000UL // 0x9f35f000UL
+#define GCR3            0xa3668e000UL // ?
+// #define VICTIM_VCPU     0x
+// // --------[ rain-vm-aws-c5-extra-old ]----------
+// #define BASE            0x9b223218UL
+// #define HOST_DIRECT_MAP	0xffff93e3c0000000
+// #define OWN_VCPU        0xffff93e3e5580000
+// #define OWN_TASK        0xffff93e461911860 // ?
 
 #endif // MACHINE
 

