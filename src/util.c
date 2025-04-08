@@ -224,6 +224,14 @@ int nr_letters_equal(const char *str1, const char *str2)
     return nr_equal;
 }
 
+int nr_letters_equal_len(const char *str1, const char *str2, int len)
+{
+    int nr_equal = 0;
+    for (int i = 0; i < len; i++)
+        nr_equal += str1[i] == str2[i];
+    return nr_equal;
+}
+
 int hamming_dist(u64 a, u64 b)
 {
     u64 x = a ^ b;

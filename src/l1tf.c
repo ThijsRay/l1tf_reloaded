@@ -1171,8 +1171,8 @@ void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t
             buf[off/8] = hc_read_pa(pa+off);
     memcpy(data, buf, len);
   #if LEAK == CHEAT_NOISY
-    for (int i = 0; i < len; i++)
-      if (rdrand() % 1024 < 100)
+    for (u64 i = 0; i < len; i++)
+      if (rdrand() % 1024 < NOISINESS)
         ((char *)data)[i] = 0;
   #endif
 #else // LEAK == L1tF || SKIP

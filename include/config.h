@@ -37,3 +37,5 @@
 #elif LEAK == CHEAT_NOISY
         #define LEAK_STR "CHEAT_NOISY"
 #endif
+
+#define NOISINESS 400 // Out of 1024
