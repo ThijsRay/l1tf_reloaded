@@ -122,7 +122,7 @@ void benchmark_leakage_primitive(uintptr_t base)
 	display_data(secret);
 	for (int i = 0; i < 3; i++) {
 		t0 = clock_read();
-		thijs_l1tf_leak(data, base, leak_pa + 0x40, 0x40);
+		try_l1tf_leak(data, base, leak_pa + 0x40, 0x40);
 		time = (clock_read()-t0)/1000000000.0;
 		errors = check_correctness(data);
 		fprintf(stderr, "time = %8.1f | errors = %3d\n", time, errors);
