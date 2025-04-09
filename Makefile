@@ -1,7 +1,7 @@
 .PHONY: run_exploit
 run_exploit:
 	make exploit
-	./build/exploit 2>>std.err | tee std.out
+	./build/exploit 2>>std.err | tee -a std.out
 
 all: build
 	$(MAKE) kvm_leak
