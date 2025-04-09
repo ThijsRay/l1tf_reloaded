@@ -14,6 +14,10 @@ hpa_t gadget_base(void)
 	dump(BASE);
         return BASE;
 #endif
+#if LEAK == CHEAT || LeAK == CHEAT_NOISY
+	dump(helper_base_pa());
+	return helper_base_pa();
+#endif
         return l1tf_find_base();
 }
 

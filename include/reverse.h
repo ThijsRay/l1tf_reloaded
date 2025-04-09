@@ -333,7 +333,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #if MACHINE == FATHER
 
-#define BASE		0x2dd2ae218UL
+#define BASE		0x2e5046218UL
 #define HOST_DIRECT_MAP	0xffffa03300000000
 #define OWN_VCPU	0xffffa03509eea300
 #define OWN_TASK	0xffffa03706e28000
@@ -346,7 +346,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define GCR3		0x295b40000UL
 #define GTEXT		0xffffffffb3400000
 #define INIT_COMM	0x34f211e68UL
-// #define NGINX		0xffff929245ad4100
+#define NGINX		0xffff929245ad4100
 
 #elif MACHINE == GCE
 

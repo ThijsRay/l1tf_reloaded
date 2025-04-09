@@ -38,4 +38,4 @@
         #define LEAK_STR "CHEAT_NOISY"
 #endif
 
-#define NOISINESS 400 // Out of 1024
+#define NOISINESS 100 // Out of 1024
