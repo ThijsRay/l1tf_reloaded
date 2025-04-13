@@ -151,6 +151,8 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_FILE_PRIV		0x20	// void *private_data
 // };
 
+#define FD_KVM_GUESS		0xa	// At what file descriptor number do we expect the kvm file?
+
 // struct mm_struct {
 #define H_MM_PGD		0x78	// pgd_t *pgd
 // };
@@ -221,9 +223,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // };
 
 // struct file {
-#define H_FILE_PRIV		0x20	// void *private_data
+#define H_FILE_PRIV		0xc8	// void *private_data
 // };
 
+#define FD_KVM_GUESS		0x163	// At what file descriptor number do we expect the kvm file?
 
 // struct mm_struct {
 #define H_MM_PGD		0x80	// pgd_t *pgd
@@ -298,6 +301,8 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_FILE_PRIV		0xc0	// void *private_data
 // };
 
+#define FD_KVM_GUESS		0xa	// At what file descriptor number do we expect the kvm file?
+
 // struct mm_struct {
 #define H_MM_PGD		0x40	// pgd_t *pgd
 // };
@@ -355,19 +360,20 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 // ---------[ rain-vm-gce ]---------
 #define BASE		0x11f73d218UL
-#define HOST_DIRECT_MAP	0xffff934040000000
-#define OWN_VCPU	0xffff934153430e80
-#define OWN_TASK	0xffff936fa3088040
-#define HCR3		0x111cf6000UL
-#define VICTIM_TASK	0xffff935f6acfe140
-#define VICTIM_VCPU	0xffff93479fb210c0
-#define EPTP		0x88030b000UL
-#define GCR3		0x3adfb1e000UL
-#define GTEXT		0xffffffff90600000
-#define GDM		0xffff919200000000
-#define NGINX		0xffff91930087af40
-#define NGINX_CR3	0x117e010000UL
-#define SSLKEY_HPA      0x16ff0999fUL
+// #define HOST_DIRECT_MAP	0xffff934040000000
+// #define OWN_VCPU	0xffff934153430e80
+// #define OWN_KVM         0xffff9584f57c7000
+// #define OWN_TASK	0xffff936fa3088040
+// #define HCR3		0x111cf6000UL
+// #define VICTIM_TASK	0xffff935f6acfe140
+// #define VICTIM_VCPU	0xffff93479fb210c0
+// #define EPTP		0x88030b000UL
+// #define GCR3		0x3adfb1e000UL
+// #define GTEXT		0xffffffff90600000
+// #define GDM		0xffff919200000000
+// #define NGINX		0xffff91930087af40
+// #define NGINX_CR3	0x117e010000UL
+// #define SSLKEY_HPA      0x16ff0999fUL
 // ---------[ old (pre-reboot) rain-vm-gce ]---------
 // #define BASE		0x88d43f218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000

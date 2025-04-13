@@ -1043,7 +1043,7 @@ hpa_t l1tf_find_magic16(hpa_t base, uint16_t magic, hpa_t start, hpa_t end, int 
         break;
       }
     }
-    if (run % 100 == 0)
+    if (verbose && run % 100 == 0)
       fprintf(stderr, " run = %d\n", run);
   }
   half_spectre_stop();
