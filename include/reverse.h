@@ -79,10 +79,10 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // struct task_struct {
 #define G_TASK_TASKS		0x890	// struct list_head tasks
 #define G_TASK_MM		0x940	// struct mm_struct *mm
-#define G_TASK_PARENT		0x950	// struct task_struct *real_parent
-#define G_TASK_CHILDREN		0x960	// struct list_head children
-#define G_TASK_SIBLING		0x970	// struct list_head sibling
-#define G_TASK_PID		(0x890+0xd0) // 0x9c0	// pid_t pid, tgid
+#define G_TASK_PID		0x960	// pid_t pid, tgid
+#define G_TASK_PARENT		0x970	// struct task_struct *real_parent
+#define G_TASK_CHILDREN		0x980	// struct list_head children
+#define G_TASK_SIBLING		0x990	// struct list_head sibling
 #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
 // };
@@ -209,6 +209,9 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_TASKS		0x900	// struct list_head tasks
 #define H_TASK_MM		0x950	// struct mm_struct *mm
 #define H_TASK_PID		0xa08	// pid_t pid, tgid
+#define H_TASK_PARENT		0xa18	// struct task_struct *real_parent
+#define H_TASK_CHILDREN		0xa28	// struct list_head children
+#define H_TASK_SIBLING		0xa38	// struct list_head sibling
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc38	// char comm[TASK_COMM_LEN]
 #define H_TASK_FILES		0xc58   // struct files_struct *files
@@ -284,6 +287,9 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_TASKS		0x908	// struct list_head tasks
 #define H_TASK_MM		0x958	// struct mm_struct *mm
 #define H_TASK_PID		0xa08	// pid_t pid, tgid
+#define H_TASK_PARENT		0xa18	// struct task_struct *real_parent
+#define H_TASK_CHILDREN		0xa28	// struct list_head children
+#define H_TASK_SIBLING		0xa38	// struct list_head sibling
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc48	// char comm[TASK_COMM_LEN]
 #define H_TASK_FILES		0xc78   // struct files_struct *files
