@@ -394,6 +394,13 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_TASK	0xffff9341645e2040 // 0xffff93416f4041c0
 // #define HCR3		0x13373c000UL
 // #define OWN_KVM		0xffff9584f96ad000
+// ---------[ rain-vm-gce-test ]---------
+// #define BASE		0x305c25a218UL
+// #define HOST_DIRECT_MAP 0xffff934040000000
+// #define OWN_VCPU	0xffff93a118800bc0
+// #define OWN_TASK	0xffff93a173d86140
+// #define HCR3		0x72ecfa2000UL
+// #define VICTIM_TASK     0xffff935f6acfe140 // gce-victim's VCPU-0
 
 #elif MACHINE == AWS
 
