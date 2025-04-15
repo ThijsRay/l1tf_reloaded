@@ -256,19 +256,6 @@ static void pfx_set(char **pfx, char *prefix, const char *prefmt, const char *fm
  */
 pa_t translate_tdp(hpa_t base, gva_t va, gva_t gdm, hpa_t gcr3, hpa_t eptp, int out_gpa, const char *prefmt, ...)
 {
-	if (va == 0xffffffffb9611f80+G_TASK_COMM) {
-		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x4552e12b00);
-		return 0x4552e12b00;
-	}
-	if (va == 0xffffffffb9612810) {
-		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x4552e12810);
-		return 0x4552e12810;
-	}
-	if (va == 0xffff928b0081b8c0) {
-		fprintf(stderr, "HARDCODED TRANSLATION LOOKASIDE: gva %lx --> hpa %lx\n", va, 0x2b2c41bac0);
-		return 0x2b2c41b8c0;
-	}
-
 	va_list args;
 	char prefix[0x100];
 	char pfxbuf[0x100];

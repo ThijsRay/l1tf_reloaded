@@ -40,6 +40,16 @@ static inline __attribute__((always_inline)) u64 rdrand(void) {
 	return rand;
 }
 
+#define LABEL_FB(name, maxtries, fallback) \
+		static int global_count_##name = 0; \
+		int nr_tries_##name = 0; \
+	name: \
+		if (++global_count_##name > 10000) \
+			err(EXIT_FAILURE, "Saturation of global count of label '%s' in %s at %s:%d\n", STR(name), __func__, __FILE__, __LINE__); \
+		if (++nr_tries_##name > maxtries) \
+			fallback;
+
+#define LABEL(name) LABEL_FB(name, 10000, err(EXIT_FAILURE, "Label tries outnumbered\n"));
 
 void pr_dub(const char *format, ...);
 void set_cpu_affinity(int cpu_id);
