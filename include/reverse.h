@@ -214,7 +214,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_TASK_SIBLING		0xa38	// struct list_head sibling
 #define H_TASK_PID_LINKS	0xa78	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
 #define H_TASK_COMM		0xc38	// char comm[TASK_COMM_LEN]
-#define H_TASK_FILES		0xc58   // struct files_struct *files
+#define H_TASK_FILES		0xc70   // struct files_struct *files
 // };
 
 // struct files_struct {
