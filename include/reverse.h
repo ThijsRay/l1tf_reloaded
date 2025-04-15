@@ -229,7 +229,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define H_FILE_PRIV		0xc8	// void *private_data
 // } __randomize_layout;
 
-#define FD_KVM_GUESS		0x163	// At what file descriptor number do we expect the kvm file?
+#define FD_KVM_GUESS		0x178	// At what file descriptor number do we expect the kvm file?
 
 // struct mm_struct {
 #define H_MM_PGD		0x80	// pgd_t *pgd
