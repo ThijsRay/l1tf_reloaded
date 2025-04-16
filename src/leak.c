@@ -202,7 +202,7 @@ retry_pmd:
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
 	if (verbose == 1 && prefmt) pr_dub(" pmd %10lx", pmd);
-	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x063) || ((pmd & 0xfff) == 0x907) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
+	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x063) || ((pmd & 0xfff) == 0x907)  || ((pmd & 0xfff) == 0x977) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
 		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		goto retry_pmd;
 	}
@@ -228,7 +228,7 @@ retry_pte:
 	pte_t pte = leak_pte(base, pte_pa);
 	if (verbose >= 2) dumpp(pte);
 	if (verbose == 1 && prefmt) pr_dub(" pte %10lx", pte);
-	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x107) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
+	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x977) || ((pte & 0xfff) == 0x107)  || ((pte & 0xfff) == 0x177) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
 		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx pmd %10lx", prefix, pgd, pud, pmd);
 		goto retry_pte;
 	}
