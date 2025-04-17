@@ -183,7 +183,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #elif MACHINE == GCE
 
 #define OWN_TASK_NAME		"VCPU-0"
-#define VM_COMM                 "VCPU-"
+#define VM_COMM                 "nanny"
 
 // struct kvm_apic_map {
 #define H_MAP_PHYS_MAP		0x218   // struct kvm_lapic *phys_map[max_apic_id+1]
