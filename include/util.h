@@ -49,7 +49,7 @@ static inline __attribute__((always_inline)) u64 rdrand(void) {
 		if (++nr_tries_##name > maxtries) \
 			fallback;
 
-#define LABEL(name) LABEL_FB(name, 10000, err(EXIT_FAILURE, "Label tries outnumbered\n"));
+#define LABEL(name) LABEL_FB(name, 1000, err(EXIT_FAILURE, "Label tries outnumbered\n"));
 
 void pr_dub(const char *format, ...);
 void set_cpu_affinity(int cpu_id);

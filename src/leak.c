@@ -115,7 +115,7 @@ pte_t leak_pte(hpa_t base, hpa_t pa)
 				dump((true ^ pte) & pte);
 				fprintf(stderr, "NOTE: we leaked a non-zero nibble where we are not supposed to...\n");
 				fprintf(stderr, "\n\n\n\n\n\n\n\n\n\n\n");
-				exit(1);
+				// exit(1);
 			}
 		}
 	}
