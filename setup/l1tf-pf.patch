@@ -1,0 +1,35 @@
+diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
+index 1b5be07f86..8db0e5d1f7 100644
+--- a/arch/x86/entry/entry_64.S
++++ b/arch/x86/entry/entry_64.S
+@@ -280,6 +280,18 @@ SYM_CODE_START(xen_error_entry)
+ 	RET
+ SYM_CODE_END(xen_error_entry)
+ 
++.macro idtentry_body_pf cfunc has_error_code:req
++	cmpl $0xB1ABE849, %r12d
++	jne idtentry_body_not_fast_\@
++	cmpl $0xCD7E16F1, %r13d
++	jne idtentry_body_not_fast_\@
++	popq %r12
++	popq %r12
++	pushq %r14
++	iretq
++	idtentry_body_not_fast_\@:
++	idtentry_body \cfunc \has_error_code
++.endm
+ /**
+  * idtentry_body - Macro to emit code calling the C function
+  * @cfunc:		C function to be called
+@@ -358,7 +370,11 @@ SYM_CODE_START(\asmsym)
+ .Lfrom_usermode_no_gap_\@:
+ 	.endif
+ 
++.if \vector == X86_TRAP_PF
++	idtentry_body_pf \cfunc \has_error_code
++.else
+ 	idtentry_body \cfunc \has_error_code
++.endif
+ 
+ _ASM_NOKPROBE(\asmsym)
+ SYM_CODE_END(\asmsym)
