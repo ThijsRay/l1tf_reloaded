@@ -26,7 +26,7 @@
 #define CHEAT_NOISY 3
 #if !defined(LEAK)
         // Pick your data leaking method.
-        #define LEAK SKIP
+        #define LEAK L1TF
 #endif
 #if LEAK == L1TF
         #define LEAK_STR "L1TF"
