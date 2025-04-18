@@ -1133,6 +1133,8 @@ static char nibble_pick(hc_t hcs[16])
       hc = hcs[i];
     }
   }
+  if (hc == 1 && hcs[0] >= 10)
+    return 0;
   return nibble;
 }
 
