@@ -970,14 +970,22 @@ uintptr_t l1tf_find_page_pa(void *p)
 
 void pr_find_base_progress_bar(int run, hpa_t pa, uint64_t t0)
 {
+  static char bar[0x100] = {0};
+
+  static char new_bar[0x100] = {0};
   const int BAR_LEN = 80;
   double time = (clock_read()-t0)/1000000000.0;
   double speed = (double)(pa + run*HOST_MEMORY_SIZE) / time / (1UL << 30);
-  pr_dub(CLEAR_LINE "Attempt %d, speed %.1fGB/s, progress 0GB [", run+1, speed);
+  int off = snprintf(new_bar, sizeof(new_bar), CLEAR_LINE "Attempt %d, speed %.1fGB/s, progress 0GB [", run+1, speed);
   int pos = BAR_LEN * pa / HOST_MEMORY_SIZE;
   for (int i = 0; i < BAR_LEN; i++)
-    pr_dub("%c", i == pos ? '>' : (i < pos ? '=' : ' '));
-  pr_dub("] %ldGB", HOST_MEMORY_SIZE >> 30);
+    off += snprintf(new_bar+off, sizeof(new_bar)-off, "%c", i == pos ? '>' : (i < pos ? '=' : ' '));
+  off += snprintf(new_bar+off, sizeof(new_bar)-off, "] %lldGB", HOST_MEMORY_SIZE >> 30);
+
+  if (strcmp(bar, new_bar) != 0) {
+    strcpy(bar, new_bar);
+    pr_dub("%s", bar);
+  }
 }
 
 uintptr_t l1tf_find_base(void)
