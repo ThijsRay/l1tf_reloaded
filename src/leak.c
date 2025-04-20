@@ -228,7 +228,7 @@ retry_pte:
 	pte_t pte = leak_pte(base, pte_pa);
 	if (verbose >= 2) dumpp(pte);
 	if (prefmt) pr_dub(" pte %10lx", pte);
-	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x977) || ((pte & 0xfff) == 0x107)  || ((pte & 0xfff) == 0x177) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
+	if (!(((pte & 0xfff) == 0x063) || ((pte & 0xfff) == 0x907) || ((pte & 0xfff) == 0x977) || ((pte & 0xfff) == 0x975) || ((pte & 0xfff) == 0x107)  || ((pte & 0xfff) == 0x177) || ((pte & 0xfff) == 0x877) || ((pte & 0xfff) == 0xb77))) {
 		if (prefmt) pr_dub(CLEAR_LINE "%s --> pgd %10lx pud %10lx pmd %10lx", prefix, pgd, pud, pmd);
 		goto retry_pte;
 	}
