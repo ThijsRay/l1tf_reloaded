@@ -284,7 +284,7 @@ void try_l1tf_leak_core(char *data, uintptr_t base, const uintptr_t phys_addr, c
     data[i/2] = result;
   }
 
-  // // Sanity check using 2-byte granular leakage.
+  // // TODO: Sanity check using 2-byte granular leakage.
   // fprintf(stderr, "try_l1tf_leak sanity check | data = ");
   // display(data, length);
   // for (size_t i = 0; i+1 < length; i++) {
@@ -1193,7 +1193,6 @@ int confidently_cached(hpa_t pa, u64 len)
 
 void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t len)
 {
-  const int verbose = 0;
 #if LEAK == CHEAT || LEAK == CHEAT_NOISY
     u64 *buf = malloc(len + 8);
     for (u64 off = 0; off < len; off += 8)
@@ -1201,6 +1200,7 @@ void l1tf_leak_cheat_wrapper(char *data, uintptr_t base, uintptr_t pa, uintptr_t
     memcpy(data, buf, len);
     free(buf);
   #if LEAK == CHEAT_NOISY
+    const int verbose = 0;
     if (verbose) fprintf(stderr, "randomness for %lx +%lx: [", pa, len);
     for (u64 i = 0; i < len; i++) {
       u64 r = rdrand() % 1024;
