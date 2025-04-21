@@ -347,20 +347,21 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #if MACHINE == FATHER
 
-#define BASE		0x2e5046218UL
-#define HOST_DIRECT_MAP	0xffffa03300000000
-#define OWN_VCPU	0xffffa03509eea300
-#define OWN_TASK	0xffffa034016c0000
-#define HCR3		0x587fa6000UL
-#define OWN_KVM		0xffffb1b08d9f5000
-#define VICTIM_TASK	0xffff929245ad4100
-#define VICTIM_KVM	0xffffb1b08ef31000
-#define VICTIM_VCPU	0xffffa03509694600
-#define EPTP		0x19b9f2000UL
-#define GCR3		0x295b40000UL
-#define GTEXT		0xffffffffb3400000
-#define INIT_COMM	0x34f211e68UL
-#define NGINX		0xffff929245ad4100
+// #define BASE		0x1ff8c3218UL
+// #define HOST_DIRECT_MAP	0xffff94d200000000
+// #define OWN_VCPU	0xffff94d31dd24600
+// #define OWN_TASK	0xffff94d477bd8000
+// #define HCR3		0x221090000UL
+// #define OWN_KVM		0xffffb1b08d9f5000
+// #define VICTIM_TASK	0xffff94d43a1e2fc0
+// #define VICTIM_KVM	0xffffa6eb0f91d000
+// #define VICTIM_VCPU	0xffff94d4333f4600
+// #define EPTP		0x1f5520000UL
+// #define GCR3		0x841a8e000UL
+// #define GTEXT		0xffffffffb2000000
+// #define GDM		0xffff92b880000000
+// #define INIT_COMM	0x78b411bb0UL
+// #define NGINX		0xffff92b98abc4100
 
 #elif MACHINE == GCE
 
