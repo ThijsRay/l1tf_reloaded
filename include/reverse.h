@@ -403,16 +403,11 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define HCR3		0xa1278000UL
 // #define OWN_KVM	        0xffffab3801795000
 // --------[ rain-vm-aws-c5-extra ]----------
-// #define BASE		0x9e39e218UL
-// #define HOST_DIRECT_MAP	0xffff9868c0000000
-// #define OWN_VCPU	0xffff98695f2137c0
-// #define OWN_TASK	0xffff98695f1eb2a0
-// #define HCR3		0x9e154000UL
-// #define VICTIM_TASK	0xffff987b61afb2a0
-// #define VICTIM_VCPU	0xffff98695f2137c0 // 0xffff98695f20b7c0 // 0xffff98695f1f0000
-// #define EPTP		0x9f333000UL // 0x9f35f000UL
-// #define GCR3		0xa3668e000UL // ?
-// #define VICTIM_VCPU	0x
+// #define BASE		0x12b0fbf218UL
+// #define HOST_DIRECT_MAP	0xffff8bdf40000000
+// #define OWN_VCPU	0xffff8bdf5d47e580
+// #define OWN_TASK	0xffff8bf1f43f32a0
+// #define HCR3		0x12492da000UL
 // // --------[ rain-vm-aws-c5-extra-old ]----------
 // #define BASE		0x9b223218UL
 // #define HOST_DIRECT_MAP	0xffff93e3c0000000
