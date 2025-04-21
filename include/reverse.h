@@ -378,19 +378,12 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define GDM		0xffff919200000000
 // #define NGINX		0xffff91930087af40
 // #define NGINX_CR3	0x117e010000UL
-// #define SSLKEY_HPA      0x16ff0999fUL
-// ---------[ old (pre-reboot) rain-vm-gce ]---------
-// #define BASE		0x88d43f218UL
-// #define HOST_DIRECT_MAP	0xffff934040000000
-// #define OWN_VCPU	0xffff9352eff70e40 // 0xffff934153430e80
-// #define OWN_TASK	0xffff936a91dba000
-// #define HCR3		0x111cf6000UL
-// #define OWN_KVM		0xffff9584f2d71000
+// #define SSLKEY_HPA	0x16ff0999fUL
 // ---------[ rain-vm-gce-victim ]---------
-// #define BASE		0x257d33218UL
+// #define BASE		0x39fc58218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000
-// #define OWN_VCPU	0xffff934214b80f40 // 0xffff9341654b0f80
-// #define OWN_TASK	0xffff9341645e2040 // 0xffff93416f4041c0
+// #define OWN_VCPU	0xffff93479fb210c0
+// #define OWN_TASK	0xffff935f6acfe140
 // #define HCR3		0x13373c000UL
 // #define OWN_KVM		0xffff9584f96ad000
 // ---------[ rain-vm-gce-test ]---------
@@ -399,7 +392,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_VCPU	0xffff93a118800bc0
 // #define OWN_TASK	0xffff93a173d86140
 // #define HCR3		0x72ecfa2000UL
-// #define VICTIM_TASK     0xffff934fc41ca040 // victim's nanny ||| 0xffff935f6acfe140 // gce-victim's VCPU-0
+// #define VICTIM_TASK	0xffff934fc41ca040 // victim's nanny ||| 0xffff935f6acfe140 // gce-victim's VCPU-0
 
 #elif MACHINE == AWS
 
