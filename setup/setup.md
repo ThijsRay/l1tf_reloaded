@@ -32,7 +32,7 @@ similar to the victim VM, except for making its disk bigger: 50GB.
 
 Install standard packages, download the L1TF Reloaded repo, and install a custom kernel that speeds up L1TF on `gce-attacker`:
 ```
-sudo apt install -y git locales-all fakeroot git kernel-wedge quilt ccache flex bison libssl-dev dh-exec rsync libelf-dev bc libncurses-dev lz4 liblz4-dev tmux
+sudo apt install -y git locales-all fakeroot git kernel-wedge quilt ccache flex bison libssl-dev dh-exec rsync libelf-dev bc libncurses-dev lz4 liblz4-dev libgmp3-dev tmux
 git clone git@github.com:vusec/l1tf_reloaded.git
 git clone git@github.com:torvalds/linux.git --branch v6.13 --depth 1
 cd linux

