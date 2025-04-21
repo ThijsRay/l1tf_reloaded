@@ -1,5 +1,6 @@
 .PHONY: run_exploit
 run_exploit:
+	make clean
 	make exploit
 	./build/exploit 2>>std.err | tee -a std.out
 
