@@ -358,6 +358,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define VICTIM_VCPU	0xffff94d4333f4600
 // #define EPTP		0x1f5520000UL
 // #define GCR3		0x841a8e000UL
+// #define GCR3_LE      0x17aa43067UL
 // #define GTEXT		0xffffffffb2000000
 // #define GDM		0xffff92b880000000
 // #define INIT_COMM	0x78b411bb0UL
