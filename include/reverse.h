@@ -365,7 +365,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #elif MACHINE == GCE
 
 // ---------[ rain-vm-gce ]---------
-#define BASE		0x11f73d218UL
+// #define BASE		0x11f73d218UL
 // #define HOST_DIRECT_MAP	0xffff934040000000
 // #define OWN_VCPU	0xffff934153430e80
 // #define OWN_KVM         0xffff9584f57c7000
@@ -400,7 +400,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_VCPU	0xffff93a118800bc0
 // #define OWN_TASK	0xffff93a173d86140
 // #define HCR3		0x72ecfa2000UL
-// #define VICTIM_TASK     0xffff935f6acfe140 // gce-victim's VCPU-0
+// #define VICTIM_TASK     0xffff934fc41ca040 // victim's nanny ||| 0xffff935f6acfe140 // gce-victim's VCPU-0
 
 #elif MACHINE == AWS
 
