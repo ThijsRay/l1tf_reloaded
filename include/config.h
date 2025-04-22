@@ -15,6 +15,13 @@
         #define MACHINE_STR "AWS"
 #endif
 
+#define DEBIAN 0
+#define UBUNTU 1
+#ifndef GCE_VICTIM
+        // Is the victim VM running the Ubuntu or the Debian kernel?
+        #define GCE_VICTIM DEBIAN
+#endif
+
 #if !defined(HELPERS)
         // Are there helper-hypercalls installed on the host?
         #define HELPERS 0
