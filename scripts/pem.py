@@ -2,12 +2,13 @@
 import sys
 from Cryptodome.PublicKey import RSA
 import subprocess
+import math
 
 p = int(sys.argv[1], 16)
 q = int(sys.argv[2], 16)
 N = p * q
 e = 65537
-d = pow(e, -1, (p-1)*(q-1))
+d = pow(e, -1, math.lcm(p-1, q-1))
 key = RSA.construct((N,e,d,p,q))
 pem = key.export_key('PEM')
 
