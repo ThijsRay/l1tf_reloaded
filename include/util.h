@@ -65,3 +65,5 @@ void dump_page_table_mappings(hpa_t base, hva_t hdm, hpa_t root_page_table, hpa_
 int nr_letters_equal(const char *str1, const char *str2);
 int nr_letters_equal_len(const char *str1, const char *str2, int len);
 int hamming_dist(u64 a, u64 b);
+pa_t pagemap_phys_addr(va_t va);
+void *mmap_random_data_page(void);

@@ -242,3 +242,30 @@ int hamming_dist(u64 a, u64 b)
     } while (x);
     return dist;
 }
+
+pa_t pagemap_phys_addr(va_t va) {
+	int pagemap = open("/proc/self/pagemap", O_RDONLY);
+	if (pagemap < 0)
+		err(EXIT_FAILURE, "phys_addr: can not open /proc/self/pagemap, are you root?");
+
+	uint64_t value;
+	int got = pread(pagemap, &value, sizeof(uint64_t), (va/0x1000) * sizeof(uint64_t));
+	if (got != sizeof(uint64_t))
+		err(EXIT_FAILURE, "phys_addr: problem reading /proc/self/pagemap, are you root?");
+	close(pagemap);
+
+	uint64_t page_frame_number = value & ((1ULL << 54) - 1);
+	if (!page_frame_number)
+		err(EXIT_FAILURE, "phys_addr: errornous page frame number, are you root?");
+
+	return page_frame_number*0x1000 + va%0x1000;
+}
+
+void *mmap_random_data_page(void)
+{
+	void *p = mmap(NULL, 0x1000, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE|MAP_POPULATE, -1, 0);
+	assert(p != MAP_FAILED);
+    for (int i = 0; i < 0x1000/8; i++)
+        ((u64 *)p)[i] = rdrand();
+    return p;
+}

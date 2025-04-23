@@ -1,8 +1,9 @@
 .PHONY: run_exploit
 run_exploit:
+	sudo echo "let's clean, build, and run the exploit!"
 	make clean
 	make exploit
-	./build/exploit 2>>std.err | tee -a std.out
+	sudo ./build/exploit 2>>std.err | tee -a std.out
 
 all: build
 	$(MAKE) kvm_leak
