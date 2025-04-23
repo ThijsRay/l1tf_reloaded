@@ -42,13 +42,13 @@ similar to the victim VM, except for making its disk bigger: 50GB.
 Install standard packages, download the L1TF Reloaded repo, and install a custom kernel that speeds up L1TF on `gce-attacker`:
 ```
 sudo apt install -y locales-all fakeroot git kernel-wedge quilt ccache flex bison libssl-dev dh-exec rsync libelf-dev bc libncurses-dev lz4 liblz4-dev tmux cmake libgmp3-dev python3-pycryptodome
-git clone git@github.com:vusec/l1tf_reloaded.git
+git clone git@github.com:ThijsRay/l1tf_reloaded.git # TODO clean vusec repo
 git clone git@github.com:torvalds/linux.git --branch v6.13 --depth 1
 cd linux
 git apply ../l1tf_reloaded/setup/l1tf-pf.patch
 cp ../l1tf_reloaded/setup/kconfig .config
 make -j2 bindeb-pkg
-printf "\nGRUB_DISABLE_SUBMENU=y\n" | sudo tee /etc/default/grub
+printf "\nGRUB_DISABLE_SUBMENU=y\n" | sudo tee -a /etc/default/grub
 sudo dpkg -i ../linux-*.deb
 ```
 
@@ -56,6 +56,9 @@ Building the kernel takes almost 2 hours, so you might want to run it in the bac
 
 Reboot the VM into the just installed `l1tf-pf` kernel (`sudo reboot`).
 After reboot, ensure `uname -r` gives back `6.13.0-l1tf-pf+`.
+
+If you want to run the exploit at scale, now would be a good moment to take a snapshot of the attacker VM,
+such that you can spawn more instances of it, without the need for the two-hour long process above.
 
 ## The Exploit
 
