@@ -343,7 +343,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 	uintptr_t kvm_vcpu = hc_read_va(kvm_lapic[0]+0x90); // kvm_lapic's vcpu
 	dump(kvm_vcpu);
-	for (int off = 0; off < 0x90; off += 8) {
+	for (int off = 0; off < 0xc0; off += 8) {
 		fprintf(stderr, "kvm_vcpu+%3x = %16lx\n", off, hc_read_va(kvm_vcpu+off));
 	}
 	fprintf(stderr, "\n");
@@ -453,6 +453,8 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 	vva = 0xffffa03509ee8000; fprintf(stderr, "@ %16lx --> %16lx\n", vva, hc_read_va(vva));
 	vva = 0xffffa037d0a9c600; fprintf(stderr, "@ %16lx --> %16lx\n", vva, hc_read_va(vva));
 
+
+	exit(1);
 
 	uintptr_t mm_struct = hc_read_va(task_struct+0x950);
 	dump(mm_struct);
