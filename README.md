@@ -8,7 +8,7 @@ By combining them, commonly deployed software-based mitigations against L1TF, su
 We've demonstrated our attack on real-world KVM-based cloud solutions.
 Both Google Cloud and AWS wrote a blog post in response to this attack, where they describe how they mitigate against L1TF Reloaded and how they harden their systems against unknown transient execution attacks.
 
-- Google Cloud: Will come soon
+- Google ["Project Rain:L1TF"](https://bughunters.google.com/blog/4684191115575296/project-Rain-L1tf) 
 - AWS: ["Amazon EC2 defenses against L1TF Reloaded"](https://aws.amazon.com/blogs/security/ec2-defenses-against-l1tf-reloaded/)
 
 More details can be found in our IEEE S&P 2026 paper ["Rain: Transiently Leaking Data from Public Clouds Using Old Vulnerabilities"](https://openreview.net/pdf?id=4tDNvQe2G0) and on our [project page](https://www.vusec.net/projects/rain/).
