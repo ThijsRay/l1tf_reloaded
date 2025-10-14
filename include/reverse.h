@@ -21,7 +21,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
  #define TASK_COMM_LEN 0x10
 
- #if MACHINE == FATHER
+ #if MACHINE == LINUX_6_12
 
 #define G_INIT_NAME		"swapper/"
 #define G_TEXT_INIT_TASK	0x1c112c0	// struct task_struct init_task
@@ -133,7 +133,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  ************************  Victim Host Kernel Layout  *************************
  ******************************************************************************/
 
-#if MACHINE == FATHER
+#if MACHINE == LINUX_6_12
 
 #define OWN_TASK_NAME		"qemu-system-x86"
 #define VM_COMM                 "qemu-system-x86"
@@ -375,7 +375,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 
 #if LEAK == SKIP || HELPERS
 
-#if MACHINE == FATHER
+#if MACHINE == LINUX_6_12
 
 // #define BASE		0x1ff8c3218UL
 // #define HOST_DIRECT_MAP	0xffff94d200000000

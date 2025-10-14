@@ -796,7 +796,7 @@ void get_feeling_for_kernel_kvm_data_structures(void)
 
 	fprintf(stderr, ">>> Traverse parents and children of task_structs:\n");
 
-#if MACHINE == FATHER
+#if MACHINE == LINUX_6_12
 	hva_t swapp = 0xffffffff98e0ff00;
 	get_feeling_dump_task(swapp);
 	hva_t systemd = hc_read_va(swapp+H_TASK_TASKS) - H_TASK_TASKS;

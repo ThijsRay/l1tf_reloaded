@@ -1,14 +1,14 @@
 #pragma once
 
-#define FATHER 0
+#define LINUX_6_12 0
 #define GCE 1
 #define AWS 2
 #if !defined(MACHINE)
         // Pick the physical machine you are attacking.
         #define MACHINE GCE
 #endif
-#if MACHINE == FATHER
-        #define MACHINE_STR "FATHER"
+#if MACHINE == LINUX_6_12
+        #define MACHINE_STR "LINUX_6_12"
 #elif MACHINE == GCE
         #define MACHINE_STR "GCE"
 #elif MACHINE == AWS
