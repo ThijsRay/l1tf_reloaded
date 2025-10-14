@@ -5,10 +5,10 @@
 #define AWS 2
 #if !defined(MACHINE)
         // Pick the physical machine you are attacking.
-        #define MACHINE GCE
+        #define MACHINE LINUX_6_12
 #endif
 #if MACHINE == LINUX_6_12
-        #define MACHINE_STR "LINUX_6_12"
+        #define MACHINE_STR "Mainline Linux-6.12.0"
 #elif MACHINE == GCE
         #define MACHINE_STR "GCE"
 #elif MACHINE == AWS
