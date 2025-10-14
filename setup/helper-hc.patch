@@ -1,0 +1,209 @@
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 93636f77c42d..a0cf6357b67b 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -10105,6 +10105,11 @@ int ____kvm_emulate_hypercall(struct kvm_vcpu *vcpu, int cpl,
+ 		a3 &= 0xFFFFFFFF;
+ 	}
+ 
++	if (nr == KVM_HC_CUSTOM) {
++		ret = kvm_hc_custom(vcpu, a0, a1, a2, a3, op_64_bit, cpl);
++		goto out;
++	}
++
+ 	if (cpl) {
+ 		ret = -KVM_EPERM;
+ 		goto out;
+diff --git a/include/linux/kvm_para.h b/include/linux/kvm_para.h
+index f23b90b02898..91e4e3206c59 100644
+--- a/include/linux/kvm_para.h
++++ b/include/linux/kvm_para.h
+@@ -14,4 +14,8 @@ static inline bool kvm_para_has_hint(unsigned int feature)
+ {
+ 	return !!(kvm_arch_para_hints() & (1UL << feature));
+ }
++
++struct kvm_vcpu;
++unsigned long kvm_hc_custom(struct kvm_vcpu *vcpu, unsigned long a0, unsigned long a1,
++				unsigned long a2, unsigned long a3, int op_64_bit, int cpl);
+ #endif /* __LINUX_KVM_PARA_H */
+diff --git a/include/uapi/linux/kvm_para.h b/include/uapi/linux/kvm_para.h
+index 960c7e93d1a9..1817d201d353 100644
+--- a/include/uapi/linux/kvm_para.h
++++ b/include/uapi/linux/kvm_para.h
+@@ -30,7 +30,18 @@
+ #define KVM_HC_SEND_IPI		10
+ #define KVM_HC_SCHED_YIELD		11
+ #define KVM_HC_MAP_GPA_RANGE		12
+-
++#define KVM_HC_CUSTOM			97
++#define KVM_HC_CUSTOM_DUMMY		100
++#define KVM_HC_CUSTOM_FIND_MAGIC	101
++#define KVM_HC_CUSTOM_SINGLE_TASK	102
++#define KVM_HC_CUSTOM_READ_PA		103
++#define KVM_HC_CUSTOM_PHYS_MAP_BASE	104
++#define KVM_HC_CUSTOM_DIRECT_MAP	105
++#define KVM_HC_CUSTOM_READ_VA	 	106
++#define KVM_HC_CUSTOM_TRANSLATE_HVA 	107
++#define KVM_HC_CUSTOM_NR_EXITS		108
++#define KVM_HC_CUSTOM_NR_L1D_FLUSHES 	109
++#define KVM_HC_CUSTOM_TRANSLATE_GPA	110
+ /*
+  * hypercalls use architecture specific
+  */
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 222f0e894a0c..9cabda652083 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -6539,3 +6539,151 @@ void kvm_exit(void)
+ 	kvm_irqfd_exit();
+ }
+ EXPORT_SYMBOL_GPL(kvm_exit);
++
++#include <linux/uaccess.h>
++extern long unsigned int page_offset_base;
++#define MAX_PHYS_MEM (32 * 1024ULL*1024*1024)
++
++static uintptr_t find_magic(uint64_t magic)
++{
++	for (uintptr_t pa = 0; pa < MAX_PHYS_MEM; pa += PAGE_SIZE) {
++		uint64_t value = -1;
++		if (get_kernel_nofault(value, (uint64_t *)(page_offset_base+pa)))
++			continue;
++		if (value == magic) {
++			return pa;
++		}
++	}
++	return -1;
++}
++
++static u64 read_pa(uintptr_t pa)
++{
++	uint64_t value = -1;
++	get_kernel_nofault(value, (uint64_t *)(page_offset_base+pa));
++	return value;
++}
++
++static uintptr_t phys_map_base(struct kvm_vcpu *vcpu)
++{
++	struct kvm_apic_map *map;
++	uintptr_t phys_map_base = -1;
++	rcu_read_lock();
++	map = rcu_dereference(vcpu->kvm->arch.apic_map);
++	if (likely(map))
++		phys_map_base = (uintptr_t)&map->phys_map[0];
++	rcu_read_unlock();
++	return phys_map_base;
++}
++
++static u64 read_hva(uintptr_t hva)
++{
++	uint64_t value = -1;
++	get_kernel_nofault(value, (uint64_t *)hva);
++	return value;
++}
++
++/* @pdg: must point to the root page table to translate from
++ */
++static int page_table_walk(uintptr_t addr, pgd_t **pgd, p4d_t **p4d, pud_t **pud, pmd_t **pmd, pte_t **pte)
++{
++	*p4d = NULL;
++	*pud = NULL;
++	*pmd = NULL;
++	*pte = NULL;
++
++	*pgd = pgd_offset_pgd(*pgd, addr);
++	if (pgd_none(**pgd) || pgd_bad(**pgd))
++		return -1;
++	//pr_info("pgd = %lx\n", pgd_val(**pgd));
++
++	*p4d = p4d_offset(*pgd, addr);
++	if (p4d_none(**p4d) || p4d_bad(**p4d))
++		return -1;
++	//pr_info(" p4d = %lx\n", p4d_val(**p4d));
++
++	*pud = pud_offset(*p4d, addr);
++	if (pud_trans_huge(**pud)) {
++		pr_info("  pud = %lx (superpage)\n", pud_val(**pud));
++		return 0;
++	}
++	if (pud_none(**pud) || pud_bad(**pud))
++		return -1;
++	//pr_info("  pud = %lx\n", pud_val(**pud));
++
++	*pmd = pmd_offset(*pud, addr);
++	//if (pmd_none(**pmd) || pmd_bad(**pmd))
++	//	return -1;
++	if (pmd_trans_huge(**pmd)) {
++		// pr_info("   pmd = %lx (hugepage)\n", pmd_val(**pmd));
++		return 0;
++	}
++	//pr_info("   pmd = %lx\n", pmd_val(**pmd));
++
++	*pte = pte_offset_kernel(*pmd, addr);
++	if (pte_none(**pte))
++		return -1;
++	//pr_info("    pte = %lx\n", pte_val(**pte));
++	return 0;
++}
++
++static u64 translate(uintptr_t addr, pgd_t *pgd)
++{
++	#define HUGEPAGE_SIZE (1ULL << 21)
++	#define SUPERPAGE_SIZE (1ULL << 30)
++
++	p4d_t *p4d; pud_t *pud; pmd_t *pmd; pte_t *pte;
++
++	if (page_table_walk(addr, &pgd, &p4d, &pud, &pmd, &pte) < 0)
++		return -1;
++
++	if (pte)
++		return pte_pfn(*pte)*PAGE_SIZE + addr % PAGE_SIZE;
++	if (pmd)
++		return pmd_pfn(*pmd)*PAGE_SIZE + addr % HUGEPAGE_SIZE;
++	if (pud)
++		return pud_pfn(*pud)*PAGE_SIZE + addr % SUPERPAGE_SIZE;
++
++	return -1;
++}
++
++static u64 translate_hva(uintptr_t hva)
++{
++	return translate(hva, current->mm->pgd);
++}
++
++static u64 translate_gpa(struct kvm_vcpu *vcpu, u64 gpa)
++{
++	pgd_t *ept_root = (pgd_t *)(page_offset_base + vcpu->arch.root_mmu.root.hpa);
++	return translate(gpa, ept_root);
++}
++
++unsigned long kvm_hc_custom(struct kvm_vcpu *vcpu, unsigned long a0, unsigned long a1,
++				unsigned long a2, unsigned long a3, int op_64_bit, int cpl)
++{
++	switch (a0) {
++		case KVM_HC_CUSTOM_DUMMY:
++			return 0x97;
++		case KVM_HC_CUSTOM_FIND_MAGIC:
++			return find_magic(a1);
++		case KVM_HC_CUSTOM_SINGLE_TASK:
++			return single_task_running();
++		case KVM_HC_CUSTOM_READ_PA:
++			return read_pa(a1);
++		case KVM_HC_CUSTOM_PHYS_MAP_BASE:
++			return phys_map_base(vcpu);
++		case KVM_HC_CUSTOM_DIRECT_MAP:
++			return page_offset_base;
++		case KVM_HC_CUSTOM_READ_VA:
++			return read_hva(a1);
++		case KVM_HC_CUSTOM_TRANSLATE_HVA:
++			return translate_hva(a1);
++		case KVM_HC_CUSTOM_NR_EXITS:
++			return vcpu->stat.exits;
++		case KVM_HC_CUSTOM_NR_L1D_FLUSHES:
++			return vcpu->stat.l1d_flush;
++		case KVM_HC_CUSTOM_TRANSLATE_GPA:
++			return translate_gpa(vcpu, a1);
++	}
++	return -1;
++}
