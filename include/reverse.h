@@ -24,7 +24,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
  #if MACHINE == LINUX_6_12
 
 #define G_INIT_NAME		"swapper/"
-#define G_TEXT_INIT_TASK	0x1c112c0	// struct task_struct init_task
+#define G_TEXT_INIT_TASK	0x200ff00	// struct task_struct init_task
 
 // struct task_struct {
 #define G_TASK_TASKS		0x8f0	// struct list_head tasks
@@ -33,8 +33,8 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_TASK_PARENT		0x9d0	// struct task_struct *real_parent
 #define G_TASK_CHILDREN		0x9e0	// struct list_head children
 #define G_TASK_SIBLING		0x9f0	// struct list_head sibling
-#define G_TASK_PID_LINKS	0x9f8	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
-#define G_TASK_COMM		0xba8	// char comm[TASK_COMM_LEN]
+#define G_TASK_PID_LINKS	0xa30	// struct hlist_node pid_links[PIDTYPE_MAX] <-- PID_TASKS
+#define G_TASK_COMM		0xbe0	// char comm[TASK_COMM_LEN]
 // };
 
 // struct mm_struct {
@@ -42,7 +42,7 @@ typedef unsigned long pte_t; // page table entry - pfn is host physical
 #define G_MM_HEAP		0x158	// unsigned long start_brk
 // };
 
-#define NGINX_SSLKEY		0x8c2cf
+#define NGINX_SSLKEY		0xccd1f
 #define SSLKEY_LEN		(4 + 128 + 4 + 128) // magic + prime1 + magic + prime2
 #define SSLKEY_MAGIC		0x00818102
 
