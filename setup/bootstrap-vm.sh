@@ -79,7 +79,7 @@ fi
 
 # Create a minimal Debian distribution in a directory.
 DIR="chroot-$NAME"
-PKGS=openssh-server,curl,tar,gcc,libc6-dev,time,strace,sudo,less,psmisc,selinux-utils,policycoreutils,checkpolicy,selinux-policy-default,firmware-atheros,debian-ports-archive-keyring,make,tmux,git,cmake,libgmp3-dev,python3-pycryptodome,wget
+PKGS=openssh-server,curl,tar,gcc,libc6-dev,time,strace,sudo,less,psmisc,selinux-utils,policycoreutils,checkpolicy,selinux-policy-default,firmware-atheros,debian-ports-archive-keyring,make,tmux,git,cmake,libgmp3-dev,python3-pycryptodome,wget,build-essential
 
 
 # Handle cases where qemu and Debian use different arch names

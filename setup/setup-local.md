@@ -67,7 +67,7 @@ Victim VM
 
 Let's create the victim VM. As its kernel we take the same, 6.12 kernel we build
 for the host. We make the disk 32 GB and put a default (latest stable) Debian
-installation on it.
+installation on it (which was "Trixie" at time of writing).
 ```
 mkdir ~/victim; cd ~/victim
 ~/rain/setup/bootstrap-vm.sh --name victim --size 32 --kernel ~/host/linux
