@@ -151,9 +151,9 @@ Note: if you want a sanity check first, and you have installed helper hypercalls
 in the host kernel, then you can also first put `HELPERS` to 1 and `LEAK` to
 `CHEAT`.
 In `include/constants.h`, ensure this line defines the correct amount of host
-physical memory on you system (check with `free -h` on the host).
+physical memory on your system (check with `free -h` on the host).
 ```
-#define HOST_MEMORY_SIZE (64 * 1024ULL*1024*1024)
+#define HOST_MEMORY_SIZE (192 * 1024ULL*1024*1024)
 ```
 
 Build the exploit:
@@ -166,10 +166,53 @@ Run the exploit:
 make
 ```
 
-This can take many hours, hence we recommend running this inside a tmux session or similar.
+This can take hours, hence we recommend running this inside a tmux session or similar.
 Output of `stdout` will go to the screen as well as the file `std.out`, and extra
 verbose `stderr` output is saved in the file `std.err`.
 
 If all goes well, you expect to see something similar to our demo, resulting in a leaked private key.
 To check its correctness, compare it against the true key of the victim's Nginx webserver,
 located at `victim:/etc/ssl/private/nginx-selfsigned.key`.
+
+Troubleshooting
+===============
+
+### The exploit gets stuck at the very first step: leaking the gadget base
+
+Ensure the attacker VM is running its two vCPUs on two sibling hyperthreads of
+the same physical core.
+
+Also check whether `H_MAP_PHYS_MAP` is correct, see below how.
+
+### The exploit gets stuck at some later point
+
+Check the `std.out` and `std.err` files to see where the exploit got stuck.
+
+One reason might be: the host swapped out the victim VM's memory, and therefore
+it's unable to leak it. This is the case if the exploit gets stuck during a
+two-dimensional page table walk, at the EPT stage: you'll for example see an
+EPT-PTE (lowest level page table entry) being zero.
+The fix for this is to force the page back into memory, by letting the victim
+VM touch it. For example, try to access the webserver
+```
+wget -O /dev/stdout --no-check-certificate https://localhost:443
+```
+from within the victim, to let it access its data (and let the host page it in).
+
+Another reason might be that the offsets in `include/reverse.h` are incorrect.
+This should not happen if you followed the setup instruction above very carefully,
+but if something might break in the future: ensure that all those constants are
+correct. Probably look in particular at the constant(s) being used during/just
+before the exploit gets stuck, and verify that they match reality. For example,
+to check the correct value of `G_TASK_PARENT`, go to `~/host/linux` on the host
+and attach GDB to the kernel image (including debug symbols):
+```
+gdb vmlinux
+```
+Print the offset of the `parent` member within a `task_struct`:
+```
+p &(((struct task_struct *)0)->parent)
+```
+This is what `G_TASK_PARENT` should be equal to. Repeat for other problematic
+structs. Note: in general offsets in the host and victim guest kernel may differ,
+therefore the exploit defines both `H_*` (host) and `G_*` (victim guest) offsets.
