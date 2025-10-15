@@ -1,10 +1,15 @@
 ```
-WARNING: The instruction below let you launch a cyber attack on the real-world cloud infrastructure of Google.
+WARNING 1: The instruction below let you launch a cyber attack on the real-world cloud infrastructure of Google.
 BEFORE YOU PROCEED: Ensure you are part of, or in agreement with, the Google security team handling this vulnerability.
 Contact:
 - m.c.hertogh at vu dot nl (VU Amsterdam, exploit author)
 - aesa at google dot com (google security)
 - evn at google dot com (google security)
+```
+
+```
+WARNING 2: By now, Google has deployed mitigations against this exploit.
+Hence, the attack as described below will not actually work anymore.
 ```
 
 # Setting up the VMs
